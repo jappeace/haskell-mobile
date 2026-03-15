@@ -51,7 +51,6 @@ common common-options
     -fdefer-diagnostics -Wunused-packages
     -fenable-th-splice-warnings
     -fno-omit-yields
-    -threaded -rtsopts "-with-rtsopts=-N -M7G -T -Iw10"
 
   build-depends:
       base >=4.9.1.0 && <4.22.0
@@ -74,13 +73,13 @@ executable exe
       app
   build-depends:
       haskell-mobile
-  ghc-options: -Wno-unused-packages
+  ghc-options: -Wno-unused-packages -threaded -rtsopts "-with-rtsopts=-N -M7G -T -Iw10"
 
 test-suite unit
   import: common-options
   type: exitcode-stdio-1.0
   main-is: Test.hs
-  ghc-options: -Wno-unused-packages
+  ghc-options: -Wno-unused-packages -threaded -rtsopts "-with-rtsopts=-N -M7G -T -Iw10"
   other-modules:
       Paths_haskell_mobile
   hs-source-dirs:

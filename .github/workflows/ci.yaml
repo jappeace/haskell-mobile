@@ -36,6 +36,33 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
 
+  android:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Local cache
+      uses: actions/cache@v4
+      with:
+        path: /nix/store
+        key: "${{ runner.os }}-nix-android-cache"
+    - uses: cachix/install-nix-action@v31
+      with:
+        extra_nix_config: |
+          access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+          extra-substituters = https://cache.iog.io
+          extra-trusted-public-keys = hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
+    - uses: cachix/cachix-action@v15
+      with:
+        name: jappie
+        signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
+    - run: nix-build nix/android.nix -A lib
+    - name: Cancel workflow on failure
+      if: failure()
+      continue-on-error: true
+      run: gh run cancel ${{ github.run_id }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+
   cabal:
     runs-on: ${{ matrix.os }}
 
