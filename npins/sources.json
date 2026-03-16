@@ -13,6 +13,19 @@
       "url": "https://github.com/input-output-hk/haskell.nix/archive/d0c35e75cbbc6858770af42ac32b0b85495fbd71.tar.gz",
       "hash": "sha256-rUIr6JNbCedt1g4gVYVvE9t0oFU6FUspCA0DS5cA8Bg="
     },
+    "haskell.nix-master": {
+      "type": "Git",
+      "repository": {
+        "type": "GitHub",
+        "owner": "input-output-hk",
+        "repo": "haskell.nix"
+      },
+      "branch": "master",
+      "submodules": false,
+      "revision": "78278f5063d26702b62e46ebaede1a2fbf5f72c7",
+      "url": "https://github.com/input-output-hk/haskell.nix/archive/78278f5063d26702b62e46ebaede1a2fbf5f72c7.tar.gz",
+      "hash": "sha256-HX0C4r222GUugjb6pK2CgLSziD/VnkWykdraU4m/wY4="
+    },
     "mobile-core-tools": {
       "type": "Git",
       "repository": {

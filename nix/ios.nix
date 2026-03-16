@@ -4,10 +4,11 @@
 # This is a macOS-only build (same ISA as iOS aarch64).
 { sources ? import ../npins }:
 let
-  haskellNix = import sources."haskell.nix" {};
+  # Use haskell.nix master branch (not armv7a which is Android-specific
+  # and has macOS build issues with GHC 8.10.7 patching)
+  haskellNix = import sources."haskell.nix-master" {};
 
-  # Use nixpkgs-2305 for consistency with the Android build
-  pkgs = import haskellNix.sources.nixpkgs-2305 (haskellNix.nixpkgsArgs // {});
+  pkgs = import haskellNix.sources.nixpkgs-unstable (haskellNix.nixpkgsArgs // {});
 
   project = import ./project.nix { inherit pkgs; };
 
