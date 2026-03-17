@@ -55,7 +55,9 @@ jobs:
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
     - run: nix-build nix/android.nix
     - run: nix-build nix/apk.nix -o result-apk
+      if: github.ref == 'refs/heads/master'
     - name: Upload Android APK
+      if: github.ref == 'refs/heads/master'
       uses: actions/upload-artifact@v4
       with:
         name: haskell-mobile-android
@@ -86,6 +88,7 @@ jobs:
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
     - run: nix-build nix/ios.nix
     - name: Upload iOS library
+      if: github.ref == 'refs/heads/master'
       uses: actions/upload-artifact@v4
       with:
         name: haskell-mobile-ios
