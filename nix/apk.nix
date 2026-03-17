@@ -5,7 +5,7 @@ let
     config.android_sdk.accept_license = true;
   };
 
-  sharedLib = import ./shared-lib.nix { inherit sources; };
+  sharedLib = import ./android.nix { inherit sources; };
 
   androidComposition = pkgs.androidenv.composeAndroidPackages {
     buildToolsVersions = [ "34.0.0" ];

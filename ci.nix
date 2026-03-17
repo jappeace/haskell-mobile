@@ -3,7 +3,7 @@ let
           || builtins.currentSystem == "x86_64-darwin";
 in {
   native = import ./default.nix {};
-  android = (import ./nix/android.nix {}).lib;
+  android = import ./nix/android.nix {};
   apk = import ./nix/apk.nix {};
 } // (if isDarwin then {
   ios = import ./nix/ios.nix {};

@@ -1,18 +1,5 @@
 {
   "pins": {
-    "haskell.nix": {
-      "type": "Git",
-      "repository": {
-        "type": "GitHub",
-        "owner": "input-output-hk",
-        "repo": "haskell.nix"
-      },
-      "branch": "armv7a",
-      "submodules": false,
-      "revision": "d0c35e75cbbc6858770af42ac32b0b85495fbd71",
-      "url": "https://github.com/input-output-hk/haskell.nix/archive/d0c35e75cbbc6858770af42ac32b0b85495fbd71.tar.gz",
-      "hash": "sha256-rUIr6JNbCedt1g4gVYVvE9t0oFU6FUspCA0DS5cA8Bg="
-    },
     "mobile-core-tools": {
       "type": "Git",
       "repository": {

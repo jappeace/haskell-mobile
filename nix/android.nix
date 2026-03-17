@@ -1,56 +1,73 @@
+# Android shared library build pipeline.
+# Builds Haskell to a shared .so for aarch64-android using nixpkgs
+# cross-compilation (pkgsCross.aarch64-android-prebuilt) instead of
+# haskell.nix, which builds GHC from source without cache hits.
+#
+# Uses Google's prebuilt NDK toolchain via nixpkgs, avoiding the
+# LLVM 19 compiler-rt issue (NixOS/nixpkgs#380604).
 { sources ? import ../npins }:
 let
-  # Import haskell.nix from the armv7a branch (provides Android cross-compiler)
-  haskellNix = import sources."haskell.nix" {};
-
-  # Use nixpkgs-2305 which has LLVM 14. nixpkgs-unstable has LLVM 19 whose
-  # compiler-rt is broken for Android (os_version_check.c needs pthread.h
-  # which is unavailable in the builtins-only sysroot).
-  # See: https://github.com/NixOS/nixpkgs/issues/380604
-
-  # Android API 26 (Android 8.0 Oreo) overlay — re-imports nixpkgs with
-  # modified crossSystem, same approach as simplex-chat.
-  android26 = final: prev: {
-    pkgsCross = prev.pkgsCross // {
-      aarch64-android = import prev.path {
-        crossSystem = prev.lib.systems.examples.aarch64-android // {
-          sdkVer = "26";
-        };
-        localSystem = prev.buildPlatform;
-        inherit (prev) config overlays;
-      };
-    };
+  pkgs = import sources.nixpkgs {
+    config.allowUnfree = true;
+    config.android_sdk.accept_license = true;
   };
 
-  pkgs = import haskellNix.sources.nixpkgs-2305 (haskellNix.nixpkgsArgs // {
-    overlays = haskellNix.nixpkgsArgs.overlays ++ [ android26 ];
-  });
+  # Cross-compilation packages for Android using prebuilt NDK toolchain
+  androidPkgs = pkgs.pkgsCross.aarch64-android-prebuilt;
 
-  androidPkgs = pkgs.pkgsCross.aarch64-android;
+  # Cross-GHC: runs on x86_64-linux, produces aarch64-android code
+  ghc = androidPkgs.haskellPackages.ghc;
+  ghcCmd = "${ghc}/bin/${ghc.targetPrefix}ghc";
 
-  # Android doesn't have LANGINFO_CODESET, but nixpkgs autoconf detects it.
-  # Patch libiconv to undefine it and enable static linking.
-  androidIconv = (androidPkgs.libiconv.override {
-    enableStatic = true;
-  }).overrideAttrs (old: {
-    postConfigure = ''
-      echo "#undef HAVE_LANGINFO_CODESET" >> libcharset/config.h
-      echo "#undef HAVE_LANGINFO_CODESET" >> lib/config.h
-    '';
-  });
+  # NDK toolchain for compiling the JNI bridge C code
+  androidComposition = pkgs.androidenv.composeAndroidPackages {
+    includeNDK = true;
+  };
+  ndk = "${androidComposition.ndk-bundle}/libexec/android-sdk/ndk/${androidComposition.ndk-bundle.version}";
+  ndkCc = "${ndk}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang";
+  sysroot = "${ndk}/toolchains/llvm/prebuilt/linux-x86_64/sysroot";
 
-  # Disable fortify hardening (incompatible with Android NDK) and enable static.
-  androidFFI = androidPkgs.libffi.overrideAttrs (old: {
-    dontDisableStatic = true;
-    hardeningDisable = [ "fortify" ];
-  });
+in pkgs.stdenv.mkDerivation {
+  pname = "haskell-mobile-android";
+  version = "0.1.0.0";
 
-  project = import ./project.nix { inherit pkgs; };
+  src = ../src;
 
-in {
-  inherit pkgs androidPkgs androidIconv androidFFI;
-  lib = project.projectCross.aarch64-android.hsPkgs.haskell-mobile.components.library;
-  crossLib = project.projectCross.aarch64-android.hsPkgs.haskell-mobile.components.library;
-  # Expose all cross-compiled haskell packages for linking
-  hsPkgs = project.projectCross.aarch64-android.hsPkgs;
+  nativeBuildInputs = [ ghc ];
+  buildInputs = [ androidPkgs.libffi androidPkgs.gmp ];
+
+  buildPhase = ''
+    # Discover RTS include path for HsFFI.h
+    GHC_LIBDIR=$(${ghcCmd} --print-libdir)
+    RTS_INCLUDE=$(dirname $(find $GHC_LIBDIR -name "HsFFI.h" | head -1))
+
+    echo "GHC: ${ghcCmd}"
+    echo "GHC libdir: $GHC_LIBDIR"
+    echo "RTS include: $RTS_INCLUDE"
+
+    # Step 1: Compile JNI bridge with NDK clang
+    ${ndkCc} -c -fPIC \
+      -I${sysroot}/usr/include \
+      -I$RTS_INCLUDE \
+      -o jni_bridge.o \
+      ${../cbits/jni_bridge.c}
+
+    # Step 2: Compile Haskell to shared library with cross-GHC
+    ${ghcCmd} -shared -O2 \
+      -o libhaskellmobile.so \
+      HaskellMobile.hs \
+      ${../cbits/android_stubs.c} \
+      -optl-L${androidPkgs.gmp}/lib \
+      -optl-L${androidPkgs.libffi}/lib \
+      -optl-lffi \
+      -optl-Wl,-z,max-page-size=16384 \
+      -optl$(pwd)/jni_bridge.o \
+      -optl-Wl,-u,haskellInit \
+      -optl-Wl,-u,haskellGreet
+  '';
+
+  installPhase = ''
+    mkdir -p $out/lib/arm64-v8a
+    cp libhaskellmobile.so $out/lib/arm64-v8a/
+  '';
 }
