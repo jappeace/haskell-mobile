@@ -45,13 +45,7 @@ let
     hardeningDisable = [ "fortify" ];
   });
 
-  project = pkgs.haskell-nix.project {
-    compiler-nix-name = "ghc963";
-    src = pkgs.haskell-nix.haskellLib.cleanGit {
-      name = "haskell-mobile";
-      src = ../.;
-    };
-  };
+  project = import ./project.nix { inherit pkgs; };
 
 in {
   inherit pkgs androidPkgs androidIconv androidFFI;

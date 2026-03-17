@@ -13,6 +13,19 @@
       "url": "https://github.com/input-output-hk/haskell.nix/archive/d0c35e75cbbc6858770af42ac32b0b85495fbd71.tar.gz",
       "hash": "sha256-rUIr6JNbCedt1g4gVYVvE9t0oFU6FUspCA0DS5cA8Bg="
     },
+    "mobile-core-tools": {
+      "type": "Git",
+      "repository": {
+        "type": "GitHub",
+        "owner": "zw3rk",
+        "repo": "mobile-core-tools"
+      },
+      "branch": "master",
+      "submodules": false,
+      "revision": "90e0a52893288bfe85e5ed6bff9cee077e3d18c7",
+      "url": "https://github.com/zw3rk/mobile-core-tools/archive/90e0a52893288bfe85e5ed6bff9cee077e3d18c7.tar.gz",
+      "hash": "sha256-/1Eppd4g/30hU/LKG84VWOgjOfrWfesBqM7eNmnOf08="
+    },
     "nixpkgs": {
       "type": "Channel",
       "name": "nixpkgs-unstable",
