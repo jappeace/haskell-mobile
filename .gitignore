@@ -4,8 +4,16 @@ network-uri-lenses.cabal
 dist*
 .#*
 result
+result-*
 TAGS
 
 *.hi
 *.o
 .envrc
+
+# Generated Xcode project (recreated via xcodegen)
+ios/HaskellMobile.xcodeproj/
+
+# Staging dirs populated from nix build output
+ios/lib/
+ios/include/
