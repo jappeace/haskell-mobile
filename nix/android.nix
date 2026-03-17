@@ -34,7 +34,7 @@ in pkgs.stdenv.mkDerivation {
   src = ../src;
 
   nativeBuildInputs = [ ghc ];
-  buildInputs = [ androidPkgs.libffi ];
+  buildInputs = [ androidPkgs.libffi androidPkgs.gmp ];
 
   buildPhase = ''
     # Discover RTS include path for HsFFI.h
@@ -57,6 +57,8 @@ in pkgs.stdenv.mkDerivation {
       -o libhaskellmobile.so \
       HaskellMobile.hs \
       ${../cbits/android_stubs.c} \
+      -optl-L${androidPkgs.gmp}/lib \
+      -optl-L${androidPkgs.libffi}/lib \
       -optl-lffi \
       -optl-Wl,-z,max-page-size=16384 \
       -optl$(pwd)/jni_bridge.o \
