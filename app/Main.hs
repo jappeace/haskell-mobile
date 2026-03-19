@@ -3,19 +3,25 @@ module Main where
 import HaskellMobile (loggingMobileContext, platformLog)
 import HaskellMobile.Lifecycle (LifecycleEvent(..), MobileContext(onLifecycle))
 
--- | Demonstrate the lifecycle callback API by firing all 7 events
--- through a logging context. On desktop this prints to stderr.
+-- | Simulate a mobile app lifecycle.
+-- On Android\/iOS the platform bridge dispatches these events via
+-- 'haskellOnLifecycle'.  Here we drive them from Haskell to show
+-- that the listener callback fires for every event.
 main :: IO ()
 main = do
-  platformLog "Desktop sample app starting"
-  let ctx = loggingMobileContext
-  mapM_ (onLifecycle ctx)
-    [ Create
-    , Start
-    , Resume
-    , Pause
-    , Stop
-    , Destroy
-    , LowMemory
-    ]
-  platformLog "Desktop sample app finished"
+  platformLog "Waiting for lifecycle events..."
+  let listen = onLifecycle loggingMobileContext
+
+  -- Simulate the platform sending lifecycle events
+  listen Create
+  listen Start
+  listen Resume
+
+  platformLog "App is now in foreground"
+
+  listen Pause
+  listen Stop
+  listen LowMemory
+  listen Destroy
+
+  platformLog "App lifecycle complete"

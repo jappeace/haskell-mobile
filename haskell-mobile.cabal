@@ -66,6 +66,8 @@ library
       Paths_haskell_mobile
   hs-source-dirs:
       src
+  build-depends:
+      text
   c-sources:
       cbits/android_stubs.c
       cbits/platform_log.c
