@@ -1,4 +1,5 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE OverloadedStrings #-}
 module HaskellMobile.Lifecycle
   ( LifecycleEvent(..)
   , lifecycleFromInt
