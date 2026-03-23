@@ -92,7 +92,9 @@ jobs:
     - name: Build simulator test
       run: nix-build nix/simulator.nix -o result-simulator
     - name: Run simulator lifecycle test
-      run: nix-shell -p xcodegen --run "./result-simulator/bin/test-lifecycle-ios"
+      run: |
+        NIXPKGS=$(nix-instantiate --eval -E 'builtins.toString (import ./npins).nixpkgs' | tr -d '"')
+        nix-shell -I "nixpkgs=$NIXPKGS" -p xcodegen --run "./result-simulator/bin/test-lifecycle-ios"
     - name: Upload iOS library
       if: github.ref == 'refs/heads/master'
       uses: actions/upload-artifact@v4

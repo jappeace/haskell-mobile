@@ -12,7 +12,7 @@ test-emulator:
 
 test-simulator:
 	nix-build nix/simulator.nix -o result-simulator
-	nix-shell -p xcodegen --run "./result-simulator/bin/test-lifecycle-ios"
+	nix-shell -I nixpkgs=$$(nix-instantiate --eval -E 'builtins.toString (import ./npins).nixpkgs' | tr -d '"') -p xcodegen --run "./result-simulator/bin/test-lifecycle-ios"
 
 haddock:
 	cabal haddock all
