@@ -23,7 +23,7 @@ in pkgs.stdenv.mkDerivation {
   src = ../src;
 
   nativeBuildInputs = [ ghc ];
-  buildInputs = [ pkgs.libffi ];
+  buildInputs = [ pkgs.libffi pkgs.gmp ];
 
   buildPhase = ''
     # Copy extra source modules into the writable build directory.
@@ -47,6 +47,15 @@ in pkgs.stdenv.mkDerivation {
 
   installPhase = ''
     mkdir -p $out/lib $out/include
+
+    # Merge libgmp.a into the Haskell static library so downstream
+    # consumers don't need to link libgmp separately.
+    if [ -f ${pkgs.gmp}/lib/libgmp.a ]; then
+      echo "Merging libgmp.a into libHaskellMobile.a"
+      libtool -static -o libCombined.a libHaskellMobile.a ${pkgs.gmp}/lib/libgmp.a
+      mv libCombined.a libHaskellMobile.a
+    fi
+
     ${mac2ios}/bin/mac2ios ${if simulator then "-s" else ""} libHaskellMobile.a
     cp libHaskellMobile.a $out/lib/
     cp ${../include/HaskellMobile.h} $out/include/HaskellMobile.h

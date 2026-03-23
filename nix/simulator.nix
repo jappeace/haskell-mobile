@@ -32,9 +32,6 @@ in pkgs.stdenv.mkDerivation {
     cp ${../ios/project.yml} $out/share/ios/project.yml
     cp ${iosLib}/lib/libHaskellMobile.a $out/share/ios/lib/
     cp ${iosLib}/include/HaskellMobile.h $out/share/ios/include/
-    # GHC's integer-gmp requires libgmp at link time
-    cp ${pkgs.gmp}/lib/libgmp.a $out/share/ios/lib/ || \
-      cp ${pkgs.gmp}/lib/libgmp.dylib $out/share/ios/lib/ || true
 
     cat > $out/bin/test-lifecycle-ios << 'SCRIPT'
 #!/usr/bin/env bash
