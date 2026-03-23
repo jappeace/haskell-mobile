@@ -79,6 +79,15 @@ xcodegen generate
 
 # --- Build for simulator ---
 echo "=== Building for iOS Simulator ==="
+
+# Xcode 16.4 ld-prime has a bug: it fails on -objc_abi_version before
+# reaching -ld_classic in OTHER_LDFLAGS. Use the classic linker directly.
+LD_CLASSIC="$(dirname "$(xcrun --find ld)")/ld-classic"
+if [ ! -x "$LD_CLASSIC" ]; then
+    LD_CLASSIC="$(xcrun --find ld)"
+fi
+echo "Using linker: $LD_CLASSIC"
+
 xcodebuild build \
     -project HaskellMobile.xcodeproj \
     -scheme "$SCHEME" \
@@ -88,7 +97,7 @@ xcodebuild build \
     -derivedDataPath "$WORK_DIR/build" \
     CODE_SIGN_IDENTITY=- \
     CODE_SIGNING_ALLOWED=NO \
-    ENABLE_DEBUG_DYLIB=NO \
+    LD="$LD_CLASSIC" \
     | tail -20
 
 echo "Build succeeded."
