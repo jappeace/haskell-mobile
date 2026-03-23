@@ -69,6 +69,8 @@ cp "$SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/ios/lib/"
 cp "$SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/ios/include/"
 cp -r "$SHARE_DIR/HaskellMobile" "$WORK_DIR/ios/"
 cp "$SHARE_DIR/project.yml" "$WORK_DIR/ios/"
+# Nix store files are read-only; make writable so cleanup and xcodebuild work
+chmod -R u+w "$WORK_DIR/ios"
 
 # --- Generate Xcode project ---
 echo "=== Generating Xcode project ==="
