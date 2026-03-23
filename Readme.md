@@ -100,3 +100,11 @@ Generate the base64 values with:
 base64 -i Certificates.p12 | pbcopy
 base64 -i App.mobileprovision | pbcopy
 ```
+
+# Roadmap
+
++ Test out lifecycles.
+  + Need logging support in respective frameworks, make sure they get triggered.
++ Figure out how to do UI
+  + need to be able to register callbacks on events, eg onButtonClick
+  + tranistion between UI's?

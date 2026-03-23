@@ -19,6 +19,9 @@ let
   ghc = androidPkgs.haskellPackages.ghc;
   ghcCmd = "${ghc}/bin/${ghc.targetPrefix}ghc";
 
+  # Path to GHC's boot library static archives (for static linking into .so)
+  ghcPkgDir = "${ghc}/lib/${ghc.targetPrefix}ghc-${ghc.version}/lib/aarch64-linux-ghc-${ghc.version}";
+
   # NDK toolchain for compiling the JNI bridge C code
   androidComposition = pkgs.androidenv.composeAndroidPackages {
     includeNDK = true;
@@ -52,22 +55,54 @@ in pkgs.stdenv.mkDerivation {
       -o jni_bridge.o \
       ${../cbits/jni_bridge.c}
 
-    # Step 2: Compile Haskell to shared library with cross-GHC
+    # Step 2: Copy extra source modules into the writable build directory.
+    # GHC writes _stub.h files next to sources, so they can't live in
+    # the read-only nix store.
+    mkdir -p HaskellMobile
+    cp ${../src-lifecycle}/HaskellMobile/Lifecycle.hs HaskellMobile/
+    cp ${../default-app}/HaskellMobile/App.hs HaskellMobile/
+
+    # Step 3: Compile Haskell to shared library with cross-GHC.
+    # We use --whole-archive to statically link GHC's boot libraries
+    # (RTS, base, ghc-prim, etc.) into our .so — Android's linker
+    # can't find GHC's separate shared libraries at runtime.
+    GHC_PKG_DIR="${ghcPkgDir}"
+
     ${ghcCmd} -shared -O2 \
       -o libhaskellmobile.so \
       HaskellMobile.hs \
       ${../cbits/android_stubs.c} \
+      ${../cbits/platform_log.c} \
+      ${../cbits/numa_stubs.c} \
       -optl-L${androidPkgs.gmp}/lib \
       -optl-L${androidPkgs.libffi}/lib \
       -optl-lffi \
+      -optl-llog \
       -optl-Wl,-z,max-page-size=16384 \
       -optl$(pwd)/jni_bridge.o \
       -optl-Wl,-u,haskellInit \
-      -optl-Wl,-u,haskellGreet
+      -optl-Wl,-u,haskellGreet \
+      -optl-Wl,-u,haskellOnLifecycle \
+      -optl-Wl,-u,haskellCreateContext \
+      -optl-Wl,--whole-archive \
+      -optl$GHC_PKG_DIR/rts-1.0.2/libHSrts-1.0.2.a \
+      -optl$GHC_PKG_DIR/ghc-prim-0.12.0-b5b0/libHSghc-prim-0.12.0-b5b0.a \
+      -optl$GHC_PKG_DIR/ghc-bignum-1.3-3be2/libHSghc-bignum-1.3-3be2.a \
+      -optl$GHC_PKG_DIR/ghc-internal-9.1003.0-04f5/libHSghc-internal-9.1003.0-04f5.a \
+      -optl$GHC_PKG_DIR/base-4.20.2.0-ecb4/libHSbase-4.20.2.0-ecb4.a \
+      -optl$GHC_PKG_DIR/integer-gmp-1.1-e5a1/libHSinteger-gmp-1.1-e5a1.a \
+      -optl$GHC_PKG_DIR/text-2.1.3-8cdf/libHStext-2.1.3-8cdf.a \
+      -optl$GHC_PKG_DIR/array-0.5.8.0-39be/libHSarray-0.5.8.0-39be.a \
+      -optl$GHC_PKG_DIR/deepseq-1.5.0.0-dd79/libHSdeepseq-1.5.0.0-dd79.a \
+      -optl-Wl,--no-whole-archive
   '';
 
   installPhase = ''
     mkdir -p $out/lib/arm64-v8a
     cp libhaskellmobile.so $out/lib/arm64-v8a/
+
+    # Bundle runtime dependencies (not provided by Android)
+    cp ${androidPkgs.gmp}/lib/libgmp.so $out/lib/arm64-v8a/
+    cp ${androidPkgs.libffi}/lib/libffi.so $out/lib/arm64-v8a/
   '';
 }

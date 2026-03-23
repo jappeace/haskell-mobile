@@ -10,6 +10,14 @@ targets:
     platform: iOS
     sources:
       - HaskellMobile
+    info:
+      path: HaskellMobile/Info.plist
+      properties:
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations: {}
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: me.jappie.haskellmobile

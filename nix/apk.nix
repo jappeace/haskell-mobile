@@ -76,9 +76,9 @@ in pkgs.stdenv.mkDerivation {
     zip -j ../unsigned.apk classes.dex
     cd ..
 
-    # Add native library
+    # Add native libraries (main .so + runtime dependencies like libgmp, libffi)
     mkdir -p lib/arm64-v8a
-    cp ${sharedLib}/lib/arm64-v8a/libhaskellmobile.so lib/arm64-v8a/
+    cp ${sharedLib}/lib/arm64-v8a/*.so lib/arm64-v8a/
     zip -r unsigned.apk lib/
 
     echo "=== Step 6: Zipalign ==="

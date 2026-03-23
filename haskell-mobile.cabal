@@ -57,16 +57,56 @@ common common-options
 
   default-language: Haskell2010
 
+library haskell-mobile-lifecycle
+  import: common-options
+  exposed-modules:
+      HaskellMobile.Lifecycle
+  hs-source-dirs:
+      src-lifecycle
+  build-depends:
+      text
+  c-sources:
+      cbits/android_stubs.c
+      cbits/platform_log.c
+
 library
   import: common-options
   exposed-modules:
       HaskellMobile
+  reexported-modules:
+      HaskellMobile.Lifecycle
+  signatures:
+      HaskellMobile.App
   other-modules:
       Paths_haskell_mobile
   hs-source-dirs:
       src
-  c-sources:
-      cbits/android_stubs.c
+      src-sig
+  build-depends:
+      haskell-mobile:haskell-mobile-lifecycle
+
+library haskell-mobile-default-app
+  import: common-options
+  exposed-modules:
+      HaskellMobile.App
+  hs-source-dirs:
+      default-app
+  build-depends:
+      haskell-mobile:haskell-mobile-lifecycle
+
+-- | Instantiates the main library with the default 'HaskellMobile.App'
+-- implementation.  Consumers who want a custom app context should create
+-- their own instantiation library instead of depending on this one.
+library haskell-mobile-app
+  import: common-options
+  reexported-modules:
+      HaskellMobile,
+      HaskellMobile.Lifecycle,
+      HaskellMobile.App
+  build-depends:
+      haskell-mobile,
+      haskell-mobile:haskell-mobile-default-app,
+      haskell-mobile:haskell-mobile-lifecycle
 
 executable exe
   import: common-options
@@ -74,7 +114,7 @@ executable exe
   hs-source-dirs:
       app
   build-depends:
-      haskell-mobile
+      haskell-mobile:haskell-mobile-app
   ghc-options: -Wno-unused-packages -threaded -rtsopts "-with-rtsopts=-N -M7G -T -Iw10"
 
 test-suite unit
@@ -90,4 +130,4 @@ test-suite unit
       tasty,
       tasty-hunit,
       tasty-quickcheck,
-      haskell-mobile
+      haskell-mobile:haskell-mobile-app

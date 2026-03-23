@@ -1,0 +1,8 @@
+signature HaskellMobile.App where
+
+import HaskellMobile.Lifecycle (MobileContext)
+
+-- | The application-level 'MobileContext' used by the FFI entry points.
+-- Consumers override this by providing a concrete @HaskellMobile.App@
+-- module in their @hs-source-dirs@.
+appContext :: MobileContext

@@ -7,6 +7,10 @@ on:
 permissions:
   actions: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   nix:
     runs-on: ubuntu-latest
@@ -89,6 +93,10 @@ jobs:
         name: jappie
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
     - run: nix-build nix/ios.nix
+    - name: Build simulator test
+      run: nix-build nix/simulator.nix -o result-simulator
+    - name: Run simulator lifecycle test
+      run: ./result-simulator/bin/test-lifecycle-ios
     - name: Upload iOS library
       if: github.ref == 'refs/heads/master'
       uses: actions/upload-artifact@v4
@@ -231,10 +239,12 @@ jobs:
           ${{ runner.os }}-build-${{ env.cache-name }}-
     - name: Cabal update
       run: cabal update
+    # Backpack instantiation creates paths that exceed Windows MAX_PATH
+    # (260 chars).  Use a short absolute builddir to stay under the limit.
     - name: Build using cabal
-      run: cabal build all
+      run: cabal build all ${{ runner.os == 'Windows' && '--builddir=C:/b' || '' }}
     - name: Test
-      run: cabal test all
+      run: cabal test all ${{ runner.os == 'Windows' && '--builddir=C:/b' || '' }}
     - name: Cancel workflow on failure
       if: failure()
       continue-on-error: true
