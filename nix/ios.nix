@@ -6,7 +6,9 @@
 # Uses pre-built GHC from nixpkgs (cache.nixos.org) instead of
 # haskell.nix, which tries to build GHC from source and OOMs on
 # CI runners with limited RAM.
-{ sources ? import ../npins }:
+{ sources ? import ../npins
+, simulator ? false
+}:
 let
   pkgs = import sources.nixpkgs {};
 
@@ -45,7 +47,7 @@ in pkgs.stdenv.mkDerivation {
 
   installPhase = ''
     mkdir -p $out/lib $out/include
-    ${mac2ios}/bin/mac2ios libHaskellMobile.a
+    ${mac2ios}/bin/mac2ios ${if simulator then "-s" else ""} libHaskellMobile.a
     cp libHaskellMobile.a $out/lib/
     cp ${../include/HaskellMobile.h} $out/include/
   '';

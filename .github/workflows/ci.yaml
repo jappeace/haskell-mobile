@@ -89,6 +89,10 @@ jobs:
         name: jappie
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
     - run: nix-build nix/ios.nix
+    - name: Build simulator test
+      run: nix-build nix/simulator.nix -o result-simulator
+    - name: Run simulator lifecycle test
+      run: nix-shell -p xcodegen --run "./result-simulator/bin/test-lifecycle-ios"
     - name: Upload iOS library
       if: github.ref == 'refs/heads/master'
       uses: actions/upload-artifact@v4

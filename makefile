@@ -10,6 +10,10 @@ test-emulator:
 	nix-build nix/emulator.nix -o result-emulator
 	./result-emulator/bin/test-lifecycle
 
+test-simulator:
+	nix-build nix/simulator.nix -o result-simulator
+	nix-shell -p xcodegen --run "./result-simulator/bin/test-lifecycle-ios"
+
 haddock:
 	cabal haddock all
 
