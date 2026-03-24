@@ -226,6 +226,7 @@ static void android_set_str_prop(int32_t nodeId, int32_t propId, const char *val
 
     switch (propId) {
     case UI_PROP_TEXT: {
+        LOGI("setStrProp(node=%d, text=\"%s\")", nodeId, value);
         jstring jstr = (*env)->NewStringUTF(env, value);
         (*env)->CallVoidMethod(env, view, g_method_setText, jstr);
         (*env)->DeleteLocalRef(env, jstr);

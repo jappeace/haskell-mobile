@@ -73,6 +73,34 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
 
+  android-ui:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Local cache
+      uses: actions/cache@v4
+      with:
+        path: /nix/store
+        key: "${{ runner.os }}-nix-android-ui-cache"
+    - uses: cachix/install-nix-action@v31
+      with:
+        extra_nix_config: |
+          access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+    - uses: cachix/cachix-action@v15
+      with:
+        name: jappie
+        authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+    - name: Build UI test
+      run: nix-build nix/emulator-ui.nix -o result-emulator-ui
+    - name: Run UI rendering test
+      run: ./result-emulator-ui/bin/test-ui
+    - name: Cancel workflow on failure
+      if: failure()
+      continue-on-error: true
+      run: gh run cancel ${{ github.run_id }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+
   ios:
     runs-on: macos-latest
     env:
