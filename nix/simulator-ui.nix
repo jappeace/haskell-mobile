@@ -224,17 +224,19 @@ else
     EXIT_CODE=1
 fi
 
-# --- Wait for auto-tap (3s delay in app + margin) ---
+# --- Wait for auto-tap re-render (3s delay in app + margin) ---
+# The --autotest flag calls haskellOnUIEvent directly (bypassing ObjC handler),
+# so we detect the tap via the re-rendered "Counter: 1" in os_log.
 echo ""
-echo "=== Waiting for auto-tap to fire (timeout: 30s) ==="
+echo "=== Waiting for auto-tap re-render (timeout: 30s) ==="
 POLL_ELAPSED=0
 POLL_TIMEOUT=30
 TAP_DONE=0
 
 while [ $POLL_ELAPSED -lt $POLL_TIMEOUT ]; do
-    if grep -q 'Click dispatched: callbackId=' "$LOG_FILE" 2>/dev/null; then
+    if grep -q 'setStrProp.*Counter: 1' "$LOG_FILE" 2>/dev/null; then
         TAP_DONE=1
-        echo "Auto-tap detected after ~''${POLL_ELAPSED}s"
+        echo "Re-render detected after ~''${POLL_ELAPSED}s"
         break
     fi
     sleep 2
@@ -242,22 +244,12 @@ while [ $POLL_ELAPSED -lt $POLL_TIMEOUT ]; do
 done
 
 if [ $TAP_DONE -eq 0 ]; then
-    echo "WARNING: Click dispatched not found after ''${POLL_TIMEOUT}s"
+    echo "WARNING: Counter: 1 not found after ''${POLL_TIMEOUT}s"
 fi
-
-# Extra settle time for re-render
-sleep 3
 
 # --- Verify re-render ---
 echo ""
 echo "=== Verifying re-render (os_log) ==="
-
-if grep -q 'Click dispatched: callbackId=' "$LOG_FILE" 2>/dev/null; then
-    echo "PASS: Button tap — Click dispatched in os_log"
-else
-    echo "FAIL: Button tap — Click dispatched in os_log"
-    EXIT_CODE=1
-fi
 
 if grep -q 'setStrProp.*Counter: 1' "$LOG_FILE" 2>/dev/null; then
     echo "PASS: Re-render — Counter: 1 in os_log"
