@@ -19,6 +19,7 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import HaskellMobile.Widget (Widget(..))
 import HaskellMobile.UIBridge qualified as Bridge
+import System.IO (hPutStrLn, stderr)
 
 -- | Mutable state for the rendering engine.
 -- Holds the callback registry and next callback ID counter.
@@ -55,21 +56,21 @@ resetCallbacks rs = do
 
 -- | Render a single 'Widget' node, returning its native node ID.
 renderNode :: RenderState -> Widget -> IO Int32
-renderNode _rs (WText label) = do
+renderNode _rs (Text label) = do
   nodeId <- Bridge.createNode Bridge.NodeText
   Bridge.setStrProp nodeId Bridge.PropText label
   pure nodeId
-renderNode rs (WButton label action) = do
+renderNode rs (Button label action) = do
   nodeId <- Bridge.createNode Bridge.NodeButton
   Bridge.setStrProp nodeId Bridge.PropText label
   callbackId <- registerCallback rs action
   Bridge.setHandler nodeId Bridge.EventClick callbackId
   pure nodeId
-renderNode rs (WColumn children) = do
+renderNode rs (Column children) = do
   nodeId <- Bridge.createNode Bridge.NodeColumn
   renderChildren rs nodeId children
   pure nodeId
-renderNode rs (WRow children) = do
+renderNode rs (Row children) = do
   nodeId <- Bridge.createNode Bridge.NodeRow
   renderChildren rs nodeId children
   pure nodeId
@@ -92,10 +93,11 @@ renderWidget rs widget = do
   Bridge.setRoot rootId
 
 -- | Dispatch a native event to the registered Haskell callback.
--- Does nothing if the callbackId is not found.
+-- Logs an error to stderr if the callbackId is not found.
 dispatchEvent :: RenderState -> Int32 -> IO ()
 dispatchEvent rs callbackId = do
   callbacks <- readIORef (rsCallbacks rs)
   case IntMap.lookup (fromIntegral callbackId) callbacks of
     Just action -> action
-    Nothing     -> pure ()
+    Nothing     -> hPutStrLn stderr $
+      "dispatchEvent: unknown callback ID " ++ show callbackId

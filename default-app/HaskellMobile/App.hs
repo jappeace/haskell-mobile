@@ -7,7 +7,7 @@ module HaskellMobile.App (appContext, appView) where
 import Data.IORef (IORef, newIORef, readIORef, modifyIORef')
 import Data.Text (pack)
 import HaskellMobile.Lifecycle (MobileContext, loggingMobileContext)
-import HaskellMobile.Widget (Widget, text, button, column, row)
+import HaskellMobile.Widget (Widget(..))
 import System.IO.Unsafe (unsafePerformIO)
 
 -- | The default application context — logs every lifecycle event.
@@ -23,9 +23,9 @@ counter = unsafePerformIO (newIORef 0)
 appView :: IO Widget
 appView = do
   n <- readIORef counter
-  pure $ column
-    [ text ("Counter: " <> pack (show n))
-    , row [ button "+" (modifyIORef' counter (+ 1))
-          , button "-" (modifyIORef' counter (subtract 1))
+  pure $ Column
+    [ Text ("Counter: " <> pack (show n))
+    , Row [ Button "+" (modifyIORef' counter (+ 1))
+          , Button "-" (modifyIORef' counter (subtract 1))
           ]
     ]

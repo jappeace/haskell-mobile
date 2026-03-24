@@ -22,7 +22,7 @@ import HaskellMobile.Lifecycle
   , freeMobileContext
   , haskellOnLifecycle
   )
-import HaskellMobile.Widget (Widget(..), text, button, column, row)
+import HaskellMobile.Widget (Widget(..))
 import HaskellMobile.Render (newRenderState, renderWidget, dispatchEvent)
 
 main :: IO ()
@@ -126,7 +126,7 @@ uiTests = testGroup "UI"
   [ testCase "callback dispatch fires registered action" $ do
       ref <- newIORef (0 :: Int)
       rs <- newRenderState
-      let widget = button "click me" (modifyIORef' ref (+ 1))
+      let widget = Button "click me" (modifyIORef' ref (+ 1))
       renderWidget rs widget
       -- After rendering, callback 0 should be the button's handler
       dispatchEvent rs 0
@@ -137,9 +137,9 @@ uiTests = testGroup "UI"
       refA <- newIORef False
       refB <- newIORef False
       rs <- newRenderState
-      let widget = row
-            [ button "A" (modifyIORef' refA (const True))
-            , button "B" (modifyIORef' refB (const True))
+      let widget = Row
+            [ Button "A" (modifyIORef' refA (const True))
+            , Button "B" (modifyIORef' refB (const True))
             ]
       renderWidget rs widget
       -- Only fire callback 0 (button A)
@@ -158,34 +158,34 @@ uiTests = testGroup "UI"
       refNew <- newIORef False
       rs <- newRenderState
       -- First render with old callback
-      renderWidget rs (button "old" (modifyIORef' refOld (const True)))
+      renderWidget rs (Button "old" (modifyIORef' refOld (const True)))
       -- Second render replaces it
-      renderWidget rs (button "new" (modifyIORef' refNew (const True)))
+      renderWidget rs (Button "new" (modifyIORef' refNew (const True)))
       dispatchEvent rs 0
       old <- readIORef refOld
       new <- readIORef refNew
       old @?= False
       new @?= True
 
-  , testCase "dispatching unknown callback ID is a no-op" $ do
+  , testCase "dispatching unknown callback ID logs error" $ do
       rs <- newRenderState
-      renderWidget rs (text "no buttons")
-      -- Should not throw
+      renderWidget rs (Text "no buttons")
+      -- Should not throw (logs to stderr)
       dispatchEvent rs 42
       dispatchEvent rs 999
 
   , testCase "nested widget tree renders without error" $ do
       rs <- newRenderState
-      let widget = column
-            [ text "header"
-            , row
-              [ button "a" (pure ())
-              , column
-                [ text "nested"
-                , button "b" (pure ())
+      let widget = Column
+            [ Text "header"
+            , Row
+              [ Button "a" (pure ())
+              , Column
+                [ Text "nested"
+                , Button "b" (pure ())
                 ]
               ]
-            , text "footer"
+            , Text "footer"
             ]
       -- Should not throw — exercises all node types
       renderWidget rs widget
@@ -194,8 +194,8 @@ uiTests = testGroup "UI"
       widget <- appView
       -- appView is the counter demo; verify it's a column
       case widget of
-        WColumn _ -> pure ()
-        WText _   -> assertFailure "expected WColumn, got WText"
-        WButton _ _ -> assertFailure "expected WColumn, got WButton"
-        WRow _    -> assertFailure "expected WColumn, got WRow"
+        Column _ -> pure ()
+        Text _   -> assertFailure "expected Column, got Text"
+        Button _ _ -> assertFailure "expected Column, got Button"
+        Row _    -> assertFailure "expected Column, got Row"
   ]
