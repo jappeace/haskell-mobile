@@ -78,7 +78,7 @@ xcodebuild build \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
-    -destination "platform=iOS Simulator,OS=latest,name=$DEVICE_TYPE" \
+    -destination "generic/platform=iOS Simulator" \
     -derivedDataPath "$WORK_DIR/build" \
     CODE_SIGN_IDENTITY=- \
     CODE_SIGNING_ALLOWED=NO \
