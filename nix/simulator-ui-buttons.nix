@@ -228,24 +228,28 @@ fi
 # The --autotest-buttons flag fires: +3s, +5s, +7s, +9s, +11s
 # Total sequence takes ~11s from render. We poll for each expected value.
 
-# Helper: wait for a counter value to appear in the log
+# Helper: wait for a counter value to appear N times in the log
+# Usage: wait_for_value PATTERN LABEL [MIN_COUNT]
 wait_for_value() {
     local PATTERN="$1"
     local LABEL="$2"
+    local MIN_COUNT="''${3:-1}"
     local TIMEOUT=30
     local ELAPSED=0
 
     echo ""
     echo "=== Waiting for $LABEL (timeout: ''${TIMEOUT}s) ==="
     while [ $ELAPSED -lt $TIMEOUT ]; do
-        if grep -q "setStrProp.*$PATTERN" "$LOG_FILE" 2>/dev/null; then
-            echo "  Detected '$PATTERN' after ~''${ELAPSED}s"
+        local COUNT
+        COUNT=$(grep -c "setStrProp.*$PATTERN" "$LOG_FILE" 2>/dev/null || echo "0")
+        if [ "$COUNT" -ge "$MIN_COUNT" ]; then
+            echo "  Detected '$PATTERN' (count=$COUNT) after ~''${ELAPSED}s"
             return 0
         fi
         sleep 2
         ELAPSED=$((ELAPSED + 2))
     done
-    echo "  WARNING: '$PATTERN' not found after ''${TIMEOUT}s"
+    echo "  WARNING: '$PATTERN' not found ''${MIN_COUNT} time(s) after ''${TIMEOUT}s"
     return 1
 }
 
@@ -269,7 +273,7 @@ fi
 
 # Step 3: - → Counter: 1  (at +7s — second occurrence)
 # We need to wait for Counter: 1 to appear again after Counter: 2
-wait_for_value "Counter: 1" "first - tap → Counter: 1 (again)"
+wait_for_value "Counter: 1" "first - tap → Counter: 1 (again)" 2
 COUNT_1=$(grep -c 'setStrProp.*Counter: 1' "$LOG_FILE" 2>/dev/null || echo "0")
 if [ "$COUNT_1" -ge 2 ]; then
     echo "PASS: Counter: 1 after first - tap (seen $COUNT_1 times)"
@@ -279,7 +283,7 @@ else
 fi
 
 # Step 4: - → Counter: 0  (at +9s — second occurrence)
-wait_for_value "Counter: 0" "second - tap → Counter: 0 (again)"
+wait_for_value "Counter: 0" "second - tap → Counter: 0 (again)" 2
 COUNT_0=$(grep -c 'setStrProp.*Counter: 0' "$LOG_FILE" 2>/dev/null || echo "0")
 if [ "$COUNT_0" -ge 2 ]; then
     echo "PASS: Counter: 0 after second - tap (seen $COUNT_0 times)"
