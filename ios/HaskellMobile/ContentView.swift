@@ -21,6 +21,26 @@ struct HaskellUIView: UIViewControllerRepresentable {
             }
         }
 
+        // CI auto-test: exercise both "+" and "-" buttons.
+        // Sequence: +, +, -, -, - → Counter: 1, 2, 1, 0, -1
+        if CommandLine.arguments.contains("--autotest-buttons") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                HaskellBridge.onUIEvent(0)  // + → Counter: 1
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                HaskellBridge.onUIEvent(0)  // + → Counter: 2
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 7) {
+                HaskellBridge.onUIEvent(1)  // - → Counter: 1
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 9) {
+                HaskellBridge.onUIEvent(1)  // - → Counter: 0
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 11) {
+                HaskellBridge.onUIEvent(1)  // - → Counter: -1
+            }
+        }
+
         return vc
     }
 
