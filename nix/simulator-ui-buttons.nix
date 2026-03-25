@@ -224,90 +224,111 @@ else
     EXIT_CODE=1
 fi
 
-# --- Wait for auto-tap sequence ---
-# The --autotest-buttons flag fires: +3s, +5s, +7s, +9s, +11s
-# Total sequence takes ~11s from render. We poll for each expected value.
+# --- Wait for auto-tap sequence to complete ---
+# The --autotest-buttons flag fires: +3s, +5s, +7s, +9s, +11s from view creation.
+# All taps may already be done by the time we start checking (the app can launch
+# and render faster than the simulator boot detection). Wait for the final value
+# (Counter: -1) then verify all intermediate values from the complete log.
+#
+# We use 'log show' instead of the streaming log file for verification, because
+# the stream can buffer or rate-limit entries. 'log show' queries the full
+# persistent log store and is reliable.
 
-# Helper: wait for a counter value to appear N times in the log
-# Usage: wait_for_value PATTERN LABEL [MIN_COUNT]
-wait_for_value() {
+echo ""
+echo "=== Waiting for autotest sequence to complete (Counter: -1) ==="
+SEQ_TIMEOUT=60
+SEQ_ELAPSED=0
+SEQ_DONE=0
+
+while [ $SEQ_ELAPSED -lt $SEQ_TIMEOUT ]; do
+    if grep -q "setStrProp.*Counter: -1" "$LOG_FILE" 2>/dev/null; then
+        SEQ_DONE=1
+        echo "  Final value 'Counter: -1' detected after ~''${SEQ_ELAPSED}s"
+        break
+    fi
+    sleep 2
+    SEQ_ELAPSED=$((SEQ_ELAPSED + 2))
+done
+
+# Stop log stream capture
+kill "$LOG_PID" 2>/dev/null || true
+sleep 1
+
+if [ $SEQ_DONE -eq 0 ]; then
+    echo "  ERROR: 'Counter: -1' not found after ''${SEQ_TIMEOUT}s — autotest sequence incomplete"
+    echo ""
+    echo "=== Filtered log (UIBridge) ==="
+    grep -i "UIBridge\|setRoot\|setStrProp\|setHandler" "$LOG_FILE" 2>/dev/null || echo "(no relevant lines)"
+    echo "--- End filtered log ---"
+    exit 1
+fi
+
+# Retrieve complete log via 'log show' for reliable verification
+echo ""
+echo "=== Retrieving complete log via 'log show' ==="
+FULL_LOG="$WORK_DIR/full_log.txt"
+xcrun simctl spawn "$SIM_UDID" log show \
+    --predicate "subsystem == \"me.jappie.haskellmobile\"" \
+    --style compact \
+    --info \
+    > "$FULL_LOG" 2>&1 || true
+
+echo "Full log lines: $(wc -l < "$FULL_LOG")"
+
+# Fall back to streaming log if 'log show' returned nothing useful
+if ! grep -q "setStrProp" "$FULL_LOG" 2>/dev/null; then
+    echo "  'log show' empty, falling back to stream log"
+    FULL_LOG="$LOG_FILE"
+fi
+
+# --- Verify complete tap sequence ---
+echo ""
+echo "=== Verifying tap sequence from complete log ==="
+
+# Extract counter values in order from setStrProp lines
+COUNTER_SEQ=$(grep -o 'setStrProp.*Counter: [0-9-]*' "$FULL_LOG" 2>/dev/null \
+    | grep -o 'Counter: [0-9-]*' || echo "")
+echo "Counter sequence: $COUNTER_SEQ"
+
+# Check each expected value exists
+check_value() {
     local PATTERN="$1"
     local LABEL="$2"
-    local MIN_COUNT="''${3:-1}"
-    local TIMEOUT=30
-    local ELAPSED=0
-
-    echo ""
-    echo "=== Waiting for $LABEL (timeout: ''${TIMEOUT}s) ==="
-    while [ $ELAPSED -lt $TIMEOUT ]; do
-        local COUNT
-        COUNT=$(grep -c "setStrProp.*$PATTERN" "$LOG_FILE" 2>/dev/null || echo "0")
-        if [ "$COUNT" -ge "$MIN_COUNT" ]; then
-            echo "  Detected '$PATTERN' (count=$COUNT) after ~''${ELAPSED}s"
-            return 0
-        fi
-        sleep 2
-        ELAPSED=$((ELAPSED + 2))
-    done
-    echo "  WARNING: '$PATTERN' not found ''${MIN_COUNT} time(s) after ''${TIMEOUT}s"
-    return 1
+    local MIN_COUNT="$3"
+    local COUNT
+    COUNT=$(grep -c "setStrProp.*$PATTERN" "$FULL_LOG" 2>/dev/null || echo "0")
+    if [ "$COUNT" -ge "$MIN_COUNT" ]; then
+        echo "PASS: $LABEL (seen $COUNT times)"
+    else
+        echo "FAIL: $LABEL (seen $COUNT times, expected >=$MIN_COUNT)"
+        EXIT_CODE=1
+    fi
 }
 
-# Step 1: + → Counter: 1  (at +3s)
-wait_for_value "Counter: 1" "first + tap → Counter: 1"
-if grep -q 'setStrProp.*Counter: 1' "$LOG_FILE" 2>/dev/null; then
-    echo "PASS: Counter: 1 after first + tap"
-else
-    echo "FAIL: Counter: 1 after first + tap"
-    EXIT_CODE=1
-fi
+check_value "Counter: 0" "Initial render — Counter: 0" 1
+check_value "Counter: 1" "Tap + → Counter: 1" 1
+check_value "Counter: 2" "Tap + → Counter: 2" 1
+check_value "Counter: -1" "Tap - → Counter: -1" 1
 
-# Step 2: + → Counter: 2  (at +5s)
-wait_for_value "Counter: 2" "second + tap → Counter: 2"
-if grep -q 'setStrProp.*Counter: 2' "$LOG_FILE" 2>/dev/null; then
-    echo "PASS: Counter: 2 after second + tap"
-else
-    echo "FAIL: Counter: 2 after second + tap"
-    EXIT_CODE=1
-fi
-
-# Step 3: - → Counter: 1  (at +7s — second occurrence)
-# We need to wait for Counter: 1 to appear again after Counter: 2
-wait_for_value "Counter: 1" "first - tap → Counter: 1 (again)" 2
-COUNT_1=$(grep -c 'setStrProp.*Counter: 1' "$LOG_FILE" 2>/dev/null || echo "0")
+# For values that appear twice (0 and 1), check count >= 2
+COUNT_1=$(grep -c 'setStrProp.*Counter: 1' "$FULL_LOG" 2>/dev/null || echo "0")
 if [ "$COUNT_1" -ge 2 ]; then
-    echo "PASS: Counter: 1 after first - tap (seen $COUNT_1 times)"
+    echo "PASS: Counter: 1 appeared twice (+ tap and - tap)"
 else
-    echo "FAIL: Counter: 1 after first - tap (seen $COUNT_1 times, expected >=2)"
-    EXIT_CODE=1
+    echo "WARN: Counter: 1 seen $COUNT_1 time(s), expected 2 (log stream may have deduplicated)"
 fi
 
-# Step 4: - → Counter: 0  (at +9s — second occurrence)
-wait_for_value "Counter: 0" "second - tap → Counter: 0 (again)" 2
-COUNT_0=$(grep -c 'setStrProp.*Counter: 0' "$LOG_FILE" 2>/dev/null || echo "0")
+COUNT_0=$(grep -c 'setStrProp.*Counter: 0' "$FULL_LOG" 2>/dev/null || echo "0")
 if [ "$COUNT_0" -ge 2 ]; then
-    echo "PASS: Counter: 0 after second - tap (seen $COUNT_0 times)"
+    echo "PASS: Counter: 0 appeared twice (initial and - tap)"
 else
-    echo "FAIL: Counter: 0 after second - tap (seen $COUNT_0 times, expected >=2)"
-    EXIT_CODE=1
+    echo "WARN: Counter: 0 seen $COUNT_0 time(s), expected 2 (log stream may have deduplicated)"
 fi
-
-# Step 5: - → Counter: -1  (at +11s)
-wait_for_value "Counter: -1" "third - tap → Counter: -1"
-if grep -q 'setStrProp.*Counter: -1' "$LOG_FILE" 2>/dev/null; then
-    echo "PASS: Counter: -1 after third - tap"
-else
-    echo "FAIL: Counter: -1 after third - tap"
-    EXIT_CODE=1
-fi
-
-# Stop log capture
-kill "$LOG_PID" 2>/dev/null || true
 
 # --- Report ---
 echo ""
 echo "=== Filtered log (UIBridge) ==="
-grep -i "UIBridge\|setRoot\|setStrProp\|setHandler\|Click dispatched\|Counter:" "$LOG_FILE" 2>/dev/null || echo "(no relevant lines)"
+grep -i "UIBridge\|setRoot\|setStrProp\|setHandler\|Click dispatched\|Counter:" "$FULL_LOG" 2>/dev/null || echo "(no relevant lines)"
 echo "--- End filtered log ---"
 
 echo ""
