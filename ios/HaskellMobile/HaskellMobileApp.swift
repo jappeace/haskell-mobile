@@ -7,13 +7,6 @@ struct HaskellMobileApp: App {
     init() {
         HaskellBridge.initialize()
         HaskellBridge.onLifecycle(HaskellBridge.lifecycleCreate)
-
-        // CI auto-test: simulate a "+" button tap after 3 seconds
-        if CommandLine.arguments.contains("--autotest") {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                HaskellBridge.onUIEvent(0)
-            }
-        }
     }
 
     var body: some Scene {
