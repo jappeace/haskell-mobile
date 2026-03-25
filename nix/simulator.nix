@@ -164,46 +164,70 @@ echo "App installed."
 echo "=== Starting log capture ==="
 LOG_FILE="$WORK_DIR/os_log.txt"
 
-# Capture os_log output for our process.
-# --level info: OS_LOG_TYPE_INFO is not streamed by default (only default+error).
-# composedMessage: eventMessage has the format template, composedMessage has actual text.
+# Use subsystem predicate — matches os_log_create("me.jappie.haskellmobile", ...)
+# in platform_log.c.  More reliable than process name on newer iOS runtimes.
 xcrun simctl spawn "$SIM_UDID" log stream \
     --level info \
-    --predicate "process == \"HaskellMobile\" AND composedMessage CONTAINS \"Lifecycle:\"" \
+    --predicate "subsystem == \"me.jappie.haskellmobile\"" \
     --style compact \
     > "$LOG_FILE" 2>&1 &
 LOG_PID=$!
 
-# Give log stream a moment to attach
-sleep 2
+# Give log stream generous time to fully attach before launching app
+sleep 5
 
-# --- Launch app ---
-echo "=== Launching $BUNDLE_ID ==="
-xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID"
-
-# --- Poll for lifecycle events ---
-echo "=== Checking for lifecycle events (timeout: 60s) ==="
-EVENTS=("Lifecycle: Create" "Lifecycle: Resume")
-POLL_TIMEOUT=60
-POLL_ELAPSED=0
-ALL_FOUND=0
-
-while [ $POLL_ELAPSED -lt $POLL_TIMEOUT ]; do
-    FOUND_COUNT=0
+check_events() {
+    local FOUND_COUNT=0
     for event in "''${EVENTS[@]}"; do
         if grep -q "$event" "$LOG_FILE" 2>/dev/null; then
             FOUND_COUNT=$((FOUND_COUNT + 1))
         fi
     done
+    [ $FOUND_COUNT -eq ''${#EVENTS[@]} ]
+}
 
-    if [ $FOUND_COUNT -eq ''${#EVENTS[@]} ]; then
+# --- Launch app ---
+echo "=== Launching $BUNDLE_ID ==="
+EVENTS=("Lifecycle: Create" "Lifecycle: Resume")
+xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID"
+
+# --- Poll for lifecycle events ---
+echo "=== Checking for lifecycle events (timeout: 60s) ==="
+POLL_TIMEOUT=60
+POLL_ELAPSED=0
+ALL_FOUND=0
+
+while [ $POLL_ELAPSED -lt $POLL_TIMEOUT ]; do
+    if check_events; then
         ALL_FOUND=1
         break
     fi
-
     sleep 2
     POLL_ELAPSED=$((POLL_ELAPSED + 2))
 done
+
+# --- Retry: log stream can miss early startup messages ---
+# On retry, the stream has been attached for over a minute, so it will
+# reliably capture the lifecycle events from a fresh app launch.
+if [ $ALL_FOUND -eq 0 ]; then
+    echo ""
+    echo "=== Retrying: terminating and relaunching app ==="
+    xcrun simctl terminate "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
+    sleep 3
+    > "$LOG_FILE"
+    xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID"
+
+    POLL_TIMEOUT=30
+    POLL_ELAPSED=0
+    while [ $POLL_ELAPSED -lt $POLL_TIMEOUT ]; do
+        if check_events; then
+            ALL_FOUND=1
+            break
+        fi
+        sleep 2
+        POLL_ELAPSED=$((POLL_ELAPSED + 2))
+    done
+fi
 
 # Stop log capture
 kill "$LOG_PID" 2>/dev/null || true

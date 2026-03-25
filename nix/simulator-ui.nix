@@ -163,17 +163,17 @@ echo "App installed."
 echo "=== Starting log capture ==="
 LOG_FILE="$WORK_DIR/os_log.txt"
 
-# Capture os_log for our process — broader filter than lifecycle test,
-# since we need UIBridge log messages too.
+# Use subsystem predicate — matches os_log_create("me.jappie.haskellmobile", ...)
+# in platform_log.c.  More reliable than process name on newer iOS runtimes.
 xcrun simctl spawn "$SIM_UDID" log stream \
     --level info \
-    --predicate "process == \"HaskellMobile\"" \
+    --predicate "subsystem == \"me.jappie.haskellmobile\"" \
     --style compact \
     > "$LOG_FILE" 2>&1 &
 LOG_PID=$!
 
-# Give log stream a moment to attach
-sleep 2
+# Give log stream generous time to fully attach before launching app
+sleep 5
 
 # --- Launch app with --autotest ---
 echo "=== Launching $BUNDLE_ID with --autotest ==="
@@ -195,8 +195,29 @@ while [ $POLL_ELAPSED -lt $POLL_TIMEOUT ]; do
     POLL_ELAPSED=$((POLL_ELAPSED + 2))
 done
 
+# --- Retry: log stream can miss early startup messages ---
 if [ $RENDER_DONE -eq 0 ]; then
-    echo "WARNING: setRoot not found in os_log after ''${POLL_TIMEOUT}s"
+    echo "WARNING: setRoot not found — retrying with app relaunch"
+    xcrun simctl terminate "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
+    sleep 3
+    > "$LOG_FILE"
+    xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID" --autotest
+
+    POLL_TIMEOUT=60
+    POLL_ELAPSED=0
+    while [ $POLL_ELAPSED -lt $POLL_TIMEOUT ]; do
+        if grep -q "setRoot" "$LOG_FILE" 2>/dev/null; then
+            RENDER_DONE=1
+            echo "Initial render detected after relaunch (~''${POLL_ELAPSED}s)"
+            break
+        fi
+        sleep 2
+        POLL_ELAPSED=$((POLL_ELAPSED + 2))
+    done
+
+    if [ $RENDER_DONE -eq 0 ]; then
+        echo "WARNING: setRoot not found after retry"
+    fi
 fi
 
 # --- Verify initial render ---
