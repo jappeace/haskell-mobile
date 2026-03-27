@@ -59,6 +59,7 @@ common common-options
 
 library haskell-mobile-lifecycle
   import: common-options
+  visibility: public
   exposed-modules:
       HaskellMobile.Lifecycle
   hs-source-dirs:
@@ -71,6 +72,7 @@ library haskell-mobile-lifecycle
 
 library haskell-mobile-ui
   import: common-options
+  visibility: public
   exposed-modules:
       HaskellMobile.Widget
       HaskellMobile.UIBridge
