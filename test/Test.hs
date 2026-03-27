@@ -23,13 +23,13 @@ import HaskellMobile.Lifecycle
   , haskellOnLifecycle
   )
 import HaskellMobile.Widget (Widget(..))
-import HaskellMobile.Render (newRenderState, renderWidget, dispatchEvent)
+import HaskellMobile.Render (newRenderState, renderWidget, dispatchEvent, dispatchTextEvent)
 
 main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests]
+tests = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, textInputTests]
 
 qcProps :: TestTree
 qcProps = testGroup "(checked by QuickCheck)"
@@ -194,8 +194,67 @@ uiTests = testGroup "UI"
       widget <- appView
       -- appView is the counter demo; verify it's a column
       case widget of
-        Column _ -> pure ()
-        Text _   -> assertFailure "expected Column, got Text"
-        Button _ _ -> assertFailure "expected Column, got Button"
-        Row _    -> assertFailure "expected Column, got Row"
+        Column _        -> pure ()
+        Text _          -> assertFailure "expected Column, got Text"
+        Button _ _      -> assertFailure "expected Column, got Button"
+        TextInput _ _ _ -> assertFailure "expected Column, got TextInput"
+        Row _           -> assertFailure "expected Column, got Row"
+  ]
+
+textInputTests :: TestTree
+textInputTests = testGroup "TextInput"
+  [ testCase "text callback fires with correct value" $ do
+      ref <- newIORef ("" :: String)
+      rs <- newRenderState
+      let widget = TextInput "hint" "" (\t -> modifyIORef' ref (const (show t)))
+      renderWidget rs widget
+      -- Callback 0 is the text change handler
+      dispatchTextEvent rs 0 "hello"
+      val <- readIORef ref
+      val @?= show ("hello" :: String)
+
+  , testCase "text callback receives updated value" $ do
+      ref <- newIORef ("" :: String)
+      rs <- newRenderState
+      let widget = TextInput "enter weight" "80" (\t -> modifyIORef' ref (const (show t)))
+      renderWidget rs widget
+      dispatchTextEvent rs 0 "95.5"
+      val <- readIORef ref
+      val @?= show ("95.5" :: String)
+
+  , testCase "dispatchTextEvent with unknown ID does not crash" $ do
+      rs <- newRenderState
+      renderWidget rs (Text "no inputs")
+      -- Should not throw
+      dispatchTextEvent rs 42 "ignored"
+      dispatchTextEvent rs 999 "also ignored"
+
+  , testCase "text and click callbacks share ID space without collision" $ do
+      clickRef <- newIORef False
+      textRef  <- newIORef ("" :: String)
+      rs <- newRenderState
+      let widget = Column
+            [ Button "ok" (modifyIORef' clickRef (const True))
+            , TextInput "hint" "" (\t -> modifyIORef' textRef (const (show t)))
+            ]
+      renderWidget rs widget
+      -- Button gets callback 0, TextInput gets callback 1
+      dispatchEvent rs 0
+      dispatchTextEvent rs 1 "typed"
+      click <- readIORef clickRef
+      text  <- readIORef textRef
+      click @?= True
+      text  @?= show ("typed" :: String)
+
+  , testCase "re-render resets text callbacks" $ do
+      refOld <- newIORef ("" :: String)
+      refNew <- newIORef ("" :: String)
+      rs <- newRenderState
+      renderWidget rs (TextInput "old" "" (\t -> modifyIORef' refOld (const (show t))))
+      renderWidget rs (TextInput "new" "" (\t -> modifyIORef' refNew (const (show t))))
+      dispatchTextEvent rs 0 "val"
+      old <- readIORef refOld
+      new <- readIORef refNew
+      old @?= ""
+      new @?= show ("val" :: String)
   ]

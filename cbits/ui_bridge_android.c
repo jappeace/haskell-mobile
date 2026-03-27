@@ -24,6 +24,7 @@
 
 /* Haskell FFI exports (declared here since this file is compiled by NDK) */
 extern void haskellOnUIEvent(void *ctx, int callbackId);
+extern void haskellOnUITextChange(void *ctx, int callbackId, const char *text);
 
 /* ---- Global state (valid only on the UI thread) ---- */
 static JNIEnv  *g_env      = NULL;
@@ -39,6 +40,7 @@ static int32_t  g_next_node_id = 1;
 /* Cached JNI class/method IDs (resolved once in setup) */
 static jclass   g_class_TextView;
 static jclass   g_class_Button;
+static jclass   g_class_EditText;
 static jclass   g_class_LinearLayout;
 static jclass   g_class_ViewGroup;
 static jclass   g_class_ViewGroup_LayoutParams;
@@ -46,11 +48,13 @@ static jclass   g_class_Integer;
 
 static jmethodID g_ctor_TextView;
 static jmethodID g_ctor_Button;
+static jmethodID g_ctor_EditText;
 static jmethodID g_ctor_LinearLayout;
 static jmethodID g_ctor_ViewGroup_LayoutParams;
 static jmethodID g_ctor_Integer;
 
 static jmethodID g_method_setText;
+static jmethodID g_method_setHint;
 static jmethodID g_method_setOrientation;
 static jmethodID g_method_addView;
 static jmethodID g_method_removeView;
@@ -60,6 +64,7 @@ static jmethodID g_method_setTag;
 static jmethodID g_method_getTag;
 static jmethodID g_method_intValue;
 static jmethodID g_method_setOnClickListener;
+static jmethodID g_method_registerTextWatcher;
 
 /* LinearLayout orientation constants */
 static jint ORIENTATION_VERTICAL   = 1;
@@ -102,6 +107,10 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     if (!cls) return -1;
     g_class_Button = (*env)->NewGlobalRef(env, cls);
 
+    cls = (*env)->FindClass(env, "android/widget/EditText");
+    if (!cls) return -1;
+    g_class_EditText = (*env)->NewGlobalRef(env, cls);
+
     cls = (*env)->FindClass(env, "android/widget/LinearLayout");
     if (!cls) return -1;
     g_class_LinearLayout = (*env)->NewGlobalRef(env, cls);
@@ -123,6 +132,8 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
         "<init>", "(Landroid/content/Context;)V");
     g_ctor_Button = (*env)->GetMethodID(env, g_class_Button,
         "<init>", "(Landroid/content/Context;)V");
+    g_ctor_EditText = (*env)->GetMethodID(env, g_class_EditText,
+        "<init>", "(Landroid/content/Context;)V");
     g_ctor_LinearLayout = (*env)->GetMethodID(env, g_class_LinearLayout,
         "<init>", "(Landroid/content/Context;)V");
     g_ctor_ViewGroup_LayoutParams = (*env)->GetMethodID(env,
@@ -133,6 +144,8 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     /* Resolve methods */
     g_method_setText = (*env)->GetMethodID(env, g_class_TextView,
         "setText", "(Ljava/lang/CharSequence;)V");
+    g_method_setHint = (*env)->GetMethodID(env, g_class_TextView,
+        "setHint", "(Ljava/lang/CharSequence;)V");
     g_method_setOrientation = (*env)->GetMethodID(env, g_class_LinearLayout,
         "setOrientation", "(I)V");
     g_method_addView = (*env)->GetMethodID(env, g_class_ViewGroup,
@@ -160,6 +173,11 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     /* View.setOnClickListener(OnClickListener) — Activity implements it */
     g_method_setOnClickListener = (*env)->GetMethodID(env, viewClass,
         "setOnClickListener", "(Landroid/view/View$OnClickListener;)V");
+
+    /* Activity.registerTextWatcher(EditText) — our custom Java method */
+    jclass actClass = (*env)->GetObjectClass(env, activity);
+    g_method_registerTextWatcher = (*env)->GetMethodID(env, actClass,
+        "registerTextWatcher", "(Landroid/widget/EditText;)V");
 
     return 0;
 }
@@ -200,6 +218,9 @@ static int32_t android_create_node(int32_t nodeType)
         (*env)->CallVoidMethod(env, view, g_method_setOrientation, ORIENTATION_HORIZONTAL);
         break;
     }
+    case UI_NODE_TEXT_INPUT:
+        view = (*env)->NewObject(env, g_class_EditText, g_ctor_EditText, g_activity);
+        break;
     default:
         LOGE("Unknown node type: %d", nodeType);
         return 0;
@@ -232,6 +253,13 @@ static void android_set_str_prop(int32_t nodeId, int32_t propId, const char *val
         (*env)->DeleteLocalRef(env, jstr);
         break;
     }
+    case UI_PROP_HINT: {
+        LOGI("setStrProp(node=%d, hint=\"%s\")", nodeId, value);
+        jstring jstr = (*env)->NewStringUTF(env, value);
+        (*env)->CallVoidMethod(env, view, g_method_setHint, jstr);
+        (*env)->DeleteLocalRef(env, jstr);
+        break;
+    }
     default:
         LOGI("setStrProp: unknown propId %d", propId);
         break;
@@ -250,20 +278,26 @@ static void android_set_handler(int32_t nodeId, int32_t eventType, int32_t callb
     jobject view = get_node(nodeId);
     if (!view) return;
 
-    if (eventType != UI_EVENT_CLICK) {
-        LOGI("setHandler: unknown eventType %d", eventType);
-        return;
-    }
-
     /* Store callbackId as the view's tag (Integer) */
     jobject tagObj = (*env)->NewObject(env, g_class_Integer, g_ctor_Integer, callbackId);
     (*env)->CallVoidMethod(env, view, g_method_setTag, tagObj);
     (*env)->DeleteLocalRef(env, tagObj);
 
-    /* Register the Activity (which implements OnClickListener) as handler */
-    (*env)->CallVoidMethod(env, view, g_method_setOnClickListener, g_activity);
-
-    LOGI("setHandler(node=%d, click, callback=%d)", nodeId, callbackId);
+    switch (eventType) {
+    case UI_EVENT_CLICK:
+        /* Register the Activity (which implements OnClickListener) as handler */
+        (*env)->CallVoidMethod(env, view, g_method_setOnClickListener, g_activity);
+        LOGI("setHandler(node=%d, click, callback=%d)", nodeId, callbackId);
+        break;
+    case UI_EVENT_TEXT_CHANGE:
+        /* Register a TextWatcher via our Java helper */
+        (*env)->CallVoidMethod(env, g_activity, g_method_registerTextWatcher, view);
+        LOGI("setHandler(node=%d, textChange, callback=%d)", nodeId, callbackId);
+        break;
+    default:
+        LOGI("setHandler: unknown eventType %d", eventType);
+        break;
+    }
 }
 
 static void android_add_child(int32_t parentId, int32_t childId)
@@ -364,4 +398,31 @@ void android_handle_click(JNIEnv *env, jobject view)
 
     LOGI("Click dispatched: callbackId=%d", callbackId);
     haskellOnUIEvent(g_haskell_ctx, callbackId);
+}
+
+/*
+ * Handle a text change event from Java. Looks up the callbackId from
+ * the view's tag and dispatches to Haskell with the new text.
+ * Does NOT trigger a re-render (avoids EditText cursor/flicker).
+ */
+void android_handle_text_change(JNIEnv *env, jobject view, jstring text)
+{
+    g_env = env;
+
+    jobject tagObj = (*env)->CallObjectMethod(env, view, g_method_getTag);
+    if (!tagObj) {
+        LOGI("Text change on view with no tag — ignoring");
+        return;
+    }
+
+    jint callbackId = (*env)->CallIntMethod(env, tagObj, g_method_intValue);
+    (*env)->DeleteLocalRef(env, tagObj);
+
+    const char *ctext = (*env)->GetStringUTFChars(env, text, NULL);
+    if (!ctext) return;
+
+    LOGI("Text change dispatched: callbackId=%d, text=\"%s\"", callbackId, ctext);
+    haskellOnUITextChange(g_haskell_ctx, callbackId, ctext);
+
+    (*env)->ReleaseStringUTFChars(env, text, ctext);
 }

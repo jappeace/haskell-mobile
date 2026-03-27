@@ -30,7 +30,8 @@ import HaskellMobile.Lifecycle
   , newMobileContext
   , freeMobileContext
   )
-import HaskellMobile.Render (RenderState, newRenderState, renderWidget, dispatchEvent)
+import Data.Text (pack)
+import HaskellMobile.Render (RenderState, newRenderState, renderWidget, dispatchEvent, dispatchTextEvent)
 import System.IO.Unsafe (unsafePerformIO)
 
 -- | Global render state, shared across all render/event cycles.
@@ -83,3 +84,13 @@ haskellOnUIEvent _ctxPtr callbackId = do
   renderWidget globalRenderState widget
 
 foreign export ccall haskellOnUIEvent :: Ptr () -> CInt -> IO ()
+
+-- | Handle a text change event from native code. Dispatches the callback
+-- identified by @callbackId@ with the new text value. Does NOT re-render
+-- to avoid EditText cursor/flicker issues on Android.
+haskellOnUITextChange :: Ptr () -> CInt -> CString -> IO ()
+haskellOnUITextChange _ctxPtr callbackId cstr = do
+  str <- peekCString cstr
+  dispatchTextEvent globalRenderState (fromIntegral callbackId) (pack str)
+
+foreign export ccall haskellOnUITextChange :: Ptr () -> CInt -> CString -> IO ()

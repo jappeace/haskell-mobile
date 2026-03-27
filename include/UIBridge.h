@@ -4,21 +4,24 @@
 #include <stdint.h>
 
 /* Node types */
-#define UI_NODE_TEXT   0
-#define UI_NODE_BUTTON 1
-#define UI_NODE_COLUMN 2
-#define UI_NODE_ROW    3
+#define UI_NODE_TEXT       0
+#define UI_NODE_BUTTON     1
+#define UI_NODE_COLUMN     2
+#define UI_NODE_ROW        3
+#define UI_NODE_TEXT_INPUT 4
 
 /* Property IDs for string properties */
 #define UI_PROP_TEXT      0
 #define UI_PROP_COLOR     1
+#define UI_PROP_HINT      2
 
 /* Property IDs for numeric properties */
 #define UI_PROP_FONT_SIZE 0
 #define UI_PROP_PADDING   1
 
 /* Event types */
-#define UI_EVENT_CLICK 0
+#define UI_EVENT_CLICK       0
+#define UI_EVENT_TEXT_CHANGE  1
 
 /*
  * Function pointer table filled by the platform (Android/iOS).

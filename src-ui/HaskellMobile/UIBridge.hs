@@ -33,19 +33,22 @@ data NodeType
   | NodeButton
   | NodeColumn
   | NodeRow
+  | NodeTextInput
   deriving (Show, Eq, Enum, Bounded)
 
 -- | Map a 'NodeType' to its C integer code.
 nodeTypeToInt :: NodeType -> Int32
-nodeTypeToInt NodeText   = 0
-nodeTypeToInt NodeButton = 1
-nodeTypeToInt NodeColumn = 2
-nodeTypeToInt NodeRow    = 3
+nodeTypeToInt NodeText      = 0
+nodeTypeToInt NodeButton    = 1
+nodeTypeToInt NodeColumn    = 2
+nodeTypeToInt NodeRow       = 3
+nodeTypeToInt NodeTextInput = 4
 
 -- | Property identifiers for 'setStrProp' and 'setNumProp'.
 data PropId
   = PropText
   | PropColor
+  | PropHint
   | PropFontSize
   | PropPadding
   deriving (Show, Eq, Enum, Bounded)
@@ -54,16 +57,20 @@ data PropId
 propIdToInt :: PropId -> Int32
 propIdToInt PropText     = 0
 propIdToInt PropColor    = 1
+propIdToInt PropHint     = 2
 propIdToInt PropFontSize = 0
 propIdToInt PropPadding  = 1
 
 -- | Event types corresponding to @UI_EVENT_*@ in @UIBridge.h@.
-data EventType = EventClick
+data EventType
+  = EventClick
+  | EventTextChange
   deriving (Show, Eq, Enum, Bounded)
 
 -- | Map an 'EventType' to its C integer code.
 eventTypeToInt :: EventType -> Int32
-eventTypeToInt EventClick = 0
+eventTypeToInt EventClick      = 0
+eventTypeToInt EventTextChange = 1
 
 -- Raw FFI imports
 foreign import ccall "ui_create_node"  c_createNode  :: CInt -> IO CInt

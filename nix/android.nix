@@ -104,6 +104,7 @@ in pkgs.stdenv.mkDerivation {
       -optl-Wl,-u,haskellCreateContext \
       -optl-Wl,-u,haskellRenderUI \
       -optl-Wl,-u,haskellOnUIEvent \
+      -optl-Wl,-u,haskellOnUITextChange \
       -optl-Wl,--whole-archive \
       -optl$GHC_PKG_DIR/rts-1.0.2/libHSrts-1.0.2.a \
       -optl$GHC_PKG_DIR/ghc-prim-0.12.0-b5b0/libHSghc-prim-0.12.0-b5b0.a \

@@ -16,6 +16,9 @@ data Widget
     -- ^ A read-only text label.
   | Button Text (IO ())
     -- ^ A tappable button with a label and click handler.
+  | TextInput Text Text (Text -> IO ())
+    -- ^ A text input field: placeholder, current value, onChange handler.
+    -- Follows a controlled-component pattern: Haskell owns the state.
   | Column [Widget]
     -- ^ A vertical container laying out children top-to-bottom.
   | Row [Widget]

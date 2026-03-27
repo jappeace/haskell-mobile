@@ -17,10 +17,12 @@ extern void *haskellCreateContext(void);
 extern void haskellOnLifecycle(void *ctx, int eventType);
 extern void haskellRenderUI(void *ctx);
 extern void haskellOnUIEvent(void *ctx, int callbackId);
+extern void haskellOnUITextChange(void *ctx, int callbackId, const char *text);
 
 /* Android UI bridge (from ui_bridge_android.c) */
 extern void setup_android_ui_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
 extern void android_handle_click(JNIEnv *env, jobject view);
+extern void android_handle_text_change(JNIEnv *env, jobject view, jstring text);
 
 /* Lifecycle event codes (must match HaskellMobile.h) */
 #define LIFECYCLE_CREATE     0
@@ -79,6 +81,12 @@ JNIEXPORT void JNICALL
 Java_me_jappie_haskellmobile_MainActivity_onButtonClick(JNIEnv *env, jobject thiz, jobject view)
 {
     android_handle_click(env, view);
+}
+
+JNIEXPORT void JNICALL
+Java_me_jappie_haskellmobile_MainActivity_onTextChange(JNIEnv *env, jobject thiz, jobject view, jstring text)
+{
+    android_handle_text_change(env, view, text);
 }
 
 /* Lifecycle JNI callbacks */

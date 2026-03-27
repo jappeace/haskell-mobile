@@ -3,13 +3,14 @@
 -- via the C bridge.
 --
 -- Uses a full clear-and-rebuild strategy on every render.
--- Maintains a callback registry so native button presses can be
--- dispatched back to Haskell 'IO' actions.
+-- Maintains callback registries so native button presses and text
+-- changes can be dispatched back to Haskell 'IO' actions.
 module HaskellMobile.Render
   ( RenderState(..)
   , newRenderState
   , renderWidget
   , dispatchEvent
+  , dispatchTextEvent
   )
 where
 
@@ -17,30 +18,35 @@ import Data.IORef (IORef, newIORef, readIORef, writeIORef, modifyIORef')
 import Data.Int (Int32)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
+import Data.Text (Text)
 import HaskellMobile.Widget (Widget(..))
 import HaskellMobile.UIBridge qualified as Bridge
 import System.IO (hPutStrLn, stderr)
 
 -- | Mutable state for the rendering engine.
--- Holds the callback registry and next callback ID counter.
+-- Holds the callback registries and next callback ID counter.
 data RenderState = RenderState
-  { rsCallbacks :: IORef (IntMap (IO ()))
-    -- ^ Map from callbackId -> IO action
-  , rsNextId    :: IORef Int32
+  { rsCallbacks     :: IORef (IntMap (IO ()))
+    -- ^ Map from callbackId -> IO action (for clicks)
+  , rsTextCallbacks :: IORef (IntMap (Text -> IO ()))
+    -- ^ Map from callbackId -> text change handler
+  , rsNextId        :: IORef Int32
     -- ^ Next available callback ID
   }
 
 -- | Create a fresh 'RenderState' with no registered callbacks.
 newRenderState :: IO RenderState
 newRenderState = do
-  callbacks <- newIORef IntMap.empty
-  nextId    <- newIORef 0
+  callbacks     <- newIORef IntMap.empty
+  textCallbacks <- newIORef IntMap.empty
+  nextId        <- newIORef 0
   pure RenderState
-    { rsCallbacks = callbacks
-    , rsNextId    = nextId
+    { rsCallbacks     = callbacks
+    , rsTextCallbacks = textCallbacks
+    , rsNextId        = nextId
     }
 
--- | Register a callback and return its ID.
+-- | Register a click callback and return its ID.
 registerCallback :: RenderState -> IO () -> IO Int32
 registerCallback rs action = do
   cid <- readIORef (rsNextId rs)
@@ -48,10 +54,19 @@ registerCallback rs action = do
   writeIORef (rsNextId rs) (cid + 1)
   pure cid
 
--- | Reset the callback registry (called before each re-render).
+-- | Register a text-change callback and return its ID.
+registerTextCallback :: RenderState -> (Text -> IO ()) -> IO Int32
+registerTextCallback rs action = do
+  cid <- readIORef (rsNextId rs)
+  modifyIORef' (rsTextCallbacks rs) (IntMap.insert (fromIntegral cid) action)
+  writeIORef (rsNextId rs) (cid + 1)
+  pure cid
+
+-- | Reset both callback registries (called before each re-render).
 resetCallbacks :: RenderState -> IO ()
 resetCallbacks rs = do
   writeIORef (rsCallbacks rs) IntMap.empty
+  writeIORef (rsTextCallbacks rs) IntMap.empty
   writeIORef (rsNextId rs) 0
 
 -- | Render a single 'Widget' node, returning its native node ID.
@@ -65,6 +80,13 @@ renderNode rs (Button label action) = do
   Bridge.setStrProp nodeId Bridge.PropText label
   callbackId <- registerCallback rs action
   Bridge.setHandler nodeId Bridge.EventClick callbackId
+  pure nodeId
+renderNode rs (TextInput hint value onChange) = do
+  nodeId <- Bridge.createNode Bridge.NodeTextInput
+  Bridge.setStrProp nodeId Bridge.PropText value
+  Bridge.setStrProp nodeId Bridge.PropHint hint
+  callbackId <- registerTextCallback rs onChange
+  Bridge.setHandler nodeId Bridge.EventTextChange callbackId
   pure nodeId
 renderNode rs (Column children) = do
   nodeId <- Bridge.createNode Bridge.NodeColumn
@@ -92,7 +114,7 @@ renderWidget rs widget = do
   rootId <- renderNode rs widget
   Bridge.setRoot rootId
 
--- | Dispatch a native event to the registered Haskell callback.
+-- | Dispatch a native click event to the registered Haskell callback.
 -- Logs an error to stderr if the callbackId is not found.
 dispatchEvent :: RenderState -> Int32 -> IO ()
 dispatchEvent rs callbackId = do
@@ -101,3 +123,14 @@ dispatchEvent rs callbackId = do
     Just action -> action
     Nothing     -> hPutStrLn stderr $
       "dispatchEvent: unknown callback ID " ++ show callbackId
+
+-- | Dispatch a native text-change event to the registered Haskell callback.
+-- Does NOT trigger a re-render (avoids EditText flicker on Android).
+-- Logs an error to stderr if the callbackId is not found.
+dispatchTextEvent :: RenderState -> Int32 -> Text -> IO ()
+dispatchTextEvent rs callbackId newText = do
+  callbacks <- readIORef (rsTextCallbacks rs)
+  case IntMap.lookup (fromIntegral callbackId) callbacks of
+    Just action -> action newText
+    Nothing     -> hPutStrLn stderr $
+      "dispatchTextEvent: unknown callback ID " ++ show callbackId

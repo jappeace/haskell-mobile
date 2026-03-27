@@ -2,7 +2,10 @@ package me.jappie.haskellmobile;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
+import android.widget.EditText;
 
 public class MainActivity extends Activity implements View.OnClickListener {
 
@@ -13,6 +16,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
     private native String greet(String name);
     private native void renderUI();
     private native void onButtonClick(View view);
+    private native void onTextChange(View view, String text);
     private native void onLifecycleCreate();
     private native void onLifecycleStart();
     private native void onLifecycleResume();
@@ -32,6 +36,26 @@ public class MainActivity extends Activity implements View.OnClickListener {
     @Override
     public void onClick(View v) {
         onButtonClick(v);
+    }
+
+    /**
+     * Register a TextWatcher on an EditText. Called from native code
+     * when a TextInput widget has an EventTextChange handler.
+     * The watcher forwards text changes to the native onTextChange method.
+     */
+    public void registerTextWatcher(final EditText editText) {
+        editText.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                onTextChange(editText, s.toString());
+            }
+        });
     }
 
     @Override
