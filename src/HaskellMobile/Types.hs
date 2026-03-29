@@ -27,7 +27,7 @@ globalMobileApp = unsafePerformIO (newIORef Nothing)
 {-# NOINLINE globalMobileApp #-}
 
 -- | Register the mobile app. Must be called before any FFI entry point.
--- Desktop apps call this from 'main'. Platform builds call it from 'haskellInit'.
+-- The user's @main :: IO ()@ calls this to register their app.
 runMobileApp :: MobileApp -> IO ()
 runMobileApp = writeIORef globalMobileApp . Just
 

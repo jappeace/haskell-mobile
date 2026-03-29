@@ -17,7 +17,7 @@ class HaskellBridge {
     /// Initialize the Haskell RTS. Must be called before any other Haskell function.
     static func initialize() {
         hs_init(nil, nil)
-        haskellInit()
+        haskellRunMain()
         context = haskellCreateContext()
     }
 

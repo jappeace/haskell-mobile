@@ -6,8 +6,13 @@
 # Uses pre-built GHC from nixpkgs (cache.nixos.org) instead of
 # haskell.nix, which tries to build GHC from source and OOMs on
 # CI runners with limited RAM.
+# mainModule: path to the user's Main.hs.
+# The user writes a plain main :: IO () that calls runMobileApp.
+# No foreign export ccall needed — the C bridge calls main via
+# the GHC RTS API (rts_evalLazyIO on ZCMain_main_closure).
 { sources ? import ../npins
 , simulator ? false
+, mainModule ? ../app/MobileMain.hs
 }:
 let
   pkgs = import sources.nixpkgs {};
@@ -43,13 +48,15 @@ in pkgs.stdenv.mkDerivation {
     cp ${../src}/HaskellMobile/UIBridge.hs HaskellMobile/
     cp ${../src}/HaskellMobile/Render.hs HaskellMobile/
 
+    # Copy user entry point (plain main :: IO (), no foreign export needed)
+    cp ${mainModule} Main.hs
+
     ghc -staticlib \
       -O2 \
-      -DHASKELL_MOBILE_PLATFORM \
       -o libHaskellMobile.a \
       -I${../include} \
       -optl-lffi \
-      -optl-Wl,-u,_haskellInit \
+      -optl-Wl,-u,_haskellRunMain \
       -optl-Wl,-u,_haskellGreet \
       -optl-Wl,-u,_haskellOnLifecycle \
       -optl-Wl,-u,_haskellCreateContext \
@@ -57,6 +64,8 @@ in pkgs.stdenv.mkDerivation {
       -optl-Wl,-u,_haskellOnUIEvent \
       ${../cbits/platform_log.c} \
       ${../cbits/ui_bridge.c} \
+      ${../cbits/run_main.c} \
+      Main.hs \
       HaskellMobile.hs
   '';
 

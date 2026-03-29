@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE OverloadedStrings #-}
 module HaskellMobile
@@ -6,7 +5,6 @@ module HaskellMobile
   , runMobileApp
   , getMobileApp
   -- FFI exports
-  , haskellInit
   , haskellGreet
   , haskellCreateContext
   -- Re-exports from Lifecycle
@@ -38,27 +36,11 @@ import HaskellMobile.Render (RenderState, newRenderState, renderWidget, dispatch
 import HaskellMobile.Types (MobileApp(..), runMobileApp, getMobileApp)
 import System.IO.Unsafe (unsafePerformIO)
 
-#ifdef HASKELL_MOBILE_PLATFORM
-import HaskellMobile.App (mobileApp)
-#endif
-
 -- | Global render state, shared across all render/event cycles.
 -- Safe because all UI calls happen on the main thread.
 globalRenderState :: RenderState
 globalRenderState = unsafePerformIO newRenderState
 {-# NOINLINE globalRenderState #-}
-
--- | Called from platform bridges (JNI_OnLoad on Android, hs_init wrapper on iOS).
--- On platform builds (CPP flag HASKELL_MOBILE_PLATFORM), also registers
--- the downstream app via 'runMobileApp'.
-haskellInit :: IO ()
-haskellInit = do
-  platformLog "Haskell RTS initialized"
-#ifdef HASKELL_MOBILE_PLATFORM
-  runMobileApp mobileApp
-#endif
-
-foreign export ccall haskellInit :: IO ()
 
 -- | Takes a name as CString, returns "Hello from Haskell, <name>!" as CString.
 -- Caller is responsible for freeing the returned CString.
@@ -70,7 +52,7 @@ haskellGreet cname = do
 foreign export ccall haskellGreet :: CString -> IO CString
 
 -- | Create a 'MobileContext' and return it as an opaque pointer
--- for C code. Called by platform bridges after 'haskellInit'.
+-- for C code. Called by platform bridges after 'haskellRunMain'.
 -- Reads the context from the registered 'MobileApp'.
 haskellCreateContext :: IO (Ptr ())
 haskellCreateContext = do

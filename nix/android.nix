@@ -5,7 +5,13 @@
 #
 # Uses Google's prebuilt NDK toolchain via nixpkgs, avoiding the
 # LLVM 19 compiler-rt issue (NixOS/nixpkgs#380604).
-{ sources ? import ../npins }:
+# mainModule: path to the user's Main.hs.
+# The user writes a plain main :: IO () that calls runMobileApp.
+# No foreign export ccall needed — the C bridge calls main via
+# the GHC RTS API (rts_evalLazyIO on ZCMain_main_closure).
+{ sources ? import ../npins
+, mainModule ? ../app/MobileMain.hs
+}:
 let
   pkgs = import sources.nixpkgs {
     config.allowUnfree = true;
@@ -74,6 +80,9 @@ in pkgs.stdenv.mkDerivation {
     cp ${../src}/HaskellMobile/UIBridge.hs HaskellMobile/
     cp ${../src}/HaskellMobile/Render.hs HaskellMobile/
 
+    # Copy user entry point (plain main :: IO (), no foreign export needed)
+    cp ${mainModule} Main.hs
+
     # Step 3: Compile Haskell to shared library with cross-GHC.
     # We use --whole-archive to statically link GHC's boot libraries
     # (RTS, base, ghc-prim, etc.) into our .so — Android's linker
@@ -86,13 +95,14 @@ in pkgs.stdenv.mkDerivation {
 
     ${ghcCmd} -shared -O2 \
       -o libhaskellmobile.so \
-      -DHASKELL_MOBILE_PLATFORM \
       -I${../include} \
+      Main.hs \
       HaskellMobile.hs \
       ${../cbits/android_stubs.c} \
       ${../cbits/platform_log.c} \
       ${../cbits/numa_stubs.c} \
       ${../cbits/ui_bridge.c} \
+      ${../cbits/run_main.c} \
       -optl-L${androidPkgs.gmp}/lib \
       -optl-L${androidPkgs.libffi}/lib \
       -optl-lffi \
@@ -100,7 +110,7 @@ in pkgs.stdenv.mkDerivation {
       -optl-Wl,-z,max-page-size=16384 \
       -optl$(pwd)/jni_bridge.o \
       -optl$(pwd)/ui_bridge_android.o \
-      -optl-Wl,-u,haskellInit \
+      -optl-Wl,-u,haskellRunMain \
       -optl-Wl,-u,haskellGreet \
       -optl-Wl,-u,haskellOnLifecycle \
       -optl-Wl,-u,haskellCreateContext \

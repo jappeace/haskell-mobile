@@ -7,11 +7,17 @@
 void hs_init(int *argc, char **argv[]);
 
 /* Haskell FFI exports */
-void haskellInit(void);
 char *haskellGreet(const char *name);
 
-/* Create a default mobile context. Returns an opaque pointer.
- * Call after haskellInit(). */
+/* Run the user's Haskell main :: IO ().
+ * Uses the GHC RTS API to evaluate ZCMain_main_closure — no
+ * foreign export ccall needed in the user's Main.hs.
+ * The user's main must call runMobileApp to register their app.
+ * Call after hs_init(). */
+void haskellRunMain(void);
+
+/* Create a mobile context from the registered app. Returns an opaque pointer.
+ * Call after haskellRunMain(). */
 void *haskellCreateContext(void);
 
 /* Platform-aware logging (Android logcat / Apple os_log / stderr) */

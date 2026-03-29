@@ -1,17 +1,20 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
 import HaskellMobile (runMobileApp, platformLog, MobileApp(maContext))
 import HaskellMobile.App (mobileApp)
 import HaskellMobile.Lifecycle (LifecycleEvent(..), MobileContext(onLifecycle))
 
--- | Simulate a mobile app lifecycle.
--- On Android\/iOS the platform bridge dispatches these events via
--- 'haskellOnLifecycle'.  Here we drive them from Haskell to show
--- that the listener callback fires for every event.
+-- | Desktop entry point. Registers the app, then simulates a mobile
+-- lifecycle to exercise the callbacks.
+--
+-- On Android\/iOS, the platform bridge runs the user's @main@ via
+-- @haskellRunMain()@ (cbits\/run_main.c) instead of GHC's generated
+-- C main stub.
 main :: IO ()
 main = do
   runMobileApp mobileApp
-  platformLog "Waiting for lifecycle events..."
+  platformLog "Haskell app registered"
   let listen = onLifecycle (maContext mobileApp)
 
   -- Simulate the platform sending lifecycle events
