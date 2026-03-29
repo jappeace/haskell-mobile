@@ -57,76 +57,27 @@ common common-options
 
   default-language: Haskell2010
 
-library haskell-mobile-lifecycle
-  import: common-options
-  visibility: public
-  exposed-modules:
-      HaskellMobile.Lifecycle
-  hs-source-dirs:
-      src-lifecycle
-  build-depends:
-      text
-  c-sources:
-      cbits/android_stubs.c
-      cbits/platform_log.c
-
-library haskell-mobile-ui
-  import: common-options
-  visibility: public
-  exposed-modules:
-      HaskellMobile.Widget
-      HaskellMobile.UIBridge
-      HaskellMobile.Render
-  hs-source-dirs:
-      src-ui
-  build-depends:
-      text,
-      containers
-  c-sources:
-      cbits/ui_bridge.c
-  include-dirs:
-      include
-
 library
   import: common-options
   exposed-modules:
       HaskellMobile
       HaskellMobile.Types
-  reexported-modules:
+      HaskellMobile.App
       HaskellMobile.Lifecycle
+      HaskellMobile.Widget
+      HaskellMobile.UIBridge
+      HaskellMobile.Render
   hs-source-dirs:
       src
   build-depends:
-      haskell-mobile:haskell-mobile-lifecycle,
-      haskell-mobile:haskell-mobile-ui,
-      text
-
-library haskell-mobile-default-app
-  import: common-options
-  exposed-modules:
-      HaskellMobile.App
-  hs-source-dirs:
-      default-app
-  build-depends:
-      haskell-mobile,
-      haskell-mobile:haskell-mobile-lifecycle,
-      haskell-mobile:haskell-mobile-ui,
-      text
-
--- | Collects all project libraries for consumers (exe, tests).
-library haskell-mobile-app
-  import: common-options
-  reexported-modules:
-      HaskellMobile,
-      HaskellMobile.Lifecycle,
-      HaskellMobile.App,
-      HaskellMobile.Widget,
-      HaskellMobile.Render
-  build-depends:
-      haskell-mobile,
-      haskell-mobile:haskell-mobile-default-app,
-      haskell-mobile:haskell-mobile-lifecycle,
-      haskell-mobile:haskell-mobile-ui
+      text,
+      containers
+  c-sources:
+      cbits/android_stubs.c
+      cbits/platform_log.c
+      cbits/ui_bridge.c
+  include-dirs:
+      include
 
 executable exe
   import: common-options
@@ -134,7 +85,7 @@ executable exe
   hs-source-dirs:
       app
   build-depends:
-      haskell-mobile:haskell-mobile-app
+      haskell-mobile
   ghc-options: -Wno-unused-packages -threaded -rtsopts "-with-rtsopts=-N -M7G -T -Iw10"
 
 test-suite unit
@@ -148,4 +99,4 @@ test-suite unit
       tasty,
       tasty-hunit,
       tasty-quickcheck,
-      haskell-mobile:haskell-mobile-app
+      haskell-mobile
