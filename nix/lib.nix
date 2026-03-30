@@ -136,9 +136,35 @@ in {
         cp ${haskellMobileSrc}/cbits/run_main.c cbits/
 
         # Step 4: Compile Haskell to shared library with cross-GHC.
+        # Discover library paths dynamically — hash suffixes vary across nixpkgs.
         GHC_PKG_DIR="${ghcPkgDir}"
-        CONTAINERS_LIB=$(find $GHC_PKG_DIR -name "libHScontainers-*.a" | head -1)
-        echo "Containers lib: $CONTAINERS_LIB"
+
+        find_lib() {
+          local result
+          result=$(find "$GHC_PKG_DIR" -name "libHS$1-*.a" ! -name '*-ghc*' | head -1)
+          if [ -z "$result" ]; then
+            echo "ERROR: Could not find library: $1" >&2
+            exit 1
+          fi
+          echo "$result"
+        }
+
+        RTS_LIB=$(find_lib "rts")
+        GHC_PRIM_LIB=$(find_lib "ghc-prim")
+        GHC_BIGNUM_LIB=$(find_lib "ghc-bignum")
+        GHC_INTERNAL_LIB=$(find_lib "ghc-internal")
+        BASE_LIB=$(find_lib "base")
+        INTEGER_GMP_LIB=$(find_lib "integer-gmp")
+        TEXT_LIB=$(find_lib "text")
+        ARRAY_LIB=$(find_lib "array")
+        DEEPSEQ_LIB=$(find_lib "deepseq")
+        CONTAINERS_LIB=$(find_lib "containers")
+
+        echo "Libraries discovered:"
+        echo "  rts: $RTS_LIB"
+        echo "  ghc-prim: $GHC_PRIM_LIB"
+        echo "  base: $BASE_LIB"
+        echo "  containers: $CONTAINERS_LIB"
 
         ${ghcCmd} -shared -O2 \
           -o ${soName} \
@@ -167,15 +193,15 @@ in {
           -optl-Wl,-u,haskellOnUIEvent \
           -optl-Wl,-u,haskellOnUITextChange \
           -optl-Wl,--whole-archive \
-          -optl$GHC_PKG_DIR/rts-1.0.2/libHSrts-1.0.2.a \
-          -optl$GHC_PKG_DIR/ghc-prim-0.12.0-b5b0/libHSghc-prim-0.12.0-b5b0.a \
-          -optl$GHC_PKG_DIR/ghc-bignum-1.3-3be2/libHSghc-bignum-1.3-3be2.a \
-          -optl$GHC_PKG_DIR/ghc-internal-9.1003.0-04f5/libHSghc-internal-9.1003.0-04f5.a \
-          -optl$GHC_PKG_DIR/base-4.20.2.0-ecb4/libHSbase-4.20.2.0-ecb4.a \
-          -optl$GHC_PKG_DIR/integer-gmp-1.1-e5a1/libHSinteger-gmp-1.1-e5a1.a \
-          -optl$GHC_PKG_DIR/text-2.1.3-8cdf/libHStext-2.1.3-8cdf.a \
-          -optl$GHC_PKG_DIR/array-0.5.8.0-39be/libHSarray-0.5.8.0-39be.a \
-          -optl$GHC_PKG_DIR/deepseq-1.5.0.0-dd79/libHSdeepseq-1.5.0.0-dd79.a \
+          -optl$RTS_LIB \
+          -optl$GHC_PRIM_LIB \
+          -optl$GHC_BIGNUM_LIB \
+          -optl$GHC_INTERNAL_LIB \
+          -optl$BASE_LIB \
+          -optl$INTEGER_GMP_LIB \
+          -optl$TEXT_LIB \
+          -optl$ARRAY_LIB \
+          -optl$DEEPSEQ_LIB \
           -optl$CONTAINERS_LIB \
           -optl-Wl,--no-whole-archive
       '';
