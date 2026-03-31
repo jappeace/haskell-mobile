@@ -63,11 +63,16 @@ in {
     , mainModule
     , pname ? "haskell-mobile-android"
     , soName ? "libhaskellmobile.so"
+    , javaPackageName ? "me.jappie.haskellmobile"
+    , extraJniBridge ? []
     , extraNdkCompile ? (_: _: "")
     , extraModuleCopy ? ""
     , extraLinkObjects ? []
     , extraGhcIncludeDirs ? []
     }:
+    let
+      jniPackageMacro = builtins.replaceStrings ["."] ["_"] javaPackageName;
+    in
     pkgs.stdenv.mkDerivation {
       inherit pname;
       version = "0.1.0.0";
@@ -88,6 +93,7 @@ in {
 
         # Step 1: Compile JNI bridge and Android UI bridge with NDK clang
         ${ndkCc} -c -fPIC \
+          -DJNI_PACKAGE=${jniPackageMacro} \
           -I${sysroot}/usr/include \
           -I$RTS_INCLUDE \
           -I${haskellMobileSrc}/include \
@@ -100,6 +106,21 @@ in {
           -I${haskellMobileSrc}/include \
           -o ui_bridge_android.o \
           ${haskellMobileSrc}/cbits/ui_bridge_android.c
+
+        # Compile extra JNI bridge sources (consumer-specific JNI methods)
+        ${builtins.concatStringsSep "\n" (builtins.genList (i:
+          let src = builtins.elemAt extraJniBridge i;
+              base = builtins.replaceStrings ["/"] ["_"] (builtins.baseNameOf src);
+              oName = "extra_jni_${toString i}.o";
+          in ''
+        ${ndkCc} -c -fPIC \
+          -DJNI_PACKAGE=${jniPackageMacro} \
+          -I${sysroot}/usr/include \
+          -I$RTS_INCLUDE \
+          -I${haskellMobileSrc}/include \
+          -o ${oName} \
+          ${src}
+          '') (builtins.length extraJniBridge))}
 
         # Extra NDK compilation (e.g. SQLite, storage helpers)
         ${extraNdkCompile ndkCc sysroot}
@@ -188,6 +209,7 @@ in {
           -optl-Wl,-z,max-page-size=16384 \
           -optl$(pwd)/jni_bridge.o \
           -optl$(pwd)/ui_bridge_android.o \
+          ${builtins.concatStringsSep " " (builtins.genList (i: "-optl$(pwd)/extra_jni_${toString i}.o") (builtins.length extraJniBridge))} \
           ${builtins.concatStringsSep " " (map (o: "-optl${o}") extraLinkObjects)} \
           -optl-Wl,-u,haskellRunMain \
           -optl-Wl,-u,haskellGreet \

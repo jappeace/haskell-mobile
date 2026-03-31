@@ -3,12 +3,16 @@
  *
  * This file is compiled by NDK clang (not cabal), and linked into
  * libhaskellmobile.so alongside the Haskell static library.
+ *
+ * The Java package name is controlled by -DJNI_PACKAGE at compile time;
+ * see include/JniBridge.h for defaults.
  */
 
 #include <jni.h>
 #include <stdlib.h>
 #include <string.h>
 #include "HsFFI.h"
+#include "JniBridge.h"
 
 /* Runs the user's Haskell main via RTS API (cbits/run_main.c) */
 extern void haskellRunMain(void);
@@ -54,7 +58,7 @@ JNI_OnUnload(JavaVM *vm, void *reserved)
 }
 
 JNIEXPORT jstring JNICALL
-Java_me_jappie_haskellmobile_MainActivity_greet(JNIEnv *env, jobject thiz, jstring jname)
+JNI_METHOD(greet)(JNIEnv *env, jobject thiz, jstring jname)
 {
     const char *cname = (*env)->GetStringUTFChars(env, jname, NULL);
     if (cname == NULL) {
@@ -73,63 +77,63 @@ Java_me_jappie_haskellmobile_MainActivity_greet(JNIEnv *env, jobject thiz, jstri
 /* --- UI bridge JNI methods --- */
 
 JNIEXPORT void JNICALL
-Java_me_jappie_haskellmobile_MainActivity_renderUI(JNIEnv *env, jobject thiz)
+JNI_METHOD(renderUI)(JNIEnv *env, jobject thiz)
 {
     setup_android_ui_bridge(env, thiz, g_haskell_ctx);
     haskellRenderUI(g_haskell_ctx);
 }
 
 JNIEXPORT void JNICALL
-Java_me_jappie_haskellmobile_MainActivity_onButtonClick(JNIEnv *env, jobject thiz, jobject view)
+JNI_METHOD(onButtonClick)(JNIEnv *env, jobject thiz, jobject view)
 {
     android_handle_click(env, view);
 }
 
 JNIEXPORT void JNICALL
-Java_me_jappie_haskellmobile_MainActivity_onTextChange(JNIEnv *env, jobject thiz, jobject view, jstring text)
+JNI_METHOD(onTextChange)(JNIEnv *env, jobject thiz, jobject view, jstring text)
 {
     android_handle_text_change(env, view, text);
 }
 
 /* Lifecycle JNI callbacks */
 JNIEXPORT void JNICALL
-Java_me_jappie_haskellmobile_MainActivity_onLifecycleCreate(JNIEnv *env, jobject thiz)
+JNI_METHOD(onLifecycleCreate)(JNIEnv *env, jobject thiz)
 {
     haskellOnLifecycle(g_haskell_ctx, LIFECYCLE_CREATE);
 }
 
 JNIEXPORT void JNICALL
-Java_me_jappie_haskellmobile_MainActivity_onLifecycleStart(JNIEnv *env, jobject thiz)
+JNI_METHOD(onLifecycleStart)(JNIEnv *env, jobject thiz)
 {
     haskellOnLifecycle(g_haskell_ctx, LIFECYCLE_START);
 }
 
 JNIEXPORT void JNICALL
-Java_me_jappie_haskellmobile_MainActivity_onLifecycleResume(JNIEnv *env, jobject thiz)
+JNI_METHOD(onLifecycleResume)(JNIEnv *env, jobject thiz)
 {
     haskellOnLifecycle(g_haskell_ctx, LIFECYCLE_RESUME);
 }
 
 JNIEXPORT void JNICALL
-Java_me_jappie_haskellmobile_MainActivity_onLifecyclePause(JNIEnv *env, jobject thiz)
+JNI_METHOD(onLifecyclePause)(JNIEnv *env, jobject thiz)
 {
     haskellOnLifecycle(g_haskell_ctx, LIFECYCLE_PAUSE);
 }
 
 JNIEXPORT void JNICALL
-Java_me_jappie_haskellmobile_MainActivity_onLifecycleStop(JNIEnv *env, jobject thiz)
+JNI_METHOD(onLifecycleStop)(JNIEnv *env, jobject thiz)
 {
     haskellOnLifecycle(g_haskell_ctx, LIFECYCLE_STOP);
 }
 
 JNIEXPORT void JNICALL
-Java_me_jappie_haskellmobile_MainActivity_onLifecycleDestroy(JNIEnv *env, jobject thiz)
+JNI_METHOD(onLifecycleDestroy)(JNIEnv *env, jobject thiz)
 {
     haskellOnLifecycle(g_haskell_ctx, LIFECYCLE_DESTROY);
 }
 
 JNIEXPORT void JNICALL
-Java_me_jappie_haskellmobile_MainActivity_onLifecycleLowMemory(JNIEnv *env, jobject thiz)
+JNI_METHOD(onLifecycleLowMemory)(JNIEnv *env, jobject thiz)
 {
     haskellOnLifecycle(g_haskell_ctx, LIFECYCLE_LOW_MEMORY);
 }
