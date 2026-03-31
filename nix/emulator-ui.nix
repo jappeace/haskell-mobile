@@ -232,25 +232,27 @@ if [ $INSTALL_OK -eq 0 ]; then
 fi
 echo "APK installed."
 
-# --- Clear and capture logcat ---
+# --- Clear logcat buffer ---
 echo "=== Preparing logcat ==="
 "$ADB" -s "emulator-$PORT" logcat -c
-
-"$ADB" -s "emulator-$PORT" logcat '*:I' > "$LOGCAT_FILE" 2>&1 &
-LOGCAT_PID=$!
-sleep 2
 
 # --- Launch activity ---
 echo "=== Launching $PACKAGE/$ACTIVITY ==="
 "$ADB" -s "emulator-$PORT" shell am start -n "$PACKAGE/$ACTIVITY"
 
 # --- Step 2: Wait for initial render ---
+# Uses `logcat -d` (dump mode) on each iteration instead of a background
+# streaming process.  This avoids stdio buffering issues: a background
+# `logcat > file &` uses block-buffered stdout (~4096 bytes), so on a
+# quiet emulator the log data may never reach the file.  Dump mode writes
+# the full ring buffer and exits — no buffering.
 echo "=== Waiting for initial render (timeout: 120s) ==="
 POLL_TIMEOUT=120
 POLL_ELAPSED=0
 RENDER_DONE=0
 
 while [ $POLL_ELAPSED -lt $POLL_TIMEOUT ]; do
+    "$ADB" -s "emulator-$PORT" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1
     if grep -q "setRoot" "$LOGCAT_FILE" 2>/dev/null; then
         RENDER_DONE=1
         echo "Initial render detected after ~''${POLL_ELAPSED}s"
@@ -346,11 +348,12 @@ if [ $DUMP_OK -eq 1 ]; then
     BOUNDS=$(grep -o 'text="[+]"[^>]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' "$UI_DUMP" 2>/dev/null \
           || grep -o 'text="\+"[^>]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' "$UI_DUMP" 2>/dev/null \
           || echo "")
+    # Take only the first match — grep -o can return multiple lines
+    BOUNDS=$(echo "$BOUNDS" | head -1)
 
     if [ -n "$BOUNDS" ]; then
         # Parse [left,top][right,bottom]
-        COORDS=$(echo "$BOUNDS" | grep -o '\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]')
-        LEFT=$(echo "$COORDS" | grep -o '\[' | head -1 ; echo "$COORDS" | sed 's/\[//;s/,.*//')
+        COORDS=$(echo "$BOUNDS" | grep -o '\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1)
         LEFT=$(echo "$COORDS" | sed 's/^\[//;s/,.*//')
         TOP=$(echo "$COORDS" | sed 's/^\[[0-9]*,//;s/\].*//')
         RIGHT=$(echo "$COORDS" | sed 's/.*\]\[//;s/,.*//')
@@ -374,9 +377,10 @@ if [ $TAP_DONE -eq 0 ]; then
     TAP_DONE=1
 fi
 
-# Wait for re-render
+# Wait for re-render and dump logcat
 echo "Waiting for re-render..."
 sleep 5
+"$ADB" -s "emulator-$PORT" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1
 
 # --- Step 6: Verify re-render via logcat ---
 echo ""
@@ -423,14 +427,26 @@ else
     EXIT_CODE=1
 fi
 
-# Kill logcat capture
-kill "$LOGCAT_PID" 2>/dev/null || true
+# Final logcat dump (captures any events logged after last poll)
+"$ADB" -s "emulator-$PORT" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1
 
 # --- Report ---
 echo ""
 echo "=== Filtered logcat (UIBridge) ==="
 grep -i "UIBridge" "$LOGCAT_FILE" 2>/dev/null || echo "(no UIBridge lines)"
 echo "--- End filtered logcat ---"
+
+if [ $EXIT_CODE -ne 0 ]; then
+    echo ""
+    echo "=== Crash / library-load messages ==="
+    grep -iE "FATAL|AndroidRuntime|UnsatisfiedLinkError|System\.load|loadLibrary|haskellmobile|CRASH|SIGNAL" \
+      "$LOGCAT_FILE" 2>/dev/null | tail -30 || echo "(none)"
+    echo "--- End crash messages ---"
+    echo ""
+    echo "=== Last 40 lines of logcat ==="
+    tail -40 "$LOGCAT_FILE" 2>/dev/null || echo "(empty)"
+    echo "--- End logcat tail ---"
+fi
 
 echo ""
 if [ $EXIT_CODE -eq 0 ]; then
