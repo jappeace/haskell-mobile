@@ -232,30 +232,27 @@ if [ $INSTALL_OK -eq 0 ]; then
 fi
 echo "APK installed."
 
-# --- Clear and capture logcat ---
+# --- Clear logcat buffer ---
 echo "=== Preparing logcat ==="
 "$ADB" -s "emulator-$PORT" logcat -c
-
-# Force line-buffered output so logcat data reaches the file immediately.
-# Without this, stdio block-buffers redirected output (~4096 bytes) and
-# on a quiet emulator the UIBridge log lines never get flushed to disk,
-# causing the polling loop below to time out.
-${pkgs.coreutils}/bin/stdbuf -oL \
-  "$ADB" -s "emulator-$PORT" logcat '*:I' > "$LOGCAT_FILE" 2>&1 &
-LOGCAT_PID=$!
-sleep 2
 
 # --- Launch activity ---
 echo "=== Launching $PACKAGE/$ACTIVITY ==="
 "$ADB" -s "emulator-$PORT" shell am start -n "$PACKAGE/$ACTIVITY"
 
 # --- Step 2: Wait for initial render ---
+# Uses `logcat -d` (dump mode) on each iteration instead of a background
+# streaming process.  This avoids stdio buffering issues: a background
+# `logcat > file &` uses block-buffered stdout (~4096 bytes), so on a
+# quiet emulator the log data may never reach the file.  Dump mode writes
+# the full ring buffer and exits — no buffering.
 echo "=== Waiting for initial render (timeout: 120s) ==="
 POLL_TIMEOUT=120
 POLL_ELAPSED=0
 RENDER_DONE=0
 
 while [ $POLL_ELAPSED -lt $POLL_TIMEOUT ]; do
+    "$ADB" -s "emulator-$PORT" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1
     if grep -q "setRoot" "$LOGCAT_FILE" 2>/dev/null; then
         RENDER_DONE=1
         echo "Initial render detected after ~''${POLL_ELAPSED}s"
@@ -380,9 +377,10 @@ if [ $TAP_DONE -eq 0 ]; then
     TAP_DONE=1
 fi
 
-# Wait for re-render
+# Wait for re-render and dump logcat
 echo "Waiting for re-render..."
 sleep 5
+"$ADB" -s "emulator-$PORT" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1
 
 # --- Step 6: Verify re-render via logcat ---
 echo ""
@@ -429,8 +427,8 @@ else
     EXIT_CODE=1
 fi
 
-# Kill logcat capture
-kill "$LOGCAT_PID" 2>/dev/null || true
+# Final logcat dump (captures any events logged after last poll)
+"$ADB" -s "emulator-$PORT" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1
 
 # --- Report ---
 echo ""

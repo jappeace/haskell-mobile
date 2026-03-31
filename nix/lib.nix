@@ -515,15 +515,9 @@ if [ $INSTALL_OK -eq 0 ]; then
 fi
 echo "APK installed."
 
-# --- Clear and capture logcat ---
+# --- Clear logcat buffer ---
 echo "=== Preparing logcat ==="
 "$ADB" -s "emulator-$PORT" logcat -c
-# Force line-buffered output so log data reaches the file immediately
-# (stdio block-buffers redirected output, which can cause poll timeouts).
-${pkgs.coreutils}/bin/stdbuf -oL \
-  "$ADB" -s "emulator-$PORT" logcat '*:I' > "$LOGCAT_FILE" 2>&1 &
-LOGCAT_PID=$!
-sleep 2
 
 # --- Launch activity ---
 echo "=== Launching $PACKAGE/$ACTIVITY ==="
@@ -531,6 +525,11 @@ echo "=== Launching $PACKAGE/$ACTIVITY ==="
 sleep 10
 
 # --- Poll logcat for lifecycle events ---
+# Uses `logcat -d` (dump mode) on each iteration instead of a background
+# streaming process.  This avoids stdio buffering issues: a background
+# `logcat > file &` uses block-buffered stdout (~4096 bytes), so on a
+# quiet emulator the log data may never reach the file.  Dump mode writes
+# the full ring buffer and exits — no buffering.
 echo "=== Checking for lifecycle events (timeout: 120s) ==="
 EVENTS=(${eventsArray})
 POLL_TIMEOUT=120
@@ -538,6 +537,8 @@ POLL_ELAPSED=0
 ALL_FOUND=0
 
 while [ $POLL_ELAPSED -lt $POLL_TIMEOUT ]; do
+    "$ADB" -s "emulator-$PORT" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1
+
     FOUND_COUNT=0
     for event in "''${EVENTS[@]}"; do
         if grep -q "$event" "$LOGCAT_FILE" 2>/dev/null; then
@@ -554,7 +555,8 @@ while [ $POLL_ELAPSED -lt $POLL_TIMEOUT ]; do
     POLL_ELAPSED=$((POLL_ELAPSED + 2))
 done
 
-kill "$LOGCAT_PID" 2>/dev/null || true
+# Final dump (captures any events logged after last poll iteration)
+"$ADB" -s "emulator-$PORT" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1
 
 # --- Report results ---
 echo ""
