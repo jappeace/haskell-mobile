@@ -518,7 +518,10 @@ echo "APK installed."
 # --- Clear and capture logcat ---
 echo "=== Preparing logcat ==="
 "$ADB" -s "emulator-$PORT" logcat -c
-"$ADB" -s "emulator-$PORT" logcat '*:I' > "$LOGCAT_FILE" 2>&1 &
+# Force line-buffered output so log data reaches the file immediately
+# (stdio block-buffers redirected output, which can cause poll timeouts).
+${pkgs.coreutils}/bin/stdbuf -oL \
+  "$ADB" -s "emulator-$PORT" logcat '*:I' > "$LOGCAT_FILE" 2>&1 &
 LOGCAT_PID=$!
 sleep 2
 

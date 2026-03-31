@@ -236,7 +236,12 @@ echo "APK installed."
 echo "=== Preparing logcat ==="
 "$ADB" -s "emulator-$PORT" logcat -c
 
-"$ADB" -s "emulator-$PORT" logcat '*:I' > "$LOGCAT_FILE" 2>&1 &
+# Force line-buffered output so logcat data reaches the file immediately.
+# Without this, stdio block-buffers redirected output (~4096 bytes) and
+# on a quiet emulator the UIBridge log lines never get flushed to disk,
+# causing the polling loop below to time out.
+${pkgs.coreutils}/bin/stdbuf -oL \
+  "$ADB" -s "emulator-$PORT" logcat '*:I' > "$LOGCAT_FILE" 2>&1 &
 LOGCAT_PID=$!
 sleep 2
 
@@ -346,11 +351,12 @@ if [ $DUMP_OK -eq 1 ]; then
     BOUNDS=$(grep -o 'text="[+]"[^>]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' "$UI_DUMP" 2>/dev/null \
           || grep -o 'text="\+"[^>]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' "$UI_DUMP" 2>/dev/null \
           || echo "")
+    # Take only the first match — grep -o can return multiple lines
+    BOUNDS=$(echo "$BOUNDS" | head -1)
 
     if [ -n "$BOUNDS" ]; then
         # Parse [left,top][right,bottom]
-        COORDS=$(echo "$BOUNDS" | grep -o '\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]')
-        LEFT=$(echo "$COORDS" | grep -o '\[' | head -1 ; echo "$COORDS" | sed 's/\[//;s/,.*//')
+        COORDS=$(echo "$BOUNDS" | grep -o '\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1)
         LEFT=$(echo "$COORDS" | sed 's/^\[//;s/,.*//')
         TOP=$(echo "$COORDS" | sed 's/^\[[0-9]*,//;s/\].*//')
         RIGHT=$(echo "$COORDS" | sed 's/.*\]\[//;s/,.*//')
@@ -431,6 +437,18 @@ echo ""
 echo "=== Filtered logcat (UIBridge) ==="
 grep -i "UIBridge" "$LOGCAT_FILE" 2>/dev/null || echo "(no UIBridge lines)"
 echo "--- End filtered logcat ---"
+
+if [ $EXIT_CODE -ne 0 ]; then
+    echo ""
+    echo "=== Crash / library-load messages ==="
+    grep -iE "FATAL|AndroidRuntime|UnsatisfiedLinkError|System\.load|loadLibrary|haskellmobile|CRASH|SIGNAL" \
+      "$LOGCAT_FILE" 2>/dev/null | tail -30 || echo "(none)"
+    echo "--- End crash messages ---"
+    echo ""
+    echo "=== Last 40 lines of logcat ==="
+    tail -40 "$LOGCAT_FILE" 2>/dev/null || echo "(empty)"
+    echo "--- End logcat tail ---"
+fi
 
 echo ""
 if [ $EXIT_CODE -eq 0 ]; then
