@@ -90,6 +90,7 @@ in {
     , extraModuleCopy ? ""
     , extraLinkObjects ? []
     , extraGhcIncludeDirs ? []
+    , crossDeps ? null          # output of cross-deps.nix (lib/, hi/, pkgdb/)
     }:
     let
       jniPackageMacro = builtins.replaceStrings ["."] ["_"] javaPackageName;
@@ -143,12 +144,18 @@ in {
           ${src}
           '') (builtins.length extraJniBridge))}
 
-        # Compile SQLite amalgamation (fetched via nix) and storage helper with NDK clang
+        # Compile SQLite amalgamation and storage helper with NDK clang.
+        # When crossDeps is provided, direct-sqlite's .a already includes
+        # sqlite3.c — skip the separate NDK compilation.
+        ${if crossDeps == null then ''
         ${ndkCc} -c -fPIC \
           -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION \
           -I${sysroot}/usr/include \
           -o sqlite3.o \
           ${sqliteAmalgamation}/sqlite3.c
+        '' else ''
+        echo "Skipping sqlite3.o NDK compilation — using cross-compiled direct-sqlite"
+        ''}
 
         ${ndkCc} -c -fPIC \
           -I${sysroot}/usr/include \
@@ -230,6 +237,7 @@ in {
           -o ${soName} \
           -I${haskellMobileSrc}/include \
           ${builtins.concatStringsSep " " (map (d: "-I${d}") extraGhcIncludeDirs)} \
+          ${if crossDeps != null then "-package-db ${crossDeps}/pkgdb -i${crossDeps}/hi" else ""} \
           Main.hs \
           HaskellMobile.hs \
           cbits/android_stubs.c \
@@ -245,7 +253,7 @@ in {
           -optl-Wl,-z,max-page-size=16384 \
           -optl$(pwd)/jni_bridge.o \
           -optl$(pwd)/ui_bridge_android.o \
-          -optl$(pwd)/sqlite3.o \
+          ${if crossDeps == null then "-optl$(pwd)/sqlite3.o" else ""} \
           -optl$(pwd)/storage_helper.o \
           ${builtins.concatStringsSep " " (builtins.genList (i: "-optl$(pwd)/extra_jni_${toString i}.o") (builtins.length extraJniBridge))} \
           ${builtins.concatStringsSep " " (map (o: "-optl${o}") extraLinkObjects)} \
@@ -267,6 +275,7 @@ in {
           -optl$ARRAY_LIB \
           -optl$DEEPSEQ_LIB \
           -optl$CONTAINERS_LIB \
+          ${if crossDeps != null then "$(for a in ${crossDeps}/lib/*.a; do echo -n \"-optl$a \"; done)" else ""} \
           -optl-Wl,--no-whole-archive
       '';
 
