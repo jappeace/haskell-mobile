@@ -19,6 +19,10 @@ let
   ghcPkgCmd = "${ghc}/bin/ghc-pkg";
   hsc2hsCmd = "${ghc}/bin/hsc2hs";
 
+  # Wrapper cabal project (static files, no interpolation needed)
+  wrapperProject = ./ios-deps;
+  cabalConfig = ./cabal-config;
+
   # Fetch direct-sqlite source tarball
   directSqliteSrc = pkgs.fetchurl {
     url = "https://hackage.haskell.org/package/direct-sqlite-2.3.29/direct-sqlite-2.3.29.tar.gz";
@@ -38,14 +42,7 @@ in pkgs.stdenv.mkDerivation {
 
     # --- Pre-create cabal config to prevent network access ---
     mkdir -p $HOME/.config/cabal
-    cat > $HOME/.config/cabal/config << 'CABALCFG'
--- Minimal config for offline compilation (no network)
-repository hackage.haskell.org
-  url: http://hackage.haskell.org/
-  secure: False
-
-nix: False
-CABALCFG
+    cp ${cabalConfig} $HOME/.config/cabal/config
 
     # Create an empty package index so cabal doesn't try to download one.
     mkdir -p $HOME/.local/state/cabal/repo/hackage.haskell.org
@@ -70,23 +67,9 @@ CABALCFG
     fi
 
     # --- Create a wrapper cabal project ---
-    mkdir -p $TMPDIR/project/src
+    cp -r ${wrapperProject} $TMPDIR/project
+    chmod -R u+w $TMPDIR/project
     cd $TMPDIR/project
-
-    cat > ios-deps.cabal << 'EOF'
-cabal-version: 3.0
-name:          ios-deps
-version:       0.1
-build-type:    Simple
-
-library
-  default-language: Haskell2010
-  build-depends: base, direct-sqlite
-  exposed-modules: IOSDeps
-  hs-source-dirs: src
-EOF
-
-    echo "module IOSDeps where" > src/IOSDeps.hs
 
     cat > cabal.project << EOF
 packages: .

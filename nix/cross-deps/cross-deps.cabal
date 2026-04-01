@@ -1,0 +1,10 @@
+cabal-version: 3.0
+name:          cross-deps
+version:       0.1
+build-type:    Simple
+
+library
+  default-language: Haskell2010
+  build-depends: base, direct-sqlite
+  exposed-modules: CrossDeps
+  hs-source-dirs: src

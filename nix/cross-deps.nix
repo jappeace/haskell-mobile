@@ -23,6 +23,10 @@ let
   ghcPkgCmd = "${ghcBin}/${ghcPrefix}ghc-pkg";
   hsc2hsCmd = "${ghcBin}/${ghcPrefix}hsc2hs";
 
+  # Wrapper cabal project (static files, no interpolation needed)
+  wrapperProject = ./cross-deps;
+  cabalConfig = ./cabal-config;
+
   # Fetch direct-sqlite source tarball
   directSqliteSrc = pkgs.fetchurl {
     url = "https://hackage.haskell.org/package/direct-sqlite-2.3.29/direct-sqlite-2.3.29.tar.gz";
@@ -45,14 +49,7 @@ in pkgs.stdenv.mkDerivation {
     # Without this, cabal tries to fetch the Hackage mirror list on first
     # run, which fails inside the nix sandbox (no network).
     mkdir -p $HOME/.config/cabal
-    cat > $HOME/.config/cabal/config << 'CABALCFG'
--- Minimal config for offline cross-compilation (no network)
-repository hackage.haskell.org
-  url: http://hackage.haskell.org/
-  secure: False
-
-nix: False
-CABALCFG
+    cp ${cabalConfig} $HOME/.config/cabal/config
 
     # Create an empty package index so cabal doesn't try to download one.
     # The 01-index.tar must exist even for --offline to work.
@@ -83,23 +80,9 @@ CABALCFG
     # We need a top-level project so cabal resolves direct-sqlite as a
     # local package.  The "wrapper" library exists only to pull in the
     # dependency; we only care about direct-sqlite's build artifacts.
-    mkdir -p $TMPDIR/project/src
+    cp -r ${wrapperProject} $TMPDIR/project
+    chmod -R u+w $TMPDIR/project
     cd $TMPDIR/project
-
-    cat > cross-deps.cabal << 'EOF'
-cabal-version: 3.0
-name:          cross-deps
-version:       0.1
-build-type:    Simple
-
-library
-  default-language: Haskell2010
-  build-depends: base, direct-sqlite
-  exposed-modules: CrossDeps
-  hs-source-dirs: src
-EOF
-
-    echo "module CrossDeps where" > src/CrossDeps.hs
 
     cat > cabal.project << EOF
 packages: .
