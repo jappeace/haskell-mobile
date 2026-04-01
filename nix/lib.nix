@@ -69,6 +69,7 @@ in {
     , extraModuleCopy ? ""
     , extraLinkObjects ? []
     , extraGhcIncludeDirs ? []
+    , crossDeps ? null          # output of cross-deps.nix (lib/, hi/, pkgdb/)
     }:
     let
       jniPackageMacro = builtins.replaceStrings ["."] ["_"] javaPackageName;
@@ -195,6 +196,7 @@ in {
           -o ${soName} \
           -I${haskellMobileSrc}/include \
           ${builtins.concatStringsSep " " (map (d: "-I${d}") extraGhcIncludeDirs)} \
+          ${if crossDeps != null then "-package-db ${crossDeps}/pkgdb -i${crossDeps}/hi" else ""} \
           Main.hs \
           HaskellMobile.hs \
           cbits/android_stubs.c \
@@ -229,6 +231,7 @@ in {
           -optl$ARRAY_LIB \
           -optl$DEEPSEQ_LIB \
           -optl$CONTAINERS_LIB \
+          ${if crossDeps != null then "$(for a in ${crossDeps}/lib/*.a; do echo -n \"-optl$a \"; done)" else ""} \
           -optl-Wl,--no-whole-archive
       '';
 
@@ -601,6 +604,7 @@ SCRIPT
     , simulator ? false
     , pname ? "haskell-mobile-ios"
     , extraModuleCopy ? ""
+    , crossDeps ? null          # output of ios-deps.nix (lib/, hi/, pkgdb/)
     }:
     let
       iosPkgs = import sources.nixpkgs {};
@@ -648,6 +652,7 @@ SCRIPT
           -O2 \
           -o libHaskellMobile.a \
           -I${haskellMobileSrc}/include \
+          ${if crossDeps != null then "-package-db ${crossDeps}/pkgdb -i${crossDeps}/hi" else ""} \
           -optl-lffi \
           -optl-Wl,-u,_haskellRunMain \
           -optl-Wl,-u,_haskellGreet \
@@ -665,8 +670,10 @@ SCRIPT
       installPhase = ''
         mkdir -p $out/lib $out/include
 
-        echo "Merging libgmp.a into libHaskellMobile.a"
-        libtool -static -o libCombined.a libHaskellMobile.a ${gmpStatic}/lib/libgmp.a
+        echo "Merging static archives into libHaskellMobile.a"
+        libtool -static -o libCombined.a libHaskellMobile.a \
+          ${gmpStatic}/lib/libgmp.a \
+          ${if crossDeps != null then "${crossDeps}/lib/*.a" else ""}
         mv libCombined.a libHaskellMobile.a
 
         ${mac2ios}/bin/mac2ios ${if simulator then "-s" else ""} libHaskellMobile.a

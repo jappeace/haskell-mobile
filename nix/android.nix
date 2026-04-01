@@ -4,8 +4,9 @@
 }:
 let
   lib = import ./lib.nix { inherit sources; };
+  crossDeps = import ./cross-deps.nix { inherit sources; };
 in
 lib.mkAndroidLib {
   haskellMobileSrc = ../.;
-  inherit mainModule;
+  inherit mainModule crossDeps;
 }

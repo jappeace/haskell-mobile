@@ -1,0 +1,6 @@
+-- Minimal config for offline compilation (no network)
+repository hackage.haskell.org
+  url: http://hackage.haskell.org/
+  secure: False
+
+nix: False
