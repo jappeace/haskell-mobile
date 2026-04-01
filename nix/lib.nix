@@ -604,6 +604,7 @@ SCRIPT
     , simulator ? false
     , pname ? "haskell-mobile-ios"
     , extraModuleCopy ? ""
+    , crossDeps ? null          # output of ios-deps.nix (lib/, hi/, pkgdb/)
     }:
     let
       iosPkgs = import sources.nixpkgs {};
@@ -651,6 +652,7 @@ SCRIPT
           -O2 \
           -o libHaskellMobile.a \
           -I${haskellMobileSrc}/include \
+          ${if crossDeps != null then "-package-db ${crossDeps}/pkgdb -i${crossDeps}/hi" else ""} \
           -optl-lffi \
           -optl-Wl,-u,_haskellRunMain \
           -optl-Wl,-u,_haskellGreet \
@@ -668,8 +670,10 @@ SCRIPT
       installPhase = ''
         mkdir -p $out/lib $out/include
 
-        echo "Merging libgmp.a into libHaskellMobile.a"
-        libtool -static -o libCombined.a libHaskellMobile.a ${gmpStatic}/lib/libgmp.a
+        echo "Merging static archives into libHaskellMobile.a"
+        libtool -static -o libCombined.a libHaskellMobile.a \
+          ${gmpStatic}/lib/libgmp.a \
+          ${if crossDeps != null then "${crossDeps}/lib/*.a" else ""}
         mv libCombined.a libHaskellMobile.a
 
         ${mac2ios}/bin/mac2ios ${if simulator then "-s" else ""} libHaskellMobile.a
