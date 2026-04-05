@@ -49,4 +49,10 @@ class HaskellBridge {
     static func getContext() -> UnsafeMutableRawPointer? {
         return context
     }
+
+    /// Switch the running app to the scroll demo.
+    /// Call before renderUI() to exercise ScrollView end-to-end in integration tests.
+    static func useScrollDemo() {
+        haskellUseScrollDemo()
+    }
 }

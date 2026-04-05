@@ -14,6 +14,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
     }
 
     private native String greet(String name);
+    private native void useScrollDemo();
     private native void renderUI();
     private native void onButtonClick(View view);
     private native void onTextChange(View view, String text);
@@ -29,6 +30,10 @@ public class MainActivity extends Activity implements View.OnClickListener {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         onLifecycleCreate();
+        String testMode = getIntent().getStringExtra("test_mode");
+        if ("scroll_demo".equals(testMode)) {
+            useScrollDemo();
+        }
         // Render UI from Haskell instead of XML layout
         renderUI();
     }

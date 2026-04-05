@@ -35,6 +35,9 @@ static void             *g_haskell_ctx    = NULL;
 static __strong UIView *g_nodes[MAX_NODES];
 static int32_t          g_next_node_id = 1;
 
+/* For ScrollView nodes: the inner UIStackView that holds children */
+static __strong UIView *g_content_views[MAX_NODES];
+
 /* ---- Singleton handler for button taps ---- */
 @interface IOSBridgeHandler : NSObject
 + (instancetype)shared;
@@ -136,6 +139,31 @@ static int32_t ios_create_node(int32_t nodeType)
         view = stack;
         break;
     }
+    case UI_NODE_SCROLL_VIEW: {
+        UIScrollView *scrollView = [[UIScrollView alloc] init];
+        scrollView.translatesAutoresizingMaskIntoConstraints = NO;
+        /* Inner content stack — children are added here, not into scrollView directly */
+        UIStackView *contentStack = [[UIStackView alloc] init];
+        contentStack.axis = UILayoutConstraintAxisVertical;
+        contentStack.alignment = UIStackViewAlignmentFill;
+        contentStack.spacing = 0;
+        contentStack.translatesAutoresizingMaskIntoConstraints = NO;
+        [scrollView addSubview:contentStack];
+        UILayoutGuide *contentGuide = scrollView.contentLayoutGuide;
+        UILayoutGuide *frameGuide   = scrollView.frameLayoutGuide;
+        [NSLayoutConstraint activateConstraints:@[
+            [contentStack.topAnchor     constraintEqualToAnchor:contentGuide.topAnchor],
+            [contentStack.leadingAnchor constraintEqualToAnchor:contentGuide.leadingAnchor],
+            [contentStack.trailingAnchor constraintEqualToAnchor:contentGuide.trailingAnchor],
+            [contentStack.bottomAnchor  constraintEqualToAnchor:contentGuide.bottomAnchor],
+            [contentStack.widthAnchor   constraintEqualToAnchor:frameGuide.widthAnchor],
+        ]];
+        int32_t nodeId = g_next_node_id++;
+        g_nodes[nodeId]        = scrollView;
+        g_content_views[nodeId] = contentStack;
+        LOGI("createNode(type=%d) -> %d", nodeType, nodeId);
+        return nodeId;
+    }
     default:
         LOGE("Unknown node type: %d", nodeType);
         return 0;
@@ -198,10 +226,12 @@ static void ios_add_child(int32_t parentId, int32_t childId)
     UIView *child  = get_node(childId);
     if (!parent || !child) return;
 
-    if ([parent isKindOfClass:[UIStackView class]]) {
-        [(UIStackView *)parent addArrangedSubview:child];
+    /* For ScrollView nodes, children go into the content stack, not the scroll view itself */
+    UIView *addTarget = g_content_views[parentId] ? g_content_views[parentId] : parent;
+    if ([addTarget isKindOfClass:[UIStackView class]]) {
+        [(UIStackView *)addTarget addArrangedSubview:child];
     } else {
-        [parent addSubview:child];
+        [addTarget addSubview:child];
     }
 }
 
@@ -240,11 +270,14 @@ static void ios_set_root(int32_t nodeId)
 
     [container addSubview:view];
 
-    /* Center the root view in the view controller's view */
+    /* Pin root view to fill the safe area / full screen.
+     * Using fill instead of center lets ScrollView expand to the full viewport. */
     view.translatesAutoresizingMaskIntoConstraints = NO;
     [NSLayoutConstraint activateConstraints:@[
-        [view.centerXAnchor constraintEqualToAnchor:container.centerXAnchor],
-        [view.centerYAnchor constraintEqualToAnchor:container.centerYAnchor],
+        [view.topAnchor      constraintEqualToAnchor:container.safeAreaLayoutGuide.topAnchor],
+        [view.leadingAnchor  constraintEqualToAnchor:container.leadingAnchor],
+        [view.trailingAnchor constraintEqualToAnchor:container.trailingAnchor],
+        [view.bottomAnchor   constraintEqualToAnchor:container.bottomAnchor],
     ]];
 
     LOGI("setRoot(node=%d)", nodeId);
@@ -259,6 +292,7 @@ static void ios_clear(void)
         }
     }
     g_next_node_id = 1;
+    memset(g_content_views, 0, sizeof(g_content_views));
     LOGI("clear()");
 }
 
@@ -279,6 +313,7 @@ void setup_ios_ui_bridge(void *viewController, void *haskellCtx)
     g_haskell_ctx = haskellCtx;
 
     memset(g_nodes, 0, sizeof(g_nodes));
+    memset(g_content_views, 0, sizeof(g_content_views));
     g_next_node_id = 1;
 
     ui_register_callbacks(&g_ios_callbacks);
