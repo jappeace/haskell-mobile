@@ -42,6 +42,7 @@ static jclass   g_class_TextView;
 static jclass   g_class_Button;
 static jclass   g_class_EditText;
 static jclass   g_class_LinearLayout;
+static jclass   g_class_ScrollView;
 static jclass   g_class_ViewGroup;
 static jclass   g_class_ViewGroup_LayoutParams;
 static jclass   g_class_Integer;
@@ -50,6 +51,7 @@ static jmethodID g_ctor_TextView;
 static jmethodID g_ctor_Button;
 static jmethodID g_ctor_EditText;
 static jmethodID g_ctor_LinearLayout;
+static jmethodID g_ctor_ScrollView;
 static jmethodID g_ctor_ViewGroup_LayoutParams;
 static jmethodID g_ctor_Integer;
 
@@ -115,6 +117,10 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     if (!cls) return -1;
     g_class_LinearLayout = (*env)->NewGlobalRef(env, cls);
 
+    cls = (*env)->FindClass(env, "android/widget/ScrollView");
+    if (!cls) return -1;
+    g_class_ScrollView = (*env)->NewGlobalRef(env, cls);
+
     cls = (*env)->FindClass(env, "android/view/ViewGroup");
     if (!cls) return -1;
     g_class_ViewGroup = (*env)->NewGlobalRef(env, cls);
@@ -135,6 +141,8 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     g_ctor_EditText = (*env)->GetMethodID(env, g_class_EditText,
         "<init>", "(Landroid/content/Context;)V");
     g_ctor_LinearLayout = (*env)->GetMethodID(env, g_class_LinearLayout,
+        "<init>", "(Landroid/content/Context;)V");
+    g_ctor_ScrollView = (*env)->GetMethodID(env, g_class_ScrollView,
         "<init>", "(Landroid/content/Context;)V");
     g_ctor_ViewGroup_LayoutParams = (*env)->GetMethodID(env,
         g_class_ViewGroup_LayoutParams, "<init>", "(II)V");
@@ -220,6 +228,9 @@ static int32_t android_create_node(int32_t nodeType)
     }
     case UI_NODE_TEXT_INPUT:
         view = (*env)->NewObject(env, g_class_EditText, g_ctor_EditText, g_activity);
+        break;
+    case UI_NODE_SCROLL_VIEW:
+        view = (*env)->NewObject(env, g_class_ScrollView, g_ctor_ScrollView, g_activity);
         break;
     default:
         LOGE("Unknown node type: %d", nodeType);

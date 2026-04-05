@@ -23,3 +23,5 @@ data Widget
     -- ^ A vertical container laying out children top-to-bottom.
   | Row [Widget]
     -- ^ A horizontal container laying out children left-to-right.
+  | ScrollView [Widget]
+    -- ^ A vertically scrollable container.

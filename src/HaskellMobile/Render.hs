@@ -96,6 +96,10 @@ renderNode rs (Row children) = do
   nodeId <- Bridge.createNode Bridge.NodeRow
   renderChildren rs nodeId children
   pure nodeId
+renderNode rs (ScrollView children) = do
+  nodeId <- Bridge.createNode Bridge.NodeScrollView
+  renderChildren rs nodeId children
+  pure nodeId
 
 -- | Render a list of children and add them to a parent container.
 renderChildren :: RenderState -> Int32 -> [Widget] -> IO ()

@@ -8,7 +8,8 @@
 #define UI_NODE_BUTTON     1
 #define UI_NODE_COLUMN     2
 #define UI_NODE_ROW        3
-#define UI_NODE_TEXT_INPUT 4
+#define UI_NODE_TEXT_INPUT  4
+#define UI_NODE_SCROLL_VIEW 5
 
 /* Property IDs for string properties */
 #define UI_PROP_TEXT      0
