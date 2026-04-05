@@ -205,6 +205,7 @@ uiTests = testGroup "UI"
         Button _ _      -> assertFailure "expected Column, got Button"
         TextInput _ _ _ -> assertFailure "expected Column, got TextInput"
         Row _           -> assertFailure "expected Column, got Row"
+        ScrollView _    -> assertFailure "expected Column, got ScrollView"
   ]
 
 textInputTests :: TestTree
