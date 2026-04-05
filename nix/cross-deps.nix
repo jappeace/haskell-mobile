@@ -156,7 +156,7 @@ EOF
       echo "Installing $PKG_NAME from: $BUILD_DIR"
 
       # Copy static archives
-      cp "$BUILD_DIR"/libHS${PKG_NAME}-*.a $out/lib/ 2>/dev/null || true
+      cp "$BUILD_DIR"/libHS''${PKG_NAME}-*.a $out/lib/ 2>/dev/null || true
 
       # Copy interface files (preserving directory structure)
       (cd "$BUILD_DIR" && find . -name '*.hi' -exec cp --parents {} $out/hi/ \;) 2>/dev/null || true
@@ -187,7 +187,7 @@ EOF
     get_unit_id() {
       local PKG=$1
       local A_FILE
-      A_FILE=$(basename $out/lib/libHS${PKG}-*.a 2>/dev/null | head -1)
+      A_FILE=$(basename $out/lib/libHS''${PKG}-*.a 2>/dev/null | head -1)
       local UNIT_ID=''${A_FILE#libHS}
       UNIT_ID=''${UNIT_ID%.a}
       echo "$UNIT_ID"
