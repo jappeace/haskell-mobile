@@ -1,6 +1,7 @@
 # Android emulator ScrollView integration test.
 #
-# Boots an emulator, installs the APK in scroll-demo mode, and verifies:
+# Builds the APK with ScrollDemoMain.hs as the entry point so the app starts
+# directly in scroll-demo mode — no runtime switching needed.  Verifies:
 #   1. Haskell emitted a ScrollView node (logcat: createNode type=5)
 #   2. Native view hierarchy contains android.widget.ScrollView (uiautomator)
 #   3. Swiping up reveals the "Reached Bottom" button (uiautomator after swipe)
@@ -18,7 +19,14 @@ let
     config.android_sdk.accept_license = true;
   };
 
-  apk = import ./apk.nix { inherit sources; };
+  lib = import ./lib.nix { inherit sources; };
+  scrollAndroid = import ./android.nix { inherit sources; mainModule = ../test/ScrollDemoMain.hs; };
+  apk = lib.mkApk {
+    sharedLib = scrollAndroid;
+    androidSrc = ../android;
+    apkName = "haskell-mobile-scroll.apk";
+    name = "haskell-mobile-scroll-apk";
+  };
 
   androidComposition = pkgs.androidenv.composeAndroidPackages {
     platformVersions = [ "34" ];
@@ -230,9 +238,9 @@ echo "APK installed."
 echo "=== Preparing logcat ==="
 "$ADB" -s "emulator-$PORT" logcat -c
 
-# --- Launch activity with scroll_demo intent extra ---
-echo "=== Launching $PACKAGE/$ACTIVITY in scroll-demo mode ==="
-"$ADB" -s "emulator-$PORT" shell am start -n "$PACKAGE/$ACTIVITY" --es test_mode scroll_demo
+# --- Launch activity ---
+echo "=== Launching $PACKAGE/$ACTIVITY ==="
+"$ADB" -s "emulator-$PORT" shell am start -n "$PACKAGE/$ACTIVITY"
 
 # --- Wait for initial render ---
 echo "=== Waiting for initial render (timeout: 120s) ==="

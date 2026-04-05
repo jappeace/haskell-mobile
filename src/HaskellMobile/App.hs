@@ -1,13 +1,12 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE OverloadedStrings #-}
 -- | Default implementation of the mobile app.
 -- Provides 'loggingMobileContext' as the application context and a simple
 -- counter demo as the default UI.
-module HaskellMobile.App (mobileApp, scrollDemoApp, haskellUseScrollDemo) where
+module HaskellMobile.App (mobileApp, scrollDemoApp) where
 
 import Data.IORef (IORef, newIORef, readIORef, modifyIORef')
 import Data.Text (pack)
-import HaskellMobile.Types (MobileApp(..), runMobileApp)
+import HaskellMobile.Types (MobileApp(..))
 import HaskellMobile.Lifecycle (loggingMobileContext)
 import HaskellMobile.Widget (Widget(..))
 import System.IO.Unsafe (unsafePerformIO)
@@ -53,9 +52,3 @@ scrollDemoView = pure $ ScrollView
     )
   ]
 
--- | Switch the running app to the scroll demo. Called via JNI (Android) or
--- direct FFI (iOS) when the test harness requests scroll-demo mode.
-haskellUseScrollDemo :: IO ()
-haskellUseScrollDemo = runMobileApp scrollDemoApp
-
-foreign export ccall haskellUseScrollDemo :: IO ()

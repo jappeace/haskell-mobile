@@ -1,10 +1,10 @@
 # iOS Simulator ScrollView integration test.
 #
-# Builds and installs the app with --scroll-demo --autotest, then verifies:
+# Builds the app with ScrollDemoMain.hs as the entry point so the app starts
+# directly in scroll-demo mode, then verifies:
 #   1. Haskell emitted a ScrollView node (os_log: createNode(type=5))
 #   2. The "Reached Bottom" button callback fired (os_log: Click dispatched: callbackId=0)
 #
-# The --scroll-demo flag switches the app to scrollDemoApp before the first render.
 # The --autotest flag fires event 0 (the "Reached Bottom" button) 3s after render.
 #
 # Independent from other simulator tests — can run in parallel.
@@ -16,7 +16,13 @@
 let
   pkgs = import sources.nixpkgs {};
 
-  simulatorApp = import ./simulator-app.nix { inherit sources; };
+  scrollIos = import ./ios.nix { inherit sources; mainModule = ../test/ScrollDemoMain.hs; simulator = true; };
+  simulatorApp = lib.mkSimulatorApp {
+    iosLib = scrollIos;
+    iosSrc = ../ios;
+    name = "haskell-mobile-scroll-simulator-app";
+  };
+  lib = import ./lib.nix { inherit sources; };
 
   xcodegen = pkgs.xcodegen;
 
@@ -174,9 +180,9 @@ LOG_PID=$!
 # Give log stream time to fully attach before launching
 sleep 5
 
-# --- Launch app with --scroll-demo --autotest ---
-echo "=== Launching $BUNDLE_ID with --scroll-demo --autotest ==="
-xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID" --scroll-demo --autotest
+# --- Launch app with --autotest ---
+echo "=== Launching $BUNDLE_ID with --autotest ==="
+xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID" --autotest
 
 # --- Wait for initial render ---
 echo "=== Waiting for initial render (timeout: 60s) ==="
@@ -200,7 +206,7 @@ if [ $RENDER_DONE -eq 0 ]; then
     xcrun simctl terminate "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
     sleep 3
     > "$LOG_FILE"
-    xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID" --scroll-demo --autotest
+    xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID" --autotest
 
     POLL_TIMEOUT=60
     POLL_ELAPSED=0

@@ -10,10 +10,6 @@ struct HaskellUIView: UIViewControllerRepresentable {
         let ptr = Unmanaged.passUnretained(vc).toOpaque()
         setup_ios_ui_bridge(ptr, HaskellBridge.getContext())
 
-        if CommandLine.arguments.contains("--scroll-demo") {
-            HaskellBridge.useScrollDemo()
-        }
-
         HaskellBridge.renderUI()
 
         // CI auto-test: simulate button tap 3s after the initial render.
