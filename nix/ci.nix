@@ -25,6 +25,8 @@ in {
     (import ./emulator-ui.nix { inherit sources; }) "test-ui";
   emulator-ui-buttons-test = runTest "emulator-ui-buttons-test"
     (import ./emulator-ui-buttons.nix { inherit sources; }) "test-ui-buttons";
+  emulator-scroll-test = runTest "emulator-scroll-test"
+    (import ./emulator-scroll.nix { inherit sources; }) "test-scroll";
 } // (if isDarwin then {
   ios = import ./ios.nix { inherit sources; };
   simulator-test = runTest "simulator-test"
@@ -33,4 +35,6 @@ in {
     (import ./simulator-ui.nix { inherit sources; }) "test-ui-ios";
   simulator-ui-buttons-test = runTest "simulator-ui-buttons-test"
     (import ./simulator-ui-buttons.nix { inherit sources; }) "test-ui-buttons-ios";
+  simulator-scroll-test = runTest "simulator-scroll-test"
+    (import ./simulator-scroll.nix { inherit sources; }) "test-scroll-ios";
 } else {})

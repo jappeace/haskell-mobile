@@ -37,7 +37,7 @@ main = do
   defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, textInputTests, registrationTests]
+tests = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, registrationTests]
 
 qcProps :: TestTree
 qcProps = testGroup "(checked by QuickCheck)"
@@ -205,6 +205,52 @@ uiTests = testGroup "UI"
         Button _ _      -> assertFailure "expected Column, got Button"
         TextInput _ _ _ -> assertFailure "expected Column, got TextInput"
         Row _           -> assertFailure "expected Column, got Row"
+        ScrollView _    -> assertFailure "expected Column, got ScrollView"
+  ]
+
+-- | Tests for the ScrollView widget binding.
+-- These exercise the Haskell render path shared by both Android and iOS —
+-- the platform bridge (JNI / UIKit) receives UI_NODE_SCROLL_VIEW (5) and
+-- is responsible for mapping it to a native scroll container.
+scrollViewTests :: TestTree
+scrollViewTests = testGroup "ScrollView"
+  [ testCase "ScrollView renders without error" $ do
+      rs <- newRenderState
+      renderWidget rs (ScrollView [Text "item 1", Text "item 2"])
+
+  , testCase "button inside ScrollView fires its callback" $ do
+      ref <- newIORef (0 :: Int)
+      rs <- newRenderState
+      renderWidget rs $ ScrollView
+        [ Button "press me" (modifyIORef' ref (+ 1)) ]
+      dispatchEvent rs 0
+      count <- readIORef ref
+      count @?= 1
+
+  , testCase "ScrollView with nested Column renders and dispatches correctly" $ do
+      ref <- newIORef False
+      rs <- newRenderState
+      renderWidget rs $ ScrollView
+        [ Column
+          [ Text "header"
+          , Button "action" (modifyIORef' ref (const True))
+          ]
+        ]
+      dispatchEvent rs 0
+      fired <- readIORef ref
+      fired @?= True
+
+  , testCase "re-render inside ScrollView resets callbacks" $ do
+      refOld <- newIORef False
+      refNew <- newIORef False
+      rs <- newRenderState
+      renderWidget rs $ ScrollView [Button "old" (modifyIORef' refOld (const True))]
+      renderWidget rs $ ScrollView [Button "new" (modifyIORef' refNew (const True))]
+      dispatchEvent rs 0
+      old <- readIORef refOld
+      new <- readIORef refNew
+      old @?= False
+      new @?= True
   ]
 
 textInputTests :: TestTree

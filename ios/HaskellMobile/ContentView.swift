@@ -9,9 +9,14 @@ struct HaskellUIView: UIViewControllerRepresentable {
         vc.view.backgroundColor = .systemBackground
         let ptr = Unmanaged.passUnretained(vc).toOpaque()
         setup_ios_ui_bridge(ptr, HaskellBridge.getContext())
+
+        if CommandLine.arguments.contains("--scroll-demo") {
+            HaskellBridge.useScrollDemo()
+        }
+
         HaskellBridge.renderUI()
 
-        // CI auto-test: simulate a "+" button tap 3s after the initial render.
+        // CI auto-test: simulate button tap 3s after the initial render.
         // Scheduled here (not in App.init) so the tap always fires AFTER
         // the first render — on slow CI simulators, init() can run 60s+
         // before SwiftUI creates the view.

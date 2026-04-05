@@ -24,6 +24,7 @@ extern void haskellOnLifecycle(void *ctx, int eventType);
 extern void haskellRenderUI(void *ctx);
 extern void haskellOnUIEvent(void *ctx, int callbackId);
 extern void haskellOnUITextChange(void *ctx, int callbackId, const char *text);
+extern void haskellUseScrollDemo(void);
 
 /* Android UI bridge (from ui_bridge_android.c) */
 extern void setup_android_ui_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
@@ -75,6 +76,13 @@ JNI_METHOD(greet)(JNIEnv *env, jobject thiz, jstring jname)
 }
 
 /* --- UI bridge JNI methods --- */
+
+JNIEXPORT void JNICALL
+JNI_METHOD(useScrollDemo)(JNIEnv *env, jobject obj)
+{
+    (void)env; (void)obj;
+    haskellUseScrollDemo();
+}
 
 JNIEXPORT void JNICALL
 JNI_METHOD(renderUI)(JNIEnv *env, jobject thiz)

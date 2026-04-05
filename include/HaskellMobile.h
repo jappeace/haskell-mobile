@@ -46,4 +46,8 @@ void haskellRenderUI(void *ctx);
  * ctx must be a pointer returned by haskellCreateContext(). */
 void haskellOnUIEvent(void *ctx, int32_t callbackId);
 
+/* Switch the running app to the scroll demo.
+ * Called by test harnesses to exercise the ScrollView widget end-to-end. */
+void haskellUseScrollDemo(void);
+
 #endif /* HASKELL_MOBILE_H */

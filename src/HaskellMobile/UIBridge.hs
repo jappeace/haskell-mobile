@@ -34,6 +34,7 @@ data NodeType
   | NodeColumn
   | NodeRow
   | NodeTextInput
+  | NodeScrollView
   deriving (Show, Eq, Enum, Bounded)
 
 -- | Map a 'NodeType' to its C integer code.
@@ -42,7 +43,8 @@ nodeTypeToInt NodeText      = 0
 nodeTypeToInt NodeButton    = 1
 nodeTypeToInt NodeColumn    = 2
 nodeTypeToInt NodeRow       = 3
-nodeTypeToInt NodeTextInput = 4
+nodeTypeToInt NodeTextInput  = 4
+nodeTypeToInt NodeScrollView = 5
 
 -- | Property identifiers for 'setStrProp' and 'setNumProp'.
 data PropId
