@@ -77,9 +77,14 @@ in pkgs.stdenv.mkDerivation {
       exit 1
     fi
 
-    sed -i 's/^  build-tool-depends:.*alex.*/  -- &/' \
+    # The library's build-tool-depends spans multiple lines:
+    #   build-tool-depends:
+    #       alex:alex  >= 3.2,
+    #       happy:happy >= 1.19,
+    # Comment out the alex and happy lines directly.
+    sed -i 's/^        alex:alex.*/        -- &/' \
       toml-parser-2.0.2.0/toml-parser.cabal
-    sed -i 's/^  build-tool-depends:.*happy.*/  -- &/' \
+    sed -i 's/^        happy:happy.*/        -- &/' \
       toml-parser-2.0.2.0/toml-parser.cabal
 
     # --- Create a wrapper cabal project ---
