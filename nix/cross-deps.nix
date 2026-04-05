@@ -37,7 +37,7 @@ let
 
   prettyprinterSrc = pkgs.fetchurl {
     url = "https://hackage.haskell.org/package/prettyprinter-1.7.1/prettyprinter-1.7.1.tar.gz";
-    sha256 = "0hy28mrkcrn5s3h2mrsa7b6shiyqz2rwb5gvhp0bij80gk230a1i";
+    sha256 = "sha256-Xm6mkDEU+hGPzDWWM9+37N3suSwGyFPQKne3KyUfC0U=";
   };
 
   tomlParserSrc = pkgs.fetchurl {
