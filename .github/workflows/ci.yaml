@@ -89,3 +89,61 @@ jobs:
       run: gh run cancel ${{ github.run_id }}
       env:
         GH_TOKEN: ${{ github.token }}
+
+  android-ui-buttons:
+    needs: [android]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Local cache
+      uses: actions/cache@v4
+      with:
+        path: /nix/store
+        key: "${{ runner.os }}-nix-android-cache"
+        restore-keys: |
+          ${{ runner.os }}-nix-android-
+    - uses: cachix/install-nix-action@v31
+      with:
+        extra_nix_config: |
+          access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+          extra-substituters = https://nix-cache.jappie.me
+          extra-trusted-public-keys = nix-cache.jappie.me:WjkKcvFtHih2i+n7bdsrJ3HuGboJiU2hA2CZbf9I9oc=
+    - name: Build UI buttons test
+      run: nix-build nix/emulator-ui-buttons.nix -o result-emulator-ui-buttons
+    - name: Run UI two-button test
+      run: ./result-emulator-ui-buttons/bin/test-ui-buttons
+    - name: Cancel workflow on failure
+      if: failure()
+      continue-on-error: true
+      run: gh run cancel ${{ github.run_id }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+
+  ios-ui-buttons:
+    needs: [ios]
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Local cache
+      uses: actions/cache@v4
+      with:
+        path: /nix/store
+        key: "${{ runner.os }}-nix-ios-cache"
+        restore-keys: |
+          ${{ runner.os }}-nix-ios-
+    - uses: cachix/install-nix-action@v31
+      with:
+        extra_nix_config: |
+          access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+          extra-substituters = https://nix-cache.jappie.me
+          extra-trusted-public-keys = nix-cache.jappie.me:WjkKcvFtHih2i+n7bdsrJ3HuGboJiU2hA2CZbf9I9oc=
+    - name: Build UI buttons test
+      run: nix-build nix/simulator-ui-buttons.nix -o result-simulator-ui-buttons
+    - name: Run UI two-button test
+      run: ./result-simulator-ui-buttons/bin/test-ui-buttons-ios
+    - name: Cancel workflow on failure
+      if: failure()
+      continue-on-error: true
+      run: gh run cancel ${{ github.run_id }}
+      env:
+        GH_TOKEN: ${{ github.token }}
