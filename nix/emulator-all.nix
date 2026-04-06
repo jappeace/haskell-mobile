@@ -1,0 +1,310 @@
+# Android emulator combined integration test.
+#
+# Single emulator session covering all test suites:
+#
+#   Phase 1 — Counter app (lifecycle + UI rendering + two-button sequence)
+#     Verifies: Lifecycle events, setRoot/setStrProp/setHandler logcat,
+#               uiautomator view hierarchy, + and - buttons, counter state.
+#
+#   Phase 2 — Scroll demo app
+#     Verifies: createNode(type=5), android.widget.ScrollView in hierarchy,
+#               swipe reveals Reached Bottom, tap dispatches click event.
+#
+# One boot + teardown cycle instead of four.
+#
+# Usage:
+#   nix-build nix/emulator-all.nix -o result-emulator-all
+#   ./result-emulator-all/bin/test-all
+{ sources ? import ../npins }:
+let
+  pkgs = import sources.nixpkgs {
+    config.allowUnfree = true;
+    config.android_sdk.accept_license = true;
+  };
+
+  lib = import ./lib.nix { inherit sources; };
+
+  counterApk = import ./apk.nix { inherit sources; };
+
+  scrollAndroid = import ./android.nix {
+    inherit sources;
+    mainModule = ../test/ScrollDemoMain.hs;
+  };
+  scrollApk = lib.mkApk {
+    sharedLib = scrollAndroid;
+    androidSrc = ../android;
+    apkName = "haskell-mobile-scroll.apk";
+    name = "haskell-mobile-scroll-apk";
+  };
+
+  androidComposition = pkgs.androidenv.composeAndroidPackages {
+    platformVersions = [ "34" ];
+    includeEmulator = true;
+    includeSystemImages = true;
+    systemImageTypes = [ "google_apis_playstore" ];
+    abiVersions = [ "x86_64" ];
+    cmdLineToolsVersion = "8.0";
+  };
+
+  sdk = androidComposition.androidsdk;
+  sdkRoot = "${sdk}/libexec/android-sdk";
+
+  platformVersion = "34";
+  systemImageType = "google_apis_playstore";
+  abiVersion = "x86_64";
+  imagePackage = "system-images;android-${platformVersion};${systemImageType};${abiVersion}";
+
+  testScripts = builtins.path { path = ../test; name = "test-scripts"; };
+
+in pkgs.stdenv.mkDerivation {
+  name = "haskell-mobile-emulator-all-tests";
+
+  dontUnpack = true;
+
+  buildPhase = ''
+    mkdir -p $out/bin
+
+    cat > $out/bin/test-all << 'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+
+# --- Configuration ---
+export ANDROID_SDK_ROOT="${sdkRoot}"
+export ANDROID_HOME="${sdkRoot}"
+unset ANDROID_NDK_HOME 2>/dev/null || true
+ADB="$ANDROID_SDK_ROOT/platform-tools/adb"
+EMULATOR="$ANDROID_SDK_ROOT/emulator/emulator"
+AVDMANAGER="${sdk}/bin/avdmanager"
+COUNTER_APK="${counterApk}/haskell-mobile.apk"
+SCROLL_APK="${scrollApk}/haskell-mobile-scroll.apk"
+PACKAGE="me.jappie.haskellmobile"
+ACTIVITY=".MainActivity"
+DEVICE_NAME="test_all"
+TEST_SCRIPTS="${testScripts}"
+
+# --- Debug: show SDK structure ---
+echo "=== SDK structure ==="
+echo "SDK_ROOT: $ANDROID_SDK_ROOT"
+ls "$ANDROID_SDK_ROOT/" 2>/dev/null || echo "(cannot list SDK root)"
+echo "--- system-images ---"
+ls -R "$ANDROID_SDK_ROOT/system-images/" 2>/dev/null | head -20 || echo "(no system-images)"
+echo "=== End SDK structure ==="
+
+# --- KVM detection ---
+if [ -e /dev/kvm ] && [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
+    echo "KVM detected -- using hardware acceleration"
+    ACCEL_FLAG=""
+    BOOT_TIMEOUT=180
+else
+    echo "No KVM -- using software emulation (slow boot expected)"
+    ACCEL_FLAG="-no-accel"
+    BOOT_TIMEOUT=900
+fi
+
+# --- Temp dirs ---
+WORK_DIR=$(mktemp -d /tmp/haskell-mobile-emu-all-XXXX)
+export HOME="$WORK_DIR/home"
+export ANDROID_USER_HOME="$WORK_DIR/user-home"
+export ANDROID_AVD_HOME="$WORK_DIR/avd"
+export ANDROID_EMULATOR_HOME="$WORK_DIR/emulator-home"
+export TMPDIR="$WORK_DIR/tmp"
+mkdir -p "$HOME" "$ANDROID_USER_HOME" "$ANDROID_AVD_HOME" "$ANDROID_EMULATOR_HOME" "$TMPDIR"
+
+"$ADB" kill-server 2>/dev/null || true
+"$ADB" start-server 2>/dev/null || true
+
+EMU_PID=""
+PORT=""
+
+# Phase result tracking
+PHASE1_OK=0
+PHASE2_OK=0
+
+cleanup() {
+    echo ""
+    echo "=== Cleaning up ==="
+    if [ -n "$EMU_PID" ] && kill -0 "$EMU_PID" 2>/dev/null; then
+        echo "Killing emulator (PID $EMU_PID)"
+        kill "$EMU_PID" 2>/dev/null || true
+        wait "$EMU_PID" 2>/dev/null || true
+    fi
+    if [ -n "$PORT" ]; then
+        "$ADB" -s "emulator-$PORT" emu kill 2>/dev/null || true
+    fi
+    rm -rf "$WORK_DIR"
+    echo "Cleanup done."
+}
+trap cleanup EXIT
+
+# --- Find free port ---
+echo "=== Finding free emulator port ==="
+for p in $(seq 5554 2 5584); do
+    if ! "$ADB" devices 2>/dev/null | grep -q "emulator-$p"; then
+        PORT=$p
+        break
+    fi
+done
+
+if [ -z "$PORT" ]; then
+    echo "ERROR: No free emulator port found (5554-5584 all in use)"
+    exit 1
+fi
+echo "Using port: $PORT"
+export ANDROID_SERIAL="emulator-$PORT"
+EMULATOR_SERIAL="emulator-$PORT"
+
+# --- Create AVD ---
+echo "=== Creating AVD ==="
+echo "n" | "$AVDMANAGER" create avd \
+    --force \
+    --name "$DEVICE_NAME" \
+    --package "${imagePackage}" \
+    --device "pixel_6" \
+    -p "$ANDROID_AVD_HOME/$DEVICE_NAME.avd"
+
+cat >> "$ANDROID_AVD_HOME/$DEVICE_NAME.avd/config.ini" << 'AVDCONF'
+hw.ramSize = 4096
+hw.gpu.enabled = yes
+hw.gpu.mode = swiftshader_indirect
+disk.dataPartition.size = 2G
+AVDCONF
+
+echo "=== AVD config.ini ==="
+cat "$ANDROID_AVD_HOME/$DEVICE_NAME.avd/config.ini"
+echo "=== End config.ini ==="
+
+# Fix system image path if needed
+SYSIMG_DIR="$ANDROID_SDK_ROOT/system-images/android-${platformVersion}/${systemImageType}/${abiVersion}"
+if [ ! -d "$SYSIMG_DIR" ]; then
+    echo "WARNING: Expected system image dir not found: $SYSIMG_DIR"
+    FOUND_SYSIMG=$(find "$ANDROID_SDK_ROOT" -name "system.img" -print -quit 2>/dev/null || echo "")
+    if [ -n "$FOUND_SYSIMG" ]; then
+        SYSIMG_DIR=$(dirname "$FOUND_SYSIMG")
+        echo "Found system image at: $SYSIMG_DIR"
+        sed -i "s|^image.sysdir.1=.*|image.sysdir.1=$SYSIMG_DIR/|" "$ANDROID_AVD_HOME/$DEVICE_NAME.avd/config.ini"
+        echo "Patched image.sysdir.1 in AVD config"
+    else
+        echo "ERROR: Could not find system.img anywhere in SDK"
+    fi
+else
+    echo "System image dir exists: $SYSIMG_DIR"
+fi
+
+# --- Boot emulator ---
+echo "=== Booting emulator ==="
+"$EMULATOR" \
+    -avd "$DEVICE_NAME" \
+    -no-window \
+    -no-audio \
+    -no-boot-anim \
+    -no-metrics \
+    -port "$PORT" \
+    -gpu swiftshader_indirect \
+    -no-snapshot \
+    -memory 4096 \
+    $ACCEL_FLAG \
+    &
+EMU_PID=$!
+echo "Emulator PID: $EMU_PID"
+
+# --- Wait for boot ---
+echo "=== Waiting for boot (timeout: ''${BOOT_TIMEOUT}s) ==="
+BOOT_DONE=""
+ELAPSED=0
+while [ $ELAPSED -lt $BOOT_TIMEOUT ]; do
+    BOOT_DONE=$("$ADB" -s "emulator-$PORT" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n' || echo "")
+    if [ "$BOOT_DONE" = "1" ]; then
+        echo "Boot completed after ~''${ELAPSED}s"
+        break
+    fi
+    sleep 10
+    ELAPSED=$((ELAPSED + 10))
+    if [ $((ELAPSED % 60)) -eq 0 ]; then
+        echo "  Still waiting... (''${ELAPSED}s elapsed)"
+    fi
+done
+
+if [ "$BOOT_DONE" != "1" ]; then
+    echo "ERROR: Emulator failed to boot within ''${BOOT_TIMEOUT}s"
+    exit 1
+fi
+
+echo "Waiting for device to settle..."
+sleep 30
+
+# ===========================================================================
+# PHASE 1 + PHASE 2 — Run test scripts
+# ===========================================================================
+export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK PACKAGE ACTIVITY WORK_DIR
+
+PHASE1_EXIT=0
+PHASE2_EXIT=0
+
+echo ""
+echo "--- lifecycle ---"
+bash "$TEST_SCRIPTS/android/lifecycle.sh" || PHASE1_EXIT=1
+echo "--- ui ---"
+bash "$TEST_SCRIPTS/android/ui.sh"        || PHASE1_EXIT=1
+echo "--- buttons ---"
+bash "$TEST_SCRIPTS/android/buttons.sh"   || PHASE1_EXIT=1
+echo "--- scroll ---"
+bash "$TEST_SCRIPTS/android/scroll.sh"    || PHASE2_EXIT=1
+
+# --- Phase results ---
+if [ $PHASE1_EXIT -eq 0 ]; then
+    PHASE1_OK=1
+    echo ""
+    echo "PHASE 1 PASSED"
+else
+    echo ""
+    echo "PHASE 1 FAILED"
+fi
+
+if [ $PHASE2_EXIT -eq 0 ]; then
+    PHASE2_OK=1
+    echo ""
+    echo "PHASE 2 PASSED"
+else
+    echo ""
+    echo "PHASE 2 FAILED"
+fi
+
+# ===========================================================================
+# PHASE 3 — Final report
+# ===========================================================================
+echo ""
+echo "============================================================"
+echo "FINAL REPORT"
+echo "============================================================"
+
+FINAL_EXIT=0
+
+if [ $PHASE1_OK -eq 1 ]; then
+    echo "PASS  Phase 1 — Counter app (lifecycle + UI + buttons)"
+else
+    echo "FAIL  Phase 1 — Counter app (lifecycle + UI + buttons)"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE2_OK -eq 1 ]; then
+    echo "PASS  Phase 2 — Scroll demo app"
+else
+    echo "FAIL  Phase 2 — Scroll demo app"
+    FINAL_EXIT=1
+fi
+
+echo ""
+if [ $FINAL_EXIT -eq 0 ]; then
+    echo "All combined emulator integration checks passed!"
+else
+    echo "Some combined emulator integration checks FAILED."
+fi
+
+exit $FINAL_EXIT
+SCRIPT
+
+    chmod +x $out/bin/test-all
+  '';
+
+  installPhase = "true";
+}
