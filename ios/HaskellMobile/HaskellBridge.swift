@@ -1,7 +1,9 @@
 import Foundation
+import os.log
 
 /// Swift wrapper around the Haskell FFI functions exposed via C.
 class HaskellBridge {
+    private static let bridgeLog = OSLog(subsystem: "me.jappie.haskellmobile", category: "UIBridge")
     // Lifecycle event codes (must match HaskellMobile.h)
     static let lifecycleCreate: Int32     = 0
     static let lifecycleStart: Int32      = 1
@@ -42,6 +44,7 @@ class HaskellBridge {
 
     /// Dispatch a UI event (e.g. button tap) to Haskell, which re-renders.
     static func onUIEvent(_ callbackId: Int32) {
+        os_log("Click dispatched: callbackId=%d", log: bridgeLog, type: .info, callbackId)
         haskellOnUIEvent(context, callbackId)
     }
 
