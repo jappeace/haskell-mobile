@@ -47,4 +47,16 @@ void haskellRenderUI(void *ctx);
 void haskellOnUIEvent(void *ctx, int32_t callbackId);
 
 
+/* Log the detected system locale via platformLog.
+ * Called from platform bridges after setSystemLocale(). */
+void haskellLogLocale(void);
+
+/* Set the system locale string. Called by platform bridges during init.
+ * The caller owns the memory (must be static or strdup'd). */
+void setSystemLocale(const char *locale);
+
+/* Get the system locale string. Returns the value set by setSystemLocale(),
+ * or falls back to LANG env var (desktop) or "en" (default). */
+const char* getSystemLocale(void);
+
 #endif /* HASKELL_MOBILE_H */

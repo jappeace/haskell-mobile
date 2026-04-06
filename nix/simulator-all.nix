@@ -256,6 +256,8 @@ echo "--- buttons ---"
 run_with_retry "buttons"   bash "$TEST_SCRIPTS/ios/buttons.sh"   || PHASE1_EXIT=1
 echo "--- scroll ---"
 run_with_retry "scroll"    bash "$TEST_SCRIPTS/ios/scroll.sh"    || PHASE2_EXIT=1
+echo "--- locale ---"
+run_with_retry "locale"    bash "$TEST_SCRIPTS/ios/locale.sh"    || PHASE1_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then

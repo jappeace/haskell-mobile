@@ -4,8 +4,11 @@ import Test.Tasty
 import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit
 
+import Data.Either (isLeft)
 import Data.List (sort)
 import Data.IORef (newIORef, readIORef, modifyIORef')
+import Data.Map.Strict qualified as Map
+import Data.Text qualified as Text
 import Foreign.C.String (newCString, peekCString)
 import Foreign.Marshal.Alloc (free)
 import Foreign.Ptr (Ptr)
@@ -15,6 +18,19 @@ import HaskellMobile
   , runMobileApp
   , getMobileApp
   , haskellGreet
+  )
+import HaskellMobile.Locale
+  ( Language(..)
+  , Locale(..)
+  , LocaleFailure(..)
+  , getSystemLocale
+  , parseLocale
+  , localeToText
+  )
+import HaskellMobile.I18n
+  ( Key(..)
+  , TranslateFailure(..)
+  , translate
   )
 import HaskellMobile.App (mobileApp)
 import HaskellMobile.Lifecycle
@@ -37,7 +53,7 @@ main = do
   defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, registrationTests]
+tests = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, registrationTests, localeTests, i18nTests]
 
 qcProps :: TestTree
 qcProps = testGroup "(checked by QuickCheck)"
@@ -331,4 +347,69 @@ registrationTests = testGroup "Registration"
         _       -> assertFailure "expected Text \"custom\""
       -- Restore the original
       runMobileApp mobileApp
+  ]
+
+localeTests :: TestTree
+localeTests = testGroup "Locale"
+  [ testCase "parseLocale parses language-only tag" $
+      parseLocale "en" @?= Right (Locale En Nothing)
+  , testCase "parseLocale parses language-region tag" $
+      parseLocale "nl-NL" @?= Right (Locale Nl (Just "NL"))
+  , testCase "parseLocale handles underscore separator" $
+      parseLocale "en_US" @?= Right (Locale En (Just "US"))
+  , testCase "parseLocale normalises case" $
+      parseLocale "EN-us" @?= Right (Locale En (Just "US"))
+  , testCase "parseLocale accepts 3-digit region code" $
+      parseLocale "en-001" @?= Right (Locale En (Just "001"))
+  , testCase "parseLocale rejects empty tag" $
+      parseLocale "" @?= Left EmptyLocaleTag
+  , testCase "parseLocale rejects unknown language code" $
+      isLeft (parseLocale "xx") @?= True
+  , testCase "parseLocale rejects invalid language" $
+      isLeft (parseLocale "123") @?= True
+  , testCase "parseLocale rejects single-char language" $
+      isLeft (parseLocale "e") @?= True
+  , testCase "localeToText roundtrips" $ do
+      let locale = Locale Nl (Just "NL")
+      parseLocale (localeToText locale) @?= Right locale
+  , testCase "localeToText language-only" $
+      localeToText (Locale En Nothing) @?= "en"
+  , testCase "localeToText language-region" $
+      localeToText (Locale Nl (Just "NL")) @?= "nl-NL"
+  , testCase "getSystemLocale returns non-empty text" $ do
+      locale <- getSystemLocale
+      assertBool "locale should not be empty" (not (Text.null locale))
+  ]
+
+i18nTests :: TestTree
+i18nTests = testGroup "I18n"
+  [ testCase "translate finds exact locale match" $ do
+      let translations = Map.fromList
+            [ (Locale Nl (Just "NL"), Map.fromList [(Key "greeting", "Hallo")])
+            , (Locale En Nothing,     Map.fromList [(Key "greeting", "Hello")])
+            ]
+      translate translations (Locale Nl (Just "NL")) (Key "greeting") @?= Right "Hallo"
+  , testCase "translate falls back to language-only" $ do
+      let translations = Map.fromList
+            [ (Locale Nl Nothing, Map.fromList [(Key "greeting", "Hallo")])
+            ]
+      translate translations (Locale Nl (Just "BE")) (Key "greeting") @?= Right "Hallo"
+  , testCase "translate reports KeyNotFound for missing key" $ do
+      let translations = Map.fromList
+            [ (Locale En Nothing, Map.fromList [(Key "greeting", "Hello")])
+            ]
+      translate translations (Locale En Nothing) (Key "farewell")
+        @?= Left (KeyNotFound (Locale En Nothing) (Key "farewell"))
+  , testCase "translate reports LocaleNotFound for missing locale" $ do
+      let translations = Map.fromList
+            [ (Locale En Nothing, Map.fromList [(Key "greeting", "Hello")])
+            ]
+      translate translations (Locale Ja Nothing) (Key "greeting")
+        @?= Left (LocaleNotFound (Locale Ja Nothing))
+  , testCase "translate prefers exact match over fallback" $ do
+      let translations = Map.fromList
+            [ (Locale Nl Nothing,       Map.fromList [(Key "greeting", "Hallo")])
+            , (Locale Nl (Just "BE"),   Map.fromList [(Key "greeting", "Hoi")])
+            ]
+      translate translations (Locale Nl (Just "BE")) (Key "greeting") @?= Right "Hoi"
   ]

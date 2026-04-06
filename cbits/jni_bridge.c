@@ -17,6 +17,12 @@
 /* Runs the user's Haskell main via RTS API (cbits/run_main.c) */
 extern void haskellRunMain(void);
 
+/* Locale detection (cbits/locale.c) */
+extern void setSystemLocale(const char *locale);
+
+/* Log detected locale from Haskell (HaskellMobile.Locale) */
+extern void haskellLogLocale(void);
+
 /* Haskell foreign exports */
 extern char* haskellGreet(const char* name);
 extern void *haskellCreateContext(void);
@@ -48,6 +54,27 @@ JNI_OnLoad(JavaVM *vm, void *reserved)
     hs_init(NULL, NULL);
     haskellRunMain();
     g_haskell_ctx = haskellCreateContext();
+
+    /* Cache the system locale from Android's Locale.getDefault().toLanguageTag() */
+    {
+        JNIEnv *env;
+        (*vm)->GetEnv(vm, (void**)&env, JNI_VERSION_1_6);
+
+        jclass localeClass = (*env)->FindClass(env, "java/util/Locale");
+        jmethodID getDefault = (*env)->GetStaticMethodID(env, localeClass,
+            "getDefault", "()Ljava/util/Locale;");
+        jobject locale = (*env)->CallStaticObjectMethod(env, localeClass, getDefault);
+        jmethodID toLanguageTag = (*env)->GetMethodID(env, localeClass,
+            "toLanguageTag", "()Ljava/lang/String;");
+        jstring jtag = (*env)->CallObjectMethod(env, locale, toLanguageTag);
+
+        const char *ctag = (*env)->GetStringUTFChars(env, jtag, NULL);
+        setSystemLocale(strdup(ctag));
+        (*env)->ReleaseStringUTFChars(env, jtag, ctag);
+
+        haskellLogLocale();
+    }
+
     return JNI_VERSION_1_6;
 }
 

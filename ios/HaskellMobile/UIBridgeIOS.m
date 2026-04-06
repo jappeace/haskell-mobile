@@ -27,6 +27,12 @@ static os_log_t g_log;
 /* Haskell FFI exports (declared here since this file is compiled by Xcode) */
 extern void haskellOnUIEvent(void *ctx, int callbackId);
 
+/* Locale detection (cbits/locale.c) */
+extern void setSystemLocale(const char *locale);
+
+/* Log detected locale from Haskell (HaskellMobile.Locale) */
+extern void haskellLogLocale(void);
+
 /* ---- Global state (valid only on the main thread) ---- */
 static UIViewController *g_viewController = nil;
 static void             *g_haskell_ctx    = NULL;
@@ -318,4 +324,15 @@ void setup_ios_ui_bridge(void *viewController, void *haskellCtx)
 
     ui_register_callbacks(&g_ios_callbacks);
     LOGI("iOS UI bridge initialized");
+
+    /* Cache the system locale from NSLocale.currentLocale */
+    {
+        NSString *lang = [[NSLocale currentLocale] languageCode];
+        NSString *region = [[NSLocale currentLocale] countryCode];
+        NSString *tag = region
+            ? [NSString stringWithFormat:@"%@-%@", lang, region]
+            : lang;
+        setSystemLocale(strdup([tag UTF8String]));
+        haskellLogLocale();
+    }
 }

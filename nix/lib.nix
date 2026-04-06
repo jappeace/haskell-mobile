@@ -121,6 +121,8 @@ in {
         cp ${haskellMobileSrc}/src/HaskellMobile/Widget.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/UIBridge.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/Render.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/Locale.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/I18n.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile.hs .
 
         # Default App.hs — only copy if not already present (consumer may override)
@@ -142,6 +144,7 @@ in {
         cp ${haskellMobileSrc}/cbits/numa_stubs.c cbits/
         cp ${haskellMobileSrc}/cbits/ui_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/run_main.c cbits/
+        cp ${haskellMobileSrc}/cbits/locale.c cbits/
 
         # Step 4: Compile Haskell to shared library with cross-GHC.
         # Discover library paths dynamically — hash suffixes vary across nixpkgs.
@@ -171,6 +174,8 @@ in {
         ARRAY_LIB=$(find_lib "array")
         DEEPSEQ_LIB=$(find_lib "deepseq")
         CONTAINERS_LIB=$(find_lib "containers")
+        TRANSFORMERS_LIB=$(find_lib "transformers")
+        TIME_LIB=$(find_lib "time")
 
         echo "Libraries discovered:"
         echo "  rts: $RTS_LIB"
@@ -190,6 +195,7 @@ in {
           cbits/numa_stubs.c \
           cbits/ui_bridge.c \
           cbits/run_main.c \
+          cbits/locale.c \
           -optl-L${androidPkgs.gmp}/lib \
           -optl-L${androidPkgs.libffi}/lib \
           -optl-lffi \
@@ -206,6 +212,7 @@ in {
           -optl-Wl,-u,haskellRenderUI \
           -optl-Wl,-u,haskellOnUIEvent \
           -optl-Wl,-u,haskellOnUITextChange \
+          -optl-Wl,-u,haskellLogLocale \
           -optl-Wl,--no-undefined \
           -optl-Wl,--whole-archive \
           -optl$RTS_LIB \
@@ -218,6 +225,8 @@ in {
           -optl$ARRAY_LIB \
           -optl$DEEPSEQ_LIB \
           -optl$CONTAINERS_LIB \
+          -optl$TRANSFORMERS_LIB \
+          -optl$TIME_LIB \
           ${if crossDeps != null then "$(for a in ${crossDeps}/lib/*.a; do echo -n \"-optl$a \"; done)" else ""} \
           -optl-Wl,--no-whole-archive
       '';
@@ -361,6 +370,8 @@ in {
         cp ${haskellMobileSrc}/src/HaskellMobile/Widget.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/UIBridge.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/Render.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/Locale.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/I18n.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile.hs .
 
         # Default App.hs — only copy if not already present
@@ -378,6 +389,7 @@ in {
         cp ${haskellMobileSrc}/cbits/platform_log.c cbits/
         cp ${haskellMobileSrc}/cbits/ui_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/run_main.c cbits/
+        cp ${haskellMobileSrc}/cbits/locale.c cbits/
 
         ghc -staticlib \
           -O2 \
@@ -391,9 +403,11 @@ in {
           -optl-Wl,-u,_haskellCreateContext \
           -optl-Wl,-u,_haskellRenderUI \
           -optl-Wl,-u,_haskellOnUIEvent \
+          -optl-Wl,-u,_haskellLogLocale \
           cbits/platform_log.c \
           cbits/ui_bridge.c \
           cbits/run_main.c \
+          cbits/locale.c \
           Main.hs \
           HaskellMobile.hs
       '';
