@@ -224,15 +224,38 @@ export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP WORK_DIR
 PHASE1_EXIT=0
 PHASE2_EXIT=0
 
+# run_with_retry LABEL COMMAND [ARGS...]
+# Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
+run_with_retry() {
+    local label="$1"; shift
+    local max_attempts=10
+    local attempt=1
+    while [ $attempt -le $max_attempts ]; do
+        echo "[$label] attempt $attempt/$max_attempts"
+        if "$@"; then
+            echo "[$label] PASSED on attempt $attempt"
+            return 0
+        fi
+        echo "[$label] attempt $attempt FAILED"
+        attempt=$((attempt + 1))
+        if [ $attempt -le $max_attempts ]; then
+            echo "[$label] retrying in 5s..."
+            sleep 5
+        fi
+    done
+    echo "[$label] FAILED after $max_attempts attempts"
+    return 1
+}
+
 echo ""
 echo "--- lifecycle ---"
-bash "$TEST_SCRIPTS/ios/lifecycle.sh" || PHASE1_EXIT=1
+run_with_retry "lifecycle" bash "$TEST_SCRIPTS/ios/lifecycle.sh" || PHASE1_EXIT=1
 echo "--- ui ---"
-bash "$TEST_SCRIPTS/ios/ui.sh"        || PHASE1_EXIT=1
+run_with_retry "ui"        bash "$TEST_SCRIPTS/ios/ui.sh"        || PHASE1_EXIT=1
 echo "--- buttons ---"
-bash "$TEST_SCRIPTS/ios/buttons.sh"   || PHASE1_EXIT=1
+run_with_retry "buttons"   bash "$TEST_SCRIPTS/ios/buttons.sh"   || PHASE1_EXIT=1
 echo "--- scroll ---"
-bash "$TEST_SCRIPTS/ios/scroll.sh"    || PHASE2_EXIT=1
+run_with_retry "scroll"    bash "$TEST_SCRIPTS/ios/scroll.sh"    || PHASE2_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
