@@ -31,6 +31,8 @@ jobs:
           extra-trusted-public-keys = nix-cache.jappie.me:WjkKcvFtHih2i+n7bdsrJ3HuGboJiU2hA2CZbf9I9oc=
     - run: nix-build
     - run: nix-build nix/android.nix
+    - name: Consumer link test
+      run: nix-build nix/test-link-consumer.nix
     - run: nix-build nix/apk.nix -o result-apk
     - name: Upload Android APK
       if: github.ref == 'refs/heads/master'

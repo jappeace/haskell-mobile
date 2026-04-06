@@ -17,6 +17,7 @@ in {
   native = import ../default.nix {};
   android = import ./android.nix { inherit sources; };
   apk = import ./apk.nix { inherit sources; };
+  consumer-link-test = import ./test-link-consumer.nix { inherit sources; };
 
   # Android tests (Linux)
   emulator-test = runTest "emulator-test"
