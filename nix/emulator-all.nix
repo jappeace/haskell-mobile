@@ -15,34 +15,42 @@
 # Usage:
 #   nix-build nix/emulator-all.nix -o result-emulator-all
 #   ./result-emulator-all/bin/test-all
-{ sources ? import ../npins }:
+{ sources ? import ../npins, androidArch ? "aarch64" }:
 let
   pkgs = import sources.nixpkgs {
     config.allowUnfree = true;
     config.android_sdk.accept_license = true;
   };
 
-  lib = import ./lib.nix { inherit sources; };
+  abiDir = { aarch64 = "arm64-v8a"; armv7a = "armeabi-v7a"; }.${androidArch};
 
-  counterApk = import ./apk.nix { inherit sources; };
+  lib = import ./lib.nix { inherit sources androidArch; };
+
+  counterAndroid = import ./android.nix { inherit sources androidArch; };
+  counterApk = lib.mkApk {
+    sharedLibs = [{ lib = counterAndroid; inherit abiDir; }];
+    androidSrc = ../android;
+    apkName = "haskell-mobile.apk";
+    name = "haskell-mobile-apk";
+  };
 
   scrollAndroid = import ./android.nix {
-    inherit sources;
+    inherit sources androidArch;
     mainModule = ../test/ScrollDemoMain.hs;
   };
   scrollApk = lib.mkApk {
-    sharedLib = scrollAndroid;
+    sharedLibs = [{ lib = scrollAndroid; inherit abiDir; }];
     androidSrc = ../android;
     apkName = "haskell-mobile-scroll.apk";
     name = "haskell-mobile-scroll-apk";
   };
 
   textinputAndroid = import ./android.nix {
-    inherit sources;
+    inherit sources androidArch;
     mainModule = ../test/TextInputDemoMain.hs;
   };
   textinputApk = lib.mkApk {
-    sharedLib = textinputAndroid;
+    sharedLibs = [{ lib = textinputAndroid; inherit abiDir; }];
     androidSrc = ../android;
     apkName = "haskell-mobile-textinput.apk";
     name = "haskell-mobile-textinput-apk";
