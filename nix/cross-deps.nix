@@ -6,8 +6,8 @@
 #   $out/hi/           — interface files (.hi)
 #   $out/pkgdb/        — GHC package database (.conf + cache)
 #
-# Currently builds: direct-sqlite (bundled sqlite3.c, no systemlib),
-# prettyprinter, and toml-parser (for i18n support).
+# Currently builds: direct-sqlite (bundled sqlite3.c, no systemlib)
+# and prettyprinter.
 { sources }:
 let
   pkgs = import sources.nixpkgs {
@@ -40,17 +40,12 @@ let
     sha256 = "sha256-Xm6mkDEU+hGPzDWWM9+37N3suSwGyFPQKne3KyUfC0U=";
   };
 
-  tomlParserSrc = pkgs.fetchurl {
-    url = "https://hackage.haskell.org/package/toml-parser-2.0.2.0/toml-parser-2.0.2.0.tar.gz";
-    sha256 = "sha256-note5e6pvqJEFzI0eDmo4y6YeJBVpiH1WnLC33qN4ag=";
-  };
-
 in pkgs.stdenv.mkDerivation {
   name = "haskell-mobile-cross-deps";
 
   dontUnpack = true;
 
-  nativeBuildInputs = [ ghc pkgs.cabal-install pkgs.haskellPackages.alex pkgs.haskellPackages.happy ];
+  nativeBuildInputs = [ ghc pkgs.cabal-install ];
   buildInputs = [ androidPkgs.libffi androidPkgs.gmp ];
 
   buildPhase = ''
@@ -75,7 +70,6 @@ in pkgs.stdenv.mkDerivation {
     cd $TMPDIR/deps
     tar xzf ${directSqliteSrc}
     tar xzf ${prettyprinterSrc}
-    tar xzf ${tomlParserSrc}
 
     # --- Patch out build-tool-depends: hsc2hs ---
     # Cabal tries to cross-compile hsc2hs, producing an ARM binary that
@@ -90,20 +84,6 @@ in pkgs.stdenv.mkDerivation {
       exit 1
     fi
 
-    # --- Patch out build-tool-depends for toml-parser ---
-    # alex and happy must run on the build host, not the target.
-    # The Hackage tarball ships pre-generated .hs files, so we just
-    # comment out the build-tool-depends lines.
-    # The library's build-tool-depends spans multiple lines:
-    #   build-tool-depends:
-    #       alex:alex  >= 3.2,
-    #       happy:happy >= 1.19,
-    # Comment out the alex and happy lines directly.
-    sed -i 's/^        alex:alex.*/        -- &/' \
-      toml-parser-2.0.2.0/toml-parser.cabal
-    sed -i 's/^        happy:happy.*/        -- &/' \
-      toml-parser-2.0.2.0/toml-parser.cabal
-
     # --- Create a wrapper cabal project ---
     # We need a top-level project so cabal resolves direct-sqlite as a
     # local package.  The "wrapper" library exists only to pull in the
@@ -116,7 +96,6 @@ in pkgs.stdenv.mkDerivation {
 packages: .
           $TMPDIR/deps/direct-sqlite-2.3.29/
           $TMPDIR/deps/prettyprinter-1.7.1/
-          $TMPDIR/deps/toml-parser-2.0.2.0/
 
 package direct-sqlite
   flags: -systemlib
@@ -141,7 +120,7 @@ EOF
       --with-hsc2hs=${hsc2hsCmd} \
       --extra-lib-dirs=${androidPkgs.gmp}/lib \
       --extra-lib-dirs=${androidPkgs.libffi}/lib \
-      lib:direct-sqlite lib:prettyprinter lib:toml-parser
+      lib:direct-sqlite lib:prettyprinter
   '';
 
   installPhase = ''
@@ -169,7 +148,6 @@ EOF
 
     install_pkg direct-sqlite
     install_pkg prettyprinter
-    install_pkg toml-parser
 
     echo "Copied .a files:"
     ls -lh $out/lib/
@@ -182,10 +160,6 @@ EOF
     BASE_ID=$(${ghcPkgCmd} field base id --simple-output 2>/dev/null || echo "base-4.20.0.0")
     BYTESTRING_ID=$(${ghcPkgCmd} field bytestring id --simple-output 2>/dev/null || echo "bytestring-0.12.1.0")
     TEXT_ID=$(${ghcPkgCmd} field text id --simple-output 2>/dev/null || echo "text-2.1.1")
-    CONTAINERS_ID=$(${ghcPkgCmd} field containers id --simple-output 2>/dev/null || echo "containers-0.7")
-    ARRAY_ID=$(${ghcPkgCmd} field array id --simple-output 2>/dev/null || echo "array-0.5.7.0")
-    TIME_ID=$(${ghcPkgCmd} field time id --simple-output 2>/dev/null || echo "time-1.12.2")
-    TRANSFORMERS_ID=$(${ghcPkgCmd} field transformers id --simple-output 2>/dev/null || echo "transformers-0.6.1.1")
     DEEPSEQ_ID=$(${ghcPkgCmd} field deepseq id --simple-output 2>/dev/null || echo "deepseq-1.5.0.0")
 
     # --- Helper: extract unit ID from .a filename ---
@@ -200,7 +174,6 @@ EOF
 
     DS_UNIT_ID=$(get_unit_id direct-sqlite)
     PP_UNIT_ID=$(get_unit_id prettyprinter)
-    TP_UNIT_ID=$(get_unit_id toml-parser)
 
     cat > $out/pkgdb/direct-sqlite.conf << CONF
 name: direct-sqlite
@@ -232,26 +205,6 @@ depends:
     $BASE_ID
     $TEXT_ID
     $DEEPSEQ_ID
-CONF
-
-    cat > $out/pkgdb/toml-parser.conf << CONF
-name: toml-parser
-version: 2.0.2.0
-id: $TP_UNIT_ID
-key: $TP_UNIT_ID
-exposed: True
-exposed-modules: Toml Toml.Pretty Toml.Schema Toml.Schema.FromValue Toml.Schema.Generic Toml.Schema.Generic.FromValue Toml.Schema.Generic.ToValue Toml.Schema.Matcher Toml.Schema.ParseTable Toml.Schema.ToValue Toml.Semantics Toml.Semantics.Ordered Toml.Semantics.Types Toml.Syntax Toml.Syntax.Lexer Toml.Syntax.Parser Toml.Syntax.Position Toml.Syntax.Token Toml.Syntax.Types
-import-dirs: $out/hi
-library-dirs: $out/lib
-hs-libraries: HStoml-parser-2.0.2.0-inplace
-depends:
-    $BASE_ID
-    $TEXT_ID
-    $CONTAINERS_ID
-    $ARRAY_ID
-    $TIME_ID
-    $TRANSFORMERS_ID
-    $PP_UNIT_ID
 CONF
 
     ${ghcPkgCmd} --package-db=$out/pkgdb recache

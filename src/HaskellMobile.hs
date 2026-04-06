@@ -16,15 +16,16 @@ module HaskellMobile
   , newMobileContext
   , freeMobileContext
   -- Re-exports from Locale
+  , Language(..)
   , Locale(..)
   , LocaleFailure(..)
   , getSystemLocale
   , parseLocale
   , localeToText
+  , languageToCode
+  , languageFromCode
   -- Re-exports from I18n
   , Key(..)
-  , Translations
-  , parseTranslationFile
   , translate
   )
 where
@@ -43,8 +44,8 @@ import HaskellMobile.Lifecycle
   , newMobileContext
   , freeMobileContext
   )
-import HaskellMobile.I18n (Key(..), Translations, parseTranslationFile, translate)
-import HaskellMobile.Locale (Locale(..), LocaleFailure(..), getSystemLocale, parseLocale, localeToText)
+import HaskellMobile.I18n (Key(..), translate)
+import HaskellMobile.Locale (Language(..), Locale(..), LocaleFailure(..), getSystemLocale, parseLocale, localeToText, languageToCode, languageFromCode)
 import HaskellMobile.Render (RenderState, newRenderState, renderWidget, dispatchEvent, dispatchTextEvent)
 import HaskellMobile.Types (MobileApp(..), runMobileApp, getMobileApp)
 import System.IO.Unsafe (unsafePerformIO)

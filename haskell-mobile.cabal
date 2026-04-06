@@ -73,8 +73,7 @@ library
       src
   build-depends:
       text,
-      containers,
-      toml-parser
+      containers
   c-sources:
       cbits/android_stubs.c
       cbits/platform_log.c

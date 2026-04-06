@@ -20,7 +20,8 @@ import HaskellMobile
   , haskellGreet
   )
 import HaskellMobile.Locale
-  ( Locale(..)
+  ( Language(..)
+  , Locale(..)
   , LocaleFailure(..)
   , getSystemLocale
   , parseLocale
@@ -28,7 +29,6 @@ import HaskellMobile.Locale
   )
 import HaskellMobile.I18n
   ( Key(..)
-  , parseTranslationFile
   , translate
   )
 import HaskellMobile.App (mobileApp)
@@ -351,32 +351,30 @@ registrationTests = testGroup "Registration"
 localeTests :: TestTree
 localeTests = testGroup "Locale"
   [ testCase "parseLocale parses language-only tag" $
-      parseLocale "en" @?= Right (Locale "en" Nothing)
+      parseLocale "en" @?= Right (Locale En Nothing)
   , testCase "parseLocale parses language-region tag" $
-      parseLocale "nl-NL" @?= Right (Locale "nl" (Just "NL"))
+      parseLocale "nl-NL" @?= Right (Locale Nl (Just "NL"))
   , testCase "parseLocale handles underscore separator" $
-      parseLocale "en_US" @?= Right (Locale "en" (Just "US"))
+      parseLocale "en_US" @?= Right (Locale En (Just "US"))
   , testCase "parseLocale normalises case" $
-      parseLocale "EN-us" @?= Right (Locale "en" (Just "US"))
-  , testCase "parseLocale accepts 3-letter language code" $
-      parseLocale "chi-CN" @?= Right (Locale "chi" (Just "CN"))
+      parseLocale "EN-us" @?= Right (Locale En (Just "US"))
   , testCase "parseLocale accepts 3-digit region code" $
-      parseLocale "en-001" @?= Right (Locale "en" (Just "001"))
+      parseLocale "en-001" @?= Right (Locale En (Just "001"))
   , testCase "parseLocale rejects empty tag" $
       parseLocale "" @?= Left EmptyLocaleTag
+  , testCase "parseLocale rejects unknown language code" $
+      isLeft (parseLocale "xx") @?= True
   , testCase "parseLocale rejects invalid language" $
       isLeft (parseLocale "123") @?= True
   , testCase "parseLocale rejects single-char language" $
       isLeft (parseLocale "e") @?= True
-  , testCase "parseLocale rejects too-long language" $
-      isLeft (parseLocale "engl") @?= True
   , testCase "localeToText roundtrips" $ do
-      let locale = Locale "nl" (Just "NL")
+      let locale = Locale Nl (Just "NL")
       parseLocale (localeToText locale) @?= Right locale
   , testCase "localeToText language-only" $
-      localeToText (Locale "en" Nothing) @?= "en"
+      localeToText (Locale En Nothing) @?= "en"
   , testCase "localeToText language-region" $
-      localeToText (Locale "nl" (Just "NL")) @?= "nl-NL"
+      localeToText (Locale Nl (Just "NL")) @?= "nl-NL"
   , testCase "getSystemLocale returns non-empty text" $ do
       locale <- getSystemLocale
       assertBool "locale should not be empty" (not (Text.null locale))
@@ -386,46 +384,29 @@ i18nTests :: TestTree
 i18nTests = testGroup "I18n"
   [ testCase "translate finds exact locale match" $ do
       let translations = Map.fromList
-            [ (Locale "nl" (Just "NL"), Map.fromList [(Key "greeting", "Hallo")])
-            , (Locale "en" Nothing,     Map.fromList [(Key "greeting", "Hello")])
+            [ (Locale Nl (Just "NL"), Map.fromList [(Key "greeting", "Hallo")])
+            , (Locale En Nothing,     Map.fromList [(Key "greeting", "Hello")])
             ]
-      translate translations (Locale "nl" (Just "NL")) (Key "greeting") @?= Just "Hallo"
+      translate translations (Locale Nl (Just "NL")) (Key "greeting") @?= Just "Hallo"
   , testCase "translate falls back to language-only" $ do
       let translations = Map.fromList
-            [ (Locale "nl" Nothing, Map.fromList [(Key "greeting", "Hallo")])
+            [ (Locale Nl Nothing, Map.fromList [(Key "greeting", "Hallo")])
             ]
-      translate translations (Locale "nl" (Just "BE")) (Key "greeting") @?= Just "Hallo"
+      translate translations (Locale Nl (Just "BE")) (Key "greeting") @?= Just "Hallo"
   , testCase "translate returns Nothing for missing key" $ do
       let translations = Map.fromList
-            [ (Locale "en" Nothing, Map.fromList [(Key "greeting", "Hello")])
+            [ (Locale En Nothing, Map.fromList [(Key "greeting", "Hello")])
             ]
-      translate translations (Locale "en" Nothing) (Key "farewell") @?= Nothing
+      translate translations (Locale En Nothing) (Key "farewell") @?= Nothing
   , testCase "translate returns Nothing for missing locale" $ do
       let translations = Map.fromList
-            [ (Locale "en" Nothing, Map.fromList [(Key "greeting", "Hello")])
+            [ (Locale En Nothing, Map.fromList [(Key "greeting", "Hello")])
             ]
-      translate translations (Locale "ja" Nothing) (Key "greeting") @?= Nothing
+      translate translations (Locale Ja Nothing) (Key "greeting") @?= Nothing
   , testCase "translate prefers exact match over fallback" $ do
       let translations = Map.fromList
-            [ (Locale "nl" Nothing,       Map.fromList [(Key "greeting", "Hallo")])
-            , (Locale "nl" (Just "BE"),   Map.fromList [(Key "greeting", "Hoi")])
+            [ (Locale Nl Nothing,       Map.fromList [(Key "greeting", "Hallo")])
+            , (Locale Nl (Just "BE"),   Map.fromList [(Key "greeting", "Hoi")])
             ]
-      translate translations (Locale "nl" (Just "BE")) (Key "greeting") @?= Just "Hoi"
-  , testCase "parseTranslationFile parses flat TOML" $ do
-      let toml = "greeting = \"Hello\"\nfarewell = \"Goodbye\""
-      case parseTranslationFile toml of
-        Left err -> assertFailure err
-        Right translationMap -> do
-          Map.lookup (Key "greeting") translationMap @?= Just "Hello"
-          Map.lookup (Key "farewell") translationMap @?= Just "Goodbye"
-  , testCase "parseTranslationFile rejects non-string values" $ do
-      let toml = "count = 42"
-      case parseTranslationFile toml of
-        Left _  -> pure ()
-        Right _ -> assertFailure "should reject non-string values"
-  , testCase "parseTranslationFile rejects invalid TOML" $ do
-      let toml = "= invalid"
-      case parseTranslationFile toml of
-        Left _  -> pure ()
-        Right _ -> assertFailure "should reject invalid TOML"
+      translate translations (Locale Nl (Just "BE")) (Key "greeting") @?= Just "Hoi"
   ]
