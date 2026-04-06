@@ -43,7 +43,7 @@ import HaskellMobile.Lifecycle
   , freeMobileContext
   , haskellOnLifecycle
   )
-import HaskellMobile.Widget (InputType(..), TextInputConfig(..), Widget(..))
+import HaskellMobile.Widget (InputType(..), TextInputConfig(..), Widget(..), WidgetStyle(..), defaultStyle)
 import HaskellMobile.Render (newRenderState, renderWidget, dispatchEvent, dispatchTextEvent)
 
 main :: IO ()
@@ -53,7 +53,7 @@ main = do
   defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, registrationTests, localeTests, i18nTests]
+tests = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, styledTests, registrationTests, localeTests, i18nTests]
 
 qcProps :: TestTree
 qcProps = testGroup "(checked by QuickCheck)"
@@ -222,6 +222,7 @@ uiTests = testGroup "UI"
         TextInput _     -> assertFailure "expected Column, got TextInput"
         Row _           -> assertFailure "expected Column, got Row"
         ScrollView _    -> assertFailure "expected Column, got ScrollView"
+        Styled _ _      -> assertFailure "expected Column, got Styled"
   ]
 
 -- | Tests for the ScrollView widget binding.
@@ -367,6 +368,59 @@ textInputTests = testGroup "TextInput"
       nVal <- readIORef numberRef
       tVal @?= show ("Alice" :: String)
       nVal @?= show ("60.0" :: String)
+  ]
+
+-- | Tests for the Styled widget wrapper.
+styledTests :: TestTree
+styledTests = testGroup "Styled"
+  [ testCase "Styled Text renders without error" $ do
+      rs <- newRenderState
+      renderWidget rs $ Styled (WidgetStyle (Just 20.0) (Just 8.0)) (Text "styled")
+
+  , testCase "Styled Button fires callback" $ do
+      ref <- newIORef (0 :: Int)
+      rs <- newRenderState
+      renderWidget rs $ Styled (WidgetStyle (Just 16.0) Nothing)
+        (Button "tap" (modifyIORef' ref (+ 1)))
+      dispatchEvent rs 0
+      count <- readIORef ref
+      count @?= 1
+
+  , testCase "Styled Column renders children and dispatches" $ do
+      ref <- newIORef False
+      rs <- newRenderState
+      renderWidget rs $ Styled defaultStyle
+        (Column [ Text "info"
+                , Button "go" (modifyIORef' ref (const True))
+                ])
+      dispatchEvent rs 0
+      fired <- readIORef ref
+      fired @?= True
+
+  , testCase "nested Styled applies both styles" $ do
+      rs <- newRenderState
+      renderWidget rs $
+        Styled (WidgetStyle Nothing (Just 12.0))
+          (Styled (WidgetStyle (Just 18.0) Nothing)
+            (Text "double styled"))
+
+  , testCase "defaultStyle is a no-op" $ do
+      rs <- newRenderState
+      renderWidget rs $ Styled defaultStyle (Text "plain")
+
+  , testCase "re-render resets callbacks through Styled" $ do
+      refOld <- newIORef False
+      refNew <- newIORef False
+      rs <- newRenderState
+      renderWidget rs $ Styled defaultStyle
+        (Button "old" (modifyIORef' refOld (const True)))
+      renderWidget rs $ Styled defaultStyle
+        (Button "new" (modifyIORef' refNew (const True)))
+      dispatchEvent rs 0
+      old <- readIORef refOld
+      new <- readIORef refNew
+      old @?= False
+      new @?= True
   ]
 
 -- | Tests for the IORef registration pattern.

@@ -286,6 +286,8 @@ echo "--- buttons ---"
 run_with_retry "buttons"   bash "$TEST_SCRIPTS/android/buttons.sh"   || PHASE1_EXIT=1
 echo "--- scroll ---"
 run_with_retry "scroll"    bash "$TEST_SCRIPTS/android/scroll.sh"    || PHASE2_EXIT=1
+echo "--- styled ---"
+run_with_retry "styled"    bash "$TEST_SCRIPTS/android/styled.sh"    || PHASE1_EXIT=1
 echo "--- locale ---"
 run_with_retry "locale"    bash "$TEST_SCRIPTS/android/locale.sh"    || PHASE1_EXIT=1
 echo "--- textinput ---"

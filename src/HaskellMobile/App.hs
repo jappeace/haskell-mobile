@@ -8,7 +8,7 @@ import Data.IORef (IORef, newIORef, readIORef, modifyIORef')
 import Data.Text (pack)
 import HaskellMobile.Types (MobileApp(..))
 import HaskellMobile.Lifecycle (loggingMobileContext)
-import HaskellMobile.Widget (InputType(..), TextInputConfig(..), Widget(..))
+import HaskellMobile.Widget (InputType(..), TextInputConfig(..), Widget(..), WidgetStyle(..))
 import System.IO.Unsafe (unsafePerformIO)
 
 -- | The default mobile app — logs every lifecycle event and shows a counter.
@@ -28,7 +28,8 @@ counterView :: IO Widget
 counterView = do
   n <- readIORef counter
   pure $ Column
-    [ Text ("Counter: " <> pack (show n))
+    [ Styled (WidgetStyle (Just 24.0) (Just 16.0))
+        (Text ("Counter: " <> pack (show n)))
     , Row [ Button "+" (modifyIORef' counter (+ 1))
           , Button "-" (modifyIORef' counter (subtract 1))
           ]

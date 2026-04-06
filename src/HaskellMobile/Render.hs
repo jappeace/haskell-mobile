@@ -19,7 +19,7 @@ import Data.Int (Int32)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Text (Text)
-import HaskellMobile.Widget (InputType(..), TextInputConfig(..), Widget(..))
+import HaskellMobile.Widget (InputType(..), TextInputConfig(..), Widget(..), WidgetStyle(..))
 import HaskellMobile.UIBridge qualified as Bridge
 import System.IO (hPutStrLn, stderr)
 
@@ -106,6 +106,10 @@ renderNode rs (ScrollView children) = do
   nodeId <- Bridge.createNode Bridge.NodeScrollView
   renderChildren rs nodeId children
   pure nodeId
+renderNode rs (Styled style child) = do
+  nodeId <- renderNode rs child
+  applyStyle nodeId style
+  pure nodeId
 
 -- | Render a list of children and add them to a parent container.
 renderChildren :: RenderState -> Int32 -> [Widget] -> IO ()
@@ -114,6 +118,17 @@ renderChildren rs parentId children =
     childId <- renderNode rs child
     Bridge.addChild parentId childId
   ) children
+
+-- | Apply 'WidgetStyle' overrides to a rendered node by calling
+-- 'Bridge.setNumProp' for each 'Just' field.
+applyStyle :: Int32 -> WidgetStyle -> IO ()
+applyStyle nodeId style = do
+  case wsFontSize style of
+    Just fontSize -> Bridge.setNumProp nodeId Bridge.PropFontSize fontSize
+    Nothing       -> pure ()
+  case wsPadding style of
+    Just padding -> Bridge.setNumProp nodeId Bridge.PropPadding padding
+    Nothing      -> pure ()
 
 -- | Full render: clear the screen, reset callbacks, build the widget
 -- tree, and set the root node.

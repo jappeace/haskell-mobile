@@ -7,6 +7,8 @@ module HaskellMobile.Widget
   ( InputType(..)
   , TextInputConfig(..)
   , Widget(..)
+  , WidgetStyle(..)
+  , defaultStyle
   )
 where
 
@@ -31,6 +33,22 @@ data TextInputConfig = TextInputConfig
     -- ^ Callback fired when the user edits the field.
   }
 
+-- | Visual style overrides for a widget node.
+-- Each field is optional — 'Nothing' means "use the platform default".
+data WidgetStyle = WidgetStyle
+  { wsFontSize :: Maybe Double
+    -- ^ Font size in platform-native units (sp on Android, pt on iOS).
+  , wsPadding  :: Maybe Double
+    -- ^ Uniform padding in platform-native units (px on Android, pt on iOS).
+  } deriving (Show, Eq)
+
+-- | No style overrides — all fields are 'Nothing'.
+defaultStyle :: WidgetStyle
+defaultStyle = WidgetStyle
+  { wsFontSize = Nothing
+  , wsPadding  = Nothing
+  }
+
 -- | A declarative description of a UI element.
 data Widget
   = Text Text
@@ -45,3 +63,5 @@ data Widget
     -- ^ A horizontal container laying out children left-to-right.
   | ScrollView [Widget]
     -- ^ A vertically scrollable container.
+  | Styled WidgetStyle Widget
+    -- ^ Apply visual style overrides to a child widget.

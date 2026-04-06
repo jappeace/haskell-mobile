@@ -206,8 +206,33 @@ static void ios_set_str_prop(int32_t nodeId, int32_t propId, const char *value)
 
 static void ios_set_num_prop(int32_t nodeId, int32_t propId, double value)
 {
-    /* TODO: Implement font size, padding, etc. */
-    LOGI("setNumProp(node=%d, prop=%d, value=%.2f) — not yet implemented", nodeId, propId, value);
+    UIView *view = get_node(nodeId);
+    if (!view) return;
+
+    switch (propId) {
+    case UI_PROP_FONT_SIZE: {
+        UIFont *font = [UIFont systemFontOfSize:(CGFloat)value];
+        if ([view isKindOfClass:[UILabel class]]) {
+            ((UILabel *)view).font = font;
+        } else if ([view isKindOfClass:[UIButton class]]) {
+            ((UIButton *)view).titleLabel.font = font;
+        } else {
+            LOGI("setNumProp: fontSize ignored on non-text node=%d", nodeId);
+            break;
+        }
+        LOGI("setNumProp(node=%d, fontSize=%.1f)", nodeId, value);
+        break;
+    }
+    case UI_PROP_PADDING: {
+        CGFloat pt = (CGFloat)value;
+        view.layoutMargins = UIEdgeInsetsMake(pt, pt, pt, pt);
+        LOGI("setNumProp(node=%d, padding=%.1f)", nodeId, value);
+        break;
+    }
+    default:
+        LOGI("setNumProp: unknown propId %d", propId);
+        break;
+    }
 }
 
 static void ios_set_handler(int32_t nodeId, int32_t eventType, int32_t callbackId)

@@ -68,6 +68,8 @@ static jmethodID g_method_intValue;
 static jmethodID g_method_setOnClickListener;
 static jmethodID g_method_registerTextWatcher;
 static jmethodID g_method_setInputType;
+static jmethodID g_method_setTextSize;
+static jmethodID g_method_setPadding;
 
 /* LinearLayout orientation constants */
 static jint ORIENTATION_VERTICAL   = 1;
@@ -192,6 +194,14 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     g_method_setInputType = (*env)->GetMethodID(env, g_class_EditText,
         "setInputType", "(I)V");
 
+    /* TextView.setTextSize(float) — sets size in scaled pixels */
+    g_method_setTextSize = (*env)->GetMethodID(env, g_class_TextView,
+        "setTextSize", "(F)V");
+
+    /* View.setPadding(int,int,int,int) — sets padding in pixels */
+    g_method_setPadding = (*env)->GetMethodID(env, viewClass,
+        "setPadding", "(IIII)V");
+
     return 0;
 }
 
@@ -289,6 +299,21 @@ static void android_set_num_prop(int32_t nodeId, int32_t propId, double value)
     if (!view) return;
 
     switch (propId) {
+    case UI_PROP_FONT_SIZE:
+        /* setTextSize only makes sense on TextView subclasses */
+        if ((*env)->IsInstanceOf(env, view, g_class_TextView)) {
+            (*env)->CallVoidMethod(env, view, g_method_setTextSize, (jfloat)value);
+            LOGI("setNumProp(node=%d, fontSize=%.1f)", nodeId, value);
+        } else {
+            LOGI("setNumProp: fontSize ignored on non-TextView node=%d", nodeId);
+        }
+        break;
+    case UI_PROP_PADDING: {
+        jint px = (jint)value;
+        (*env)->CallVoidMethod(env, view, g_method_setPadding, px, px, px, px);
+        LOGI("setNumProp(node=%d, padding=%d)", nodeId, px);
+        break;
+    }
     case UI_PROP_INPUT_TYPE: {
         /* Haskell 0 = InputText  -> Android TYPE_CLASS_TEXT           (1)
          * Haskell 1 = InputNumber -> Android TYPE_CLASS_NUMBER |
@@ -305,7 +330,7 @@ static void android_set_num_prop(int32_t nodeId, int32_t propId, double value)
         break;
     }
     default:
-        LOGI("setNumProp(node=%d, prop=%d, value=%.2f) — not yet implemented", nodeId, propId, value);
+        LOGI("setNumProp: unknown propId %d", propId);
         break;
     }
 }
