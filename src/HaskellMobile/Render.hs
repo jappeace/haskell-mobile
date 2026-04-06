@@ -19,7 +19,7 @@ import Data.Int (Int32)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Text (Text)
-import HaskellMobile.Widget (Widget(..))
+import HaskellMobile.Widget (InputType(..), Widget(..))
 import HaskellMobile.UIBridge qualified as Bridge
 import System.IO (hPutStrLn, stderr)
 
@@ -69,6 +69,11 @@ resetCallbacks rs = do
   writeIORef (rsTextCallbacks rs) IntMap.empty
   writeIORef (rsNextId rs) 0
 
+-- | Map an 'InputType' to the numeric value sent to the platform bridge.
+inputTypeToDouble :: InputType -> Double
+inputTypeToDouble InputText   = 0
+inputTypeToDouble InputNumber = 1
+
 -- | Render a single 'Widget' node, returning its native node ID.
 renderNode :: RenderState -> Widget -> IO Int32
 renderNode _rs (Text label) = do
@@ -81,10 +86,11 @@ renderNode rs (Button label action) = do
   callbackId <- registerCallback rs action
   Bridge.setHandler nodeId Bridge.EventClick callbackId
   pure nodeId
-renderNode rs (TextInput hint value onChange) = do
+renderNode rs (TextInput inputType hint value onChange) = do
   nodeId <- Bridge.createNode Bridge.NodeTextInput
   Bridge.setStrProp nodeId Bridge.PropText value
   Bridge.setStrProp nodeId Bridge.PropHint hint
+  Bridge.setNumProp nodeId Bridge.PropInputType (inputTypeToDouble inputType)
   callbackId <- registerTextCallback rs onChange
   Bridge.setHandler nodeId Bridge.EventTextChange callbackId
   pure nodeId

@@ -4,11 +4,18 @@
 -- "HaskellMobile.Render", which traverses this tree and issues
 -- FFI calls to the platform bridge.
 module HaskellMobile.Widget
-  ( Widget(..)
+  ( InputType(..)
+  , Widget(..)
   )
 where
 
 import Data.Text (Text)
+
+-- | The kind of on-screen keyboard to show for a 'TextInput'.
+data InputType
+  = InputText    -- ^ Default text keyboard.
+  | InputNumber  -- ^ Numeric keyboard with decimal support.
+  deriving (Show, Eq)
 
 -- | A declarative description of a UI element.
 data Widget
@@ -16,8 +23,8 @@ data Widget
     -- ^ A read-only text label.
   | Button Text (IO ())
     -- ^ A tappable button with a label and click handler.
-  | TextInput Text Text (Text -> IO ())
-    -- ^ A text input field: placeholder, current value, onChange handler.
+  | TextInput InputType Text Text (Text -> IO ())
+    -- ^ A text input field: input type, placeholder, current value, onChange handler.
     -- Follows a controlled-component pattern: Haskell owns the state.
   | Column [Widget]
     -- ^ A vertical container laying out children top-to-bottom.

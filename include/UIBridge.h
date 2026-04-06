@@ -17,8 +17,9 @@
 #define UI_PROP_HINT      2
 
 /* Property IDs for numeric properties */
-#define UI_PROP_FONT_SIZE 0
-#define UI_PROP_PADDING   1
+#define UI_PROP_FONT_SIZE   0
+#define UI_PROP_PADDING     1
+#define UI_PROP_INPUT_TYPE  2
 
 /* Event types */
 #define UI_EVENT_CLICK       0

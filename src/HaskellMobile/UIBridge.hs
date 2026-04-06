@@ -53,6 +53,7 @@ data PropId
   | PropHint
   | PropFontSize
   | PropPadding
+  | PropInputType
   deriving (Show, Eq, Enum, Bounded)
 
 -- | Map a 'PropId' to its C integer code.
@@ -60,8 +61,9 @@ propIdToInt :: PropId -> Int32
 propIdToInt PropText     = 0
 propIdToInt PropColor    = 1
 propIdToInt PropHint     = 2
-propIdToInt PropFontSize = 0
-propIdToInt PropPadding  = 1
+propIdToInt PropFontSize  = 0
+propIdToInt PropPadding   = 1
+propIdToInt PropInputType = 2
 
 -- | Event types corresponding to @UI_EVENT_*@ in @UIBridge.h@.
 data EventType

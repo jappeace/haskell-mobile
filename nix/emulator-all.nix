@@ -37,6 +37,17 @@ let
     name = "haskell-mobile-scroll-apk";
   };
 
+  textinputAndroid = import ./android.nix {
+    inherit sources;
+    mainModule = ../test/TextInputDemoMain.hs;
+  };
+  textinputApk = lib.mkApk {
+    sharedLib = textinputAndroid;
+    androidSrc = ../android;
+    apkName = "haskell-mobile-textinput.apk";
+    name = "haskell-mobile-textinput-apk";
+  };
+
   androidComposition = pkgs.androidenv.composeAndroidPackages {
     platformVersions = [ "34" ];
     includeEmulator = true;
@@ -77,6 +88,7 @@ EMULATOR="$ANDROID_SDK_ROOT/emulator/emulator"
 AVDMANAGER="${sdk}/bin/avdmanager"
 COUNTER_APK="${counterApk}/haskell-mobile.apk"
 SCROLL_APK="${scrollApk}/haskell-mobile-scroll.apk"
+TEXTINPUT_APK="${textinputApk}/haskell-mobile-textinput.apk"
 PACKAGE="me.jappie.haskellmobile"
 ACTIVITY=".MainActivity"
 DEVICE_NAME="test_all"
@@ -119,6 +131,7 @@ PORT=""
 # Phase result tracking
 PHASE1_OK=0
 PHASE2_OK=0
+PHASE3_OK=0
 
 cleanup() {
     echo ""
@@ -235,10 +248,11 @@ sleep 30
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK PACKAGE ACTIVITY WORK_DIR
+export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK PACKAGE ACTIVITY WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
+PHASE3_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -274,6 +288,8 @@ echo "--- scroll ---"
 run_with_retry "scroll"    bash "$TEST_SCRIPTS/android/scroll.sh"    || PHASE2_EXIT=1
 echo "--- locale ---"
 run_with_retry "locale"    bash "$TEST_SCRIPTS/android/locale.sh"    || PHASE1_EXIT=1
+echo "--- textinput ---"
+run_with_retry "textinput" bash "$TEST_SCRIPTS/android/textinput.sh" || PHASE3_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -292,6 +308,16 @@ if [ $PHASE2_EXIT -eq 0 ]; then
 else
     echo ""
     echo "PHASE 2 FAILED"
+fi
+
+if [ $PHASE3_EXIT -eq 0 ]; then
+    PHASE3_OK=1
+    echo ""
+    echo "PHASE 3 PASSED"
+else
+    PHASE3_OK=0
+    echo ""
+    echo "PHASE 3 FAILED"
 fi
 
 # ===========================================================================
@@ -315,6 +341,13 @@ if [ $PHASE2_OK -eq 1 ]; then
     echo "PASS  Phase 2 — Scroll demo app"
 else
     echo "FAIL  Phase 2 — Scroll demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE3_OK -eq 1 ]; then
+    echo "PASS  Phase 3 — TextInput demo app"
+else
+    echo "FAIL  Phase 3 — TextInput demo app"
     FINAL_EXIT=1
 fi
 

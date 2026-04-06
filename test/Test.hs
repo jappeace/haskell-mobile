@@ -43,7 +43,7 @@ import HaskellMobile.Lifecycle
   , freeMobileContext
   , haskellOnLifecycle
   )
-import HaskellMobile.Widget (Widget(..))
+import HaskellMobile.Widget (InputType(..), Widget(..))
 import HaskellMobile.Render (newRenderState, renderWidget, dispatchEvent, dispatchTextEvent)
 
 main :: IO ()
@@ -219,7 +219,7 @@ uiTests = testGroup "UI"
         Column _        -> pure ()
         Text _          -> assertFailure "expected Column, got Text"
         Button _ _      -> assertFailure "expected Column, got Button"
-        TextInput _ _ _ -> assertFailure "expected Column, got TextInput"
+        TextInput _ _ _ _ -> assertFailure "expected Column, got TextInput"
         Row _           -> assertFailure "expected Column, got Row"
         ScrollView _    -> assertFailure "expected Column, got ScrollView"
   ]
@@ -274,7 +274,7 @@ textInputTests = testGroup "TextInput"
   [ testCase "text callback fires with correct value" $ do
       ref <- newIORef ("" :: String)
       rs <- newRenderState
-      let widget = TextInput "hint" "" (\t -> modifyIORef' ref (const (show t)))
+      let widget = TextInput InputText "hint" "" (\t -> modifyIORef' ref (const (show t)))
       renderWidget rs widget
       -- Callback 0 is the text change handler
       dispatchTextEvent rs 0 "hello"
@@ -284,7 +284,7 @@ textInputTests = testGroup "TextInput"
   , testCase "text callback receives updated value" $ do
       ref <- newIORef ("" :: String)
       rs <- newRenderState
-      let widget = TextInput "enter weight" "80" (\t -> modifyIORef' ref (const (show t)))
+      let widget = TextInput InputText "enter weight" "80" (\t -> modifyIORef' ref (const (show t)))
       renderWidget rs widget
       dispatchTextEvent rs 0 "95.5"
       val <- readIORef ref
@@ -303,7 +303,7 @@ textInputTests = testGroup "TextInput"
       rs <- newRenderState
       let widget = Column
             [ Button "ok" (modifyIORef' clickRef (const True))
-            , TextInput "hint" "" (\t -> modifyIORef' textRef (const (show t)))
+            , TextInput InputText "hint" "" (\t -> modifyIORef' textRef (const (show t)))
             ]
       renderWidget rs widget
       -- Button gets callback 0, TextInput gets callback 1
@@ -318,13 +318,39 @@ textInputTests = testGroup "TextInput"
       refOld <- newIORef ("" :: String)
       refNew <- newIORef ("" :: String)
       rs <- newRenderState
-      renderWidget rs (TextInput "old" "" (\t -> modifyIORef' refOld (const (show t))))
-      renderWidget rs (TextInput "new" "" (\t -> modifyIORef' refNew (const (show t))))
+      renderWidget rs (TextInput InputText "old" "" (\t -> modifyIORef' refOld (const (show t))))
+      renderWidget rs (TextInput InputText "new" "" (\t -> modifyIORef' refNew (const (show t))))
       dispatchTextEvent rs 0 "val"
       old <- readIORef refOld
       new <- readIORef refNew
       old @?= ""
       new @?= show ("val" :: String)
+
+  , testCase "InputNumber callback fires correctly" $ do
+      ref <- newIORef ("" :: String)
+      rs <- newRenderState
+      let widget = TextInput InputNumber "weight" "" (\t -> modifyIORef' ref (const (show t)))
+      renderWidget rs widget
+      dispatchTextEvent rs 0 "72.5"
+      val <- readIORef ref
+      val @?= show ("72.5" :: String)
+
+  , testCase "InputText and InputNumber coexist with independent callbacks" $ do
+      textRef   <- newIORef ("" :: String)
+      numberRef <- newIORef ("" :: String)
+      rs <- newRenderState
+      let widget = Column
+            [ TextInput InputText   "name"   "" (\t -> modifyIORef' textRef   (const (show t)))
+            , TextInput InputNumber "weight"  "" (\t -> modifyIORef' numberRef (const (show t)))
+            ]
+      renderWidget rs widget
+      -- TextInput gets callback 0, InputNumber gets callback 1
+      dispatchTextEvent rs 0 "Alice"
+      dispatchTextEvent rs 1 "60.0"
+      tVal <- readIORef textRef
+      nVal <- readIORef numberRef
+      tVal @?= show ("Alice" :: String)
+      nVal @?= show ("60.0" :: String)
   ]
 
 -- | Tests for the IORef registration pattern.
