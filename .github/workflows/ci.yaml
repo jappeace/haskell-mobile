@@ -30,6 +30,8 @@ jobs:
           extra-substituters = https://nix-cache.jappie.me
           extra-trusted-public-keys = nix-cache.jappie.me:WjkKcvFtHih2i+n7bdsrJ3HuGboJiU2hA2CZbf9I9oc=
     - run: nix-build nix/ci.nix
+    - name: Run combined emulator test (lifecycle + UI + buttons + scroll)
+      run: nix-build nix/ci.nix -A emulator-all -o result-emulator-all && ./result-emulator-all/bin/test-all
     - name: Cancel workflow on failure
       if: failure()
       continue-on-error: true
@@ -55,6 +57,8 @@ jobs:
           extra-substituters = https://nix-cache.jappie.me
           extra-trusted-public-keys = nix-cache.jappie.me:WjkKcvFtHih2i+n7bdsrJ3HuGboJiU2hA2CZbf9I9oc=
     - run: nix-build nix/ci.nix -A simulator-all -A ios-lib
+    - name: Run combined simulator test (lifecycle + UI + buttons + scroll)
+      run: nix-build nix/ci.nix -A simulator-all -o result-simulator-all && ./result-simulator-all/bin/test-all-ios
     - name: Cancel workflow on failure
       if: failure()
       continue-on-error: true
