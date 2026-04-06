@@ -43,7 +43,7 @@ import HaskellMobile.Lifecycle
   , freeMobileContext
   , haskellOnLifecycle
   )
-import HaskellMobile.Widget (InputType(..), Widget(..))
+import HaskellMobile.Widget (InputType(..), TextInputConfig(..), Widget(..))
 import HaskellMobile.Render (newRenderState, renderWidget, dispatchEvent, dispatchTextEvent)
 
 main :: IO ()
@@ -219,7 +219,7 @@ uiTests = testGroup "UI"
         Column _        -> pure ()
         Text _          -> assertFailure "expected Column, got Text"
         Button _ _      -> assertFailure "expected Column, got Button"
-        TextInput _ _ _ _ -> assertFailure "expected Column, got TextInput"
+        TextInput _     -> assertFailure "expected Column, got TextInput"
         Row _           -> assertFailure "expected Column, got Row"
         ScrollView _    -> assertFailure "expected Column, got ScrollView"
   ]
@@ -274,7 +274,9 @@ textInputTests = testGroup "TextInput"
   [ testCase "text callback fires with correct value" $ do
       ref <- newIORef ("" :: String)
       rs <- newRenderState
-      let widget = TextInput InputText "hint" "" (\t -> modifyIORef' ref (const (show t)))
+      let widget = TextInput TextInputConfig
+            { tiInputType = InputText, tiHint = "hint", tiValue = ""
+            , tiOnChange = \t -> modifyIORef' ref (const (show t)) }
       renderWidget rs widget
       -- Callback 0 is the text change handler
       dispatchTextEvent rs 0 "hello"
@@ -284,7 +286,9 @@ textInputTests = testGroup "TextInput"
   , testCase "text callback receives updated value" $ do
       ref <- newIORef ("" :: String)
       rs <- newRenderState
-      let widget = TextInput InputText "enter weight" "80" (\t -> modifyIORef' ref (const (show t)))
+      let widget = TextInput TextInputConfig
+            { tiInputType = InputText, tiHint = "enter weight", tiValue = "80"
+            , tiOnChange = \t -> modifyIORef' ref (const (show t)) }
       renderWidget rs widget
       dispatchTextEvent rs 0 "95.5"
       val <- readIORef ref
@@ -303,7 +307,9 @@ textInputTests = testGroup "TextInput"
       rs <- newRenderState
       let widget = Column
             [ Button "ok" (modifyIORef' clickRef (const True))
-            , TextInput InputText "hint" "" (\t -> modifyIORef' textRef (const (show t)))
+            , TextInput TextInputConfig
+                { tiInputType = InputText, tiHint = "hint", tiValue = ""
+                , tiOnChange = \t -> modifyIORef' textRef (const (show t)) }
             ]
       renderWidget rs widget
       -- Button gets callback 0, TextInput gets callback 1
@@ -318,8 +324,12 @@ textInputTests = testGroup "TextInput"
       refOld <- newIORef ("" :: String)
       refNew <- newIORef ("" :: String)
       rs <- newRenderState
-      renderWidget rs (TextInput InputText "old" "" (\t -> modifyIORef' refOld (const (show t))))
-      renderWidget rs (TextInput InputText "new" "" (\t -> modifyIORef' refNew (const (show t))))
+      renderWidget rs $ TextInput TextInputConfig
+        { tiInputType = InputText, tiHint = "old", tiValue = ""
+        , tiOnChange = \t -> modifyIORef' refOld (const (show t)) }
+      renderWidget rs $ TextInput TextInputConfig
+        { tiInputType = InputText, tiHint = "new", tiValue = ""
+        , tiOnChange = \t -> modifyIORef' refNew (const (show t)) }
       dispatchTextEvent rs 0 "val"
       old <- readIORef refOld
       new <- readIORef refNew
@@ -329,7 +339,9 @@ textInputTests = testGroup "TextInput"
   , testCase "InputNumber callback fires correctly" $ do
       ref <- newIORef ("" :: String)
       rs <- newRenderState
-      let widget = TextInput InputNumber "weight" "" (\t -> modifyIORef' ref (const (show t)))
+      let widget = TextInput TextInputConfig
+            { tiInputType = InputNumber, tiHint = "weight", tiValue = ""
+            , tiOnChange = \t -> modifyIORef' ref (const (show t)) }
       renderWidget rs widget
       dispatchTextEvent rs 0 "72.5"
       val <- readIORef ref
@@ -340,8 +352,12 @@ textInputTests = testGroup "TextInput"
       numberRef <- newIORef ("" :: String)
       rs <- newRenderState
       let widget = Column
-            [ TextInput InputText   "name"   "" (\t -> modifyIORef' textRef   (const (show t)))
-            , TextInput InputNumber "weight"  "" (\t -> modifyIORef' numberRef (const (show t)))
+            [ TextInput TextInputConfig
+                { tiInputType = InputText, tiHint = "name", tiValue = ""
+                , tiOnChange = \t -> modifyIORef' textRef (const (show t)) }
+            , TextInput TextInputConfig
+                { tiInputType = InputNumber, tiHint = "weight", tiValue = ""
+                , tiOnChange = \t -> modifyIORef' numberRef (const (show t)) }
             ]
       renderWidget rs widget
       -- TextInput gets callback 0, InputNumber gets callback 1

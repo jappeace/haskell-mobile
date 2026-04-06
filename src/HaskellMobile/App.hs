@@ -8,7 +8,7 @@ import Data.IORef (IORef, newIORef, readIORef, modifyIORef')
 import Data.Text (pack)
 import HaskellMobile.Types (MobileApp(..))
 import HaskellMobile.Lifecycle (loggingMobileContext)
-import HaskellMobile.Widget (InputType(..), Widget(..))
+import HaskellMobile.Widget (InputType(..), TextInputConfig(..), Widget(..))
 import System.IO.Unsafe (unsafePerformIO)
 
 -- | The default mobile app — logs every lifecycle event and shows a counter.
@@ -64,7 +64,17 @@ textInputDemoApp = MobileApp
 textInputDemoView :: IO Widget
 textInputDemoView = pure $ Column
   [ Text "TextInput Demo"
-  , TextInput InputNumber "enter weight (kg)" "" (\_ -> pure ())
-  , TextInput InputText "enter name" "" (\_ -> pure ())
+  , TextInput TextInputConfig
+      { tiInputType = InputNumber
+      , tiHint      = "enter weight (kg)"
+      , tiValue     = ""
+      , tiOnChange  = \_ -> pure ()
+      }
+  , TextInput TextInputConfig
+      { tiInputType = InputText
+      , tiHint      = "enter name"
+      , tiValue     = ""
+      , tiOnChange  = \_ -> pure ()
+      }
   ]
 
