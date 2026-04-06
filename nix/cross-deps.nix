@@ -1,4 +1,4 @@
-# Cross-compile Hackage packages for aarch64-android.
+# Cross-compile Hackage packages for Android (aarch64 or armv7a).
 #
 # Uses cabal-install with the cross-GHC to build packages offline from
 # locally-fetched sources.  The output contains:
@@ -10,19 +10,37 @@
 # consumerCabal2Nix (pre-generated).  When neither is given, builds just
 # direct-sqlite for backward compatibility.
 { sources
+, androidArch ? "aarch64"
 , consumerCabalFile ? null
 , consumerCabal2Nix ? null
 , extraPackages ? []
 }:
 let
-  pkgs = import sources.nixpkgs {
+  archConfig = {
+    aarch64 = { crossAttr = "aarch64-android-prebuilt"; };
+    armv7a  = { crossAttr = "armv7a-android-prebuilt"; };
+  }.${androidArch};
+
+  # armv7a: compiler-rt's cmake doesn't include "armv7a" in its ARM32 arch
+  # list, so builtin targets are empty and the build produces no output.
+  # We patch the nixpkgs source to fix this (see patch-compiler-rt.py).
+  nixpkgsSrc = import ./patched-nixpkgs.nix {
+    nixpkgsSrc = sources.nixpkgs;
+    inherit androidArch;
+  };
+
+  pkgs = import nixpkgsSrc {
     config.allowUnfree = true;
     config.android_sdk.accept_license = true;
   };
 
   # Cross-compilation toolchain
-  androidPkgs = pkgs.pkgsCross.aarch64-android-prebuilt;
-  ghc = androidPkgs.haskellPackages.ghc;
+  androidPkgs = pkgs.pkgsCross.${archConfig.crossAttr};
+  # armv7a: disable profiling — LLVM ARM backend crashes in
+  # ARMAsmPrinter::emitXXStructor when compiling profiled libraries.
+  ghc = if androidArch == "armv7a"
+    then androidPkgs.haskellPackages.ghc.override { enableProfiledLibs = false; }
+    else androidPkgs.haskellPackages.ghc;
   ghcBin = "${ghc}/bin";
   ghcPrefix = ghc.targetPrefix;
   ghcCmd = "${ghcBin}/${ghcPrefix}ghc";

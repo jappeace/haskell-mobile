@@ -5,7 +5,8 @@ let
 in {
   # Build artifacts
   native = import ../default.nix {};
-  android = import ./android.nix { inherit sources; };
+  android-aarch64 = import ./android.nix { inherit sources; };
+  android-armv7a = import ./android.nix { inherit sources; androidArch = "armv7a"; };
   apk = import ./apk.nix { inherit sources; };
   consumer-link-test = import ./test-link-consumer.nix { inherit sources; };
 
