@@ -67,6 +67,7 @@ static jmethodID g_method_getTag;
 static jmethodID g_method_intValue;
 static jmethodID g_method_setOnClickListener;
 static jmethodID g_method_registerTextWatcher;
+static jmethodID g_method_setInputType;
 
 /* LinearLayout orientation constants */
 static jint ORIENTATION_VERTICAL   = 1;
@@ -187,6 +188,10 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     g_method_registerTextWatcher = (*env)->GetMethodID(env, actClass,
         "registerTextWatcher", "(Landroid/widget/EditText;)V");
 
+    /* EditText.setInputType(int) */
+    g_method_setInputType = (*env)->GetMethodID(env, g_class_EditText,
+        "setInputType", "(I)V");
+
     return 0;
 }
 
@@ -279,8 +284,30 @@ static void android_set_str_prop(int32_t nodeId, int32_t propId, const char *val
 
 static void android_set_num_prop(int32_t nodeId, int32_t propId, double value)
 {
-    /* TODO: Implement font size, padding, etc. */
-    LOGI("setNumProp(node=%d, prop=%d, value=%.2f) — not yet implemented", nodeId, propId, value);
+    JNIEnv *env = g_env;
+    jobject view = get_node(nodeId);
+    if (!view) return;
+
+    switch (propId) {
+    case UI_PROP_INPUT_TYPE: {
+        /* Haskell 0 = InputText  -> Android TYPE_CLASS_TEXT           (1)
+         * Haskell 1 = InputNumber -> Android TYPE_CLASS_NUMBER |
+         *                            TYPE_NUMBER_FLAG_DECIMAL         (8194)
+         */
+        jint androidType;
+        if ((int)value == 1) {
+            androidType = 8194; /* TYPE_CLASS_NUMBER | TYPE_NUMBER_FLAG_DECIMAL */
+        } else {
+            androidType = 1;    /* TYPE_CLASS_TEXT */
+        }
+        (*env)->CallVoidMethod(env, view, g_method_setInputType, androidType);
+        LOGI("setNumProp(node=%d, inputType=%d, android=%d)", nodeId, (int)value, androidType);
+        break;
+    }
+    default:
+        LOGI("setNumProp(node=%d, prop=%d, value=%.2f) — not yet implemented", nodeId, propId, value);
+        break;
+    }
 }
 
 static void android_set_handler(int32_t nodeId, int32_t eventType, int32_t callbackId)

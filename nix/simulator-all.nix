@@ -33,6 +33,17 @@ let
     name = "haskell-mobile-scroll-simulator-app";
   };
 
+  textinputIos = import ./ios.nix {
+    inherit sources;
+    mainModule = ../test/TextInputDemoMain.hs;
+    simulator = true;
+  };
+  textinputSimApp = lib.mkSimulatorApp {
+    iosLib = textinputIos;
+    iosSrc = ../ios;
+    name = "haskell-mobile-textinput-simulator-app";
+  };
+
   xcodegen = pkgs.xcodegen;
 
   testScripts = builtins.path { path = ../test; name = "test-scripts"; };
@@ -55,6 +66,7 @@ SCHEME="HaskellMobile"
 DEVICE_TYPE="iPhone 16"
 COUNTER_SHARE_DIR="${counterSimApp}/share/ios"
 SCROLL_SHARE_DIR="${scrollSimApp}/share/ios"
+TEXTINPUT_SHARE_DIR="${textinputSimApp}/share/ios"
 TEST_SCRIPTS="${testScripts}"
 
 # --- Temp working directory ---
@@ -64,6 +76,7 @@ SIM_UDID=""
 # Phase result tracking
 PHASE1_OK=0
 PHASE2_OK=0
+PHASE3_OK=0
 
 cleanup() {
     echo ""
@@ -158,6 +171,40 @@ if [ -z "$SCROLL_APP" ]; then
 fi
 echo "Scroll app: $SCROLL_APP"
 
+# --- Stage and build textinput demo app ---
+echo "=== Staging textinput demo app ==="
+mkdir -p "$WORK_DIR/textinput/lib" "$WORK_DIR/textinput/include"
+cp "$TEXTINPUT_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/textinput/lib/"
+cp "$TEXTINPUT_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/textinput/include/"
+cp "$TEXTINPUT_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/textinput/include/"
+cp -r "$TEXTINPUT_SHARE_DIR/HaskellMobile" "$WORK_DIR/textinput/"
+cp "$TEXTINPUT_SHARE_DIR/project.yml" "$WORK_DIR/textinput/"
+chmod -R u+w "$WORK_DIR/textinput"
+
+echo "=== Generating textinput Xcode project ==="
+cd "$WORK_DIR/textinput"
+${xcodegen}/bin/xcodegen generate
+
+echo "=== Building textinput demo app for simulator ==="
+xcodebuild build \
+    -project HaskellMobile.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk iphonesimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/textinput-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+TEXTINPUT_APP=$(find "$WORK_DIR/textinput-build" -name "*.app" -type d | head -1)
+if [ -z "$TEXTINPUT_APP" ]; then
+    echo "ERROR: Could not find textinput .app bundle"
+    exit 1
+fi
+echo "TextInput app: $TEXTINPUT_APP"
+
 # --- Discover latest iOS runtime ---
 echo "=== Discovering iOS runtime ==="
 RUNTIME=$(xcrun simctl list runtimes -j \
@@ -219,10 +266,11 @@ sleep 5
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP WORK_DIR
+export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
+PHASE3_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -258,6 +306,8 @@ echo "--- scroll ---"
 run_with_retry "scroll"    bash "$TEST_SCRIPTS/ios/scroll.sh"    || PHASE2_EXIT=1
 echo "--- locale ---"
 run_with_retry "locale"    bash "$TEST_SCRIPTS/ios/locale.sh"    || PHASE1_EXIT=1
+echo "--- textinput ---"
+run_with_retry "textinput" bash "$TEST_SCRIPTS/ios/textinput.sh" || PHASE3_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -276,6 +326,16 @@ if [ $PHASE2_EXIT -eq 0 ]; then
 else
     echo ""
     echo "PHASE 2 FAILED"
+fi
+
+if [ $PHASE3_EXIT -eq 0 ]; then
+    PHASE3_OK=1
+    echo ""
+    echo "PHASE 3 PASSED"
+else
+    PHASE3_OK=0
+    echo ""
+    echo "PHASE 3 FAILED"
 fi
 
 # ===========================================================================
@@ -299,6 +359,13 @@ if [ $PHASE2_OK -eq 1 ]; then
     echo "PASS  Phase 2 — Scroll demo app"
 else
     echo "FAIL  Phase 2 — Scroll demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE3_OK -eq 1 ]; then
+    echo "PASS  Phase 3 — TextInput demo app"
+else
+    echo "FAIL  Phase 3 — TextInput demo app"
     FINAL_EXIT=1
 fi
 

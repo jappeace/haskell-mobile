@@ -2,13 +2,13 @@
 -- | Default implementation of the mobile app.
 -- Provides 'loggingMobileContext' as the application context and a simple
 -- counter demo as the default UI.
-module HaskellMobile.App (mobileApp, scrollDemoApp) where
+module HaskellMobile.App (mobileApp, scrollDemoApp, textInputDemoApp) where
 
 import Data.IORef (IORef, newIORef, readIORef, modifyIORef')
 import Data.Text (pack)
 import HaskellMobile.Types (MobileApp(..))
 import HaskellMobile.Lifecycle (loggingMobileContext)
-import HaskellMobile.Widget (Widget(..))
+import HaskellMobile.Widget (InputType(..), TextInputConfig(..), Widget(..))
 import System.IO.Unsafe (unsafePerformIO)
 
 -- | The default mobile app — logs every lifecycle event and shows a counter.
@@ -50,5 +50,31 @@ scrollDemoView = pure $ ScrollView
     ( map (\itemNumber -> Text ("Item " <> pack (show (itemNumber :: Int)))) [1..20]
     ++ [Button "Reached Bottom" (pure ())]
     )
+  ]
+
+-- | TextInput demo: renders numeric and text inputs side by side.
+-- Used by integration tests to verify InputType FFI binding end-to-end.
+textInputDemoApp :: MobileApp
+textInputDemoApp = MobileApp
+  { maContext = loggingMobileContext
+  , maView    = textInputDemoView
+  }
+
+-- | Builds a Column with a label and two TextInputs of different InputType.
+textInputDemoView :: IO Widget
+textInputDemoView = pure $ Column
+  [ Text "TextInput Demo"
+  , TextInput TextInputConfig
+      { tiInputType = InputNumber
+      , tiHint      = "enter weight (kg)"
+      , tiValue     = ""
+      , tiOnChange  = \_ -> pure ()
+      }
+  , TextInput TextInputConfig
+      { tiInputType = InputText
+      , tiHint      = "enter name"
+      , tiValue     = ""
+      , tiOnChange  = \_ -> pure ()
+      }
   ]
 
