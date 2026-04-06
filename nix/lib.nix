@@ -1,7 +1,7 @@
 # Reusable builder functions for haskell-mobile based projects.
 #
 # Returns an attrset of 4 builder functions:
-#   mkAndroidLib  — cross-compile Haskell to .so for aarch64-android
+#   mkAndroidLib  — cross-compile Haskell to .so for Android (aarch64 or armv7a)
 #   mkApk         — package .so + Java + resources into signed APK
 #   mkIOSLib      — compile Haskell to .a for iOS (device or simulator)
 #   mkSimulatorApp — stage iOS sources + pre-built library for xcodebuild
@@ -9,24 +9,52 @@
 # Usage:
 #   let lib = import ./lib.nix { sources = import ../npins; };
 #   in lib.mkAndroidLib { haskellMobileSrc = ../.; mainModule = ../app/MobileMain.hs; }
-{ sources }:
+{ sources, androidArch ? "aarch64" }:
 let
-  pkgs = import sources.nixpkgs {
+  archConfig = {
+    aarch64 = {
+      crossAttr = "aarch64-android-prebuilt";
+      ndkTarget = "aarch64-linux-android26";
+      ghcPkgArch = "aarch64-linux";
+      abiDir = "arm64-v8a";
+    };
+    armv7a = {
+      crossAttr = "armv7a-android-prebuilt";
+      ndkTarget = "armv7a-linux-androideabi26";
+      ghcPkgArch = "armv7-linux";
+      abiDir = "armeabi-v7a";
+    };
+  }.${androidArch};
+
+  # armv7a: compiler-rt's cmake doesn't include "armv7a" in its ARM32 arch
+  # list, so builtin targets are empty and the build produces no output.
+  # We patch the nixpkgs source to fix this (see patch-compiler-rt.py).
+  nixpkgsSrc = import ./patched-nixpkgs.nix {
+    nixpkgsSrc = sources.nixpkgs;
+    inherit androidArch;
+  };
+
+  pkgs = import nixpkgsSrc {
     config.allowUnfree = true;
     config.android_sdk.accept_license = true;
   };
 
   # --- Android cross-compilation infrastructure ---
-  androidPkgs = pkgs.pkgsCross.aarch64-android-prebuilt;
-  ghc = androidPkgs.haskellPackages.ghc;
+  androidPkgs = pkgs.pkgsCross.${archConfig.crossAttr};
+  # armv7a uses the LLVM backend (no NCG for 32-bit ARM).  Building profiled
+  # libraries with the LLVM ARM backend triggers an llc crash in
+  # ARMAsmPrinter::emitXXStructor (LLVM bug).  Disable profiling for armv7a.
+  ghc = if androidArch == "armv7a"
+    then androidPkgs.haskellPackages.ghc.override { enableProfiledLibs = false; }
+    else androidPkgs.haskellPackages.ghc;
   ghcCmd = "${ghc}/bin/${ghc.targetPrefix}ghc";
-  ghcPkgDir = "${ghc}/lib/${ghc.targetPrefix}ghc-${ghc.version}/lib/aarch64-linux-ghc-${ghc.version}";
+  ghcPkgDir = "${ghc}/lib/${ghc.targetPrefix}ghc-${ghc.version}/lib/${archConfig.ghcPkgArch}-ghc-${ghc.version}";
 
   androidComposition = pkgs.androidenv.composeAndroidPackages {
     includeNDK = true;
   };
   ndk = "${androidComposition.ndk-bundle}/libexec/android-sdk/ndk/${androidComposition.ndk-bundle.version}";
-  ndkCc = "${ndk}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang";
+  ndkCc = "${ndk}/toolchains/llvm/prebuilt/linux-x86_64/bin/${archConfig.ndkTarget}-clang";
   sysroot = "${ndk}/toolchains/llvm/prebuilt/linux-x86_64/sysroot";
 
   # --- APK toolchain ---
@@ -42,7 +70,7 @@ let
 in {
 
   # ---------------------------------------------------------------------------
-  # mkAndroidLib: Cross-compile Haskell to shared .so for aarch64-android
+  # mkAndroidLib: Cross-compile Haskell to shared .so for Android (aarch64/armv7a)
   # ---------------------------------------------------------------------------
   mkAndroidLib =
     { haskellMobileSrc
@@ -232,12 +260,12 @@ in {
       '';
 
       installPhase = ''
-        mkdir -p $out/lib/arm64-v8a
-        cp ${soName} $out/lib/arm64-v8a/
+        mkdir -p $out/lib/${archConfig.abiDir}
+        cp ${soName} $out/lib/${archConfig.abiDir}/
 
         # Bundle runtime dependencies (not provided by Android)
-        cp ${androidPkgs.gmp}/lib/libgmp.so $out/lib/arm64-v8a/
-        cp ${androidPkgs.libffi}/lib/libffi.so $out/lib/arm64-v8a/
+        cp ${androidPkgs.gmp}/lib/libgmp.so $out/lib/${archConfig.abiDir}/
+        cp ${androidPkgs.libffi}/lib/libffi.so $out/lib/${archConfig.abiDir}/
       '';
     };
 
@@ -245,11 +273,18 @@ in {
   # mkApk: Package shared library + Java + resources into a signed APK
   # ---------------------------------------------------------------------------
   mkApk =
-    { sharedLib
+    { sharedLibs ? null       # list of { lib = <drv>; abiDir = "arm64-v8a"; }
+    , sharedLib ? null        # backward compat: single lib drv (assumes arm64-v8a)
     , androidSrc
     , apkName ? "app.apk"
     , name ? "app-apk"
     }:
+    let
+      resolvedLibs =
+        if sharedLibs != null then sharedLibs
+        else if sharedLib != null then [{ lib = sharedLib; abiDir = "arm64-v8a"; }]
+        else builtins.throw "mkApk: either sharedLibs or sharedLib must be provided";
+    in
     pkgs.stdenv.mkDerivation {
       inherit name;
 
@@ -302,8 +337,10 @@ in {
         cd dex_out
         zip -j ../unsigned.apk classes.dex
         cd ..
-        mkdir -p lib/arm64-v8a
-        cp ${sharedLib}/lib/arm64-v8a/*.so lib/arm64-v8a/
+        ${builtins.concatStringsSep "\n" (map (sl: ''
+        mkdir -p lib/${sl.abiDir}
+        cp ${sl.lib}/lib/${sl.abiDir}/*.so lib/${sl.abiDir}/
+        '') resolvedLibs)}
         zip -r unsigned.apk lib/
 
         echo "=== Step 6: Zipalign ==="
