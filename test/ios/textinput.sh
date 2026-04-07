@@ -63,6 +63,8 @@ if ! grep -q "setRoot" "$FULL_LOG" 2>/dev/null; then
 fi
 
 assert_log "$FULL_LOG" "createNode" "createNode called (app renders without crashing)"
+assert_log "$FULL_LOG" "createNode\(type=4\)" "createNode(type=4) — UITextField created"
+assert_log "$FULL_LOG" "setHandler.*textChange" "setHandler with textChange — onChange registered"
 assert_log "$FULL_LOG" "setRoot" "setRoot"
 
 xcrun simctl uninstall "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true

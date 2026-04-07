@@ -43,6 +43,7 @@ static int32_t g_next_node_id = 1;
 
 /* Haskell FFI exports (declared here since this file is compiled by Xcode) */
 extern void haskellOnUIEvent(void *ctx, int callbackId);
+extern void haskellOnUITextChange(void *ctx, int callbackId, const char *text);
 
 /* Locale detection (cbits/locale.c) */
 extern void setSystemLocale(const char *locale);
@@ -58,6 +59,7 @@ static UIViewController *g_viewController = nil;
 @property (nonatomic, assign) void *haskellCtx;
 + (instancetype)shared;
 - (void)handleTap:(UIButton *)sender;
+- (void)handleTextChange:(UITextField *)sender;
 @end
 
 @implementation IOSBridgeHandler
@@ -75,6 +77,13 @@ static UIViewController *g_viewController = nil;
     int32_t callbackId = (int32_t)sender.tag;
     LOGI("Click dispatched: callbackId=%d", callbackId);
     haskellOnUIEvent(self.haskellCtx, callbackId);
+}
+
+- (void)handleTextChange:(UITextField *)sender {
+    int32_t callbackId = (int32_t)sender.tag;
+    NSString *text = sender.text ?: @"";
+    LOGI("TextChange dispatched: callbackId=%d text=\"%{public}s\"", callbackId, [text UTF8String]);
+    haskellOnUITextChange(self.haskellCtx, callbackId, [text UTF8String]);
 }
 
 @end
@@ -201,6 +210,13 @@ static int32_t ios_create_node(int32_t nodeType)
         view = stack;
         break;
     }
+    case UI_NODE_TEXT_INPUT: {
+        UITextField *textField = [[UITextField alloc] init];
+        textField.borderStyle = UITextBorderStyleRoundedRect;
+        textField.translatesAutoresizingMaskIntoConstraints = NO;
+        view = textField;
+        break;
+    }
     case UI_NODE_SCROLL_VIEW: {
         UIScrollView *scrollView = [[UIScrollView alloc] init];
         scrollView.translatesAutoresizingMaskIntoConstraints = NO;
@@ -252,6 +268,14 @@ static void ios_set_str_prop(int32_t nodeId, int32_t propId, const char *value)
             ((UILabel *)view).text = str;
         } else if ([view isKindOfClass:[UIButton class]]) {
             [((UIButton *)view) setTitle:str forState:UIControlStateNormal];
+        } else if ([view isKindOfClass:[UITextField class]]) {
+            ((UITextField *)view).text = str;
+        }
+        break;
+    case UI_PROP_HINT:
+        LOGI("setStrProp(node=%d, hint=\"%{public}s\")", nodeId, value);
+        if ([view isKindOfClass:[UITextField class]]) {
+            ((UITextField *)view).placeholder = str;
         }
         break;
     default:
@@ -272,11 +296,26 @@ static void ios_set_num_prop(int32_t nodeId, int32_t propId, double value)
             ((UILabel *)view).font = font;
         } else if ([view isKindOfClass:[UIButton class]]) {
             ((UIButton *)view).titleLabel.font = font;
+        } else if ([view isKindOfClass:[UITextField class]]) {
+            ((UITextField *)view).font = font;
         } else {
             LOGI("setNumProp: fontSize ignored on non-text node=%d", nodeId);
             break;
         }
         LOGI("setNumProp(node=%d, fontSize=%.1f)", nodeId, value);
+        break;
+    }
+    case UI_PROP_INPUT_TYPE: {
+        int inputType = (int)value;
+        if ([view isKindOfClass:[UITextField class]]) {
+            UIKeyboardType kbType;
+            switch (inputType) {
+            case 1:  kbType = UIKeyboardTypeDecimalPad; break;
+            default: kbType = UIKeyboardTypeDefault;    break;
+            }
+            ((UITextField *)view).keyboardType = kbType;
+        }
+        LOGI("setNumProp(node=%d, inputType=%d)", nodeId, inputType);
         break;
     }
     case UI_PROP_PADDING: {
@@ -327,15 +366,24 @@ static void ios_set_handler(int32_t nodeId, int32_t eventType, int32_t callbackI
     UIView *view = get_node(nodeId);
     if (!view) return;
 
-    if (eventType != UI_EVENT_CLICK) {
+    switch (eventType) {
+    case UI_EVENT_CLICK:
+        view.tag = callbackId;
+        LOGI("setHandler(node=%d, click, callback=%d)", nodeId, callbackId);
+        break;
+    case UI_EVENT_TEXT_CHANGE:
+        view.tag = callbackId;
+        if ([view isKindOfClass:[UITextField class]]) {
+            [(UITextField *)view addTarget:[IOSBridgeHandler shared]
+                                    action:@selector(handleTextChange:)
+                          forControlEvents:UIControlEventEditingChanged];
+        }
+        LOGI("setHandler(node=%d, textChange, callback=%d)", nodeId, callbackId);
+        break;
+    default:
         LOGI("setHandler: unknown eventType %d", eventType);
-        return;
+        break;
     }
-
-    /* Store callbackId in the view's tag property */
-    view.tag = callbackId;
-
-    LOGI("setHandler(node=%d, click, callback=%d)", nodeId, callbackId);
 }
 
 static void ios_add_child(int32_t parentId, int32_t childId)

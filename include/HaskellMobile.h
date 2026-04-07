@@ -46,6 +46,12 @@ void haskellRenderUI(void *ctx);
  * ctx must be a pointer returned by haskellCreateContext(). */
 void haskellOnUIEvent(void *ctx, int32_t callbackId);
 
+/* Dispatch a text change event. Fires the text-change callback
+ * registered for the given callbackId with the new text value.
+ * Does NOT re-render (avoids cursor/flicker issues).
+ * ctx must be a pointer returned by haskellCreateContext(). */
+void haskellOnUITextChange(void *ctx, int32_t callbackId, const char *text);
+
 
 /* Log the detected system locale via platformLog.
  * Called from platform bridges after setSystemLocale(). */

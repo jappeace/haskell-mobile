@@ -49,6 +49,11 @@ class HaskellBridge {
         haskellOnUIEvent(context, callbackId)
     }
 
+    /// Dispatch a text change event to Haskell (does not re-render).
+    static func onUITextChange(_ callbackId: Int32, text: String) {
+        haskellOnUITextChange(context, callbackId, text)
+    }
+
     /// Return the opaque Haskell context pointer (for passing to C bridge setup).
     static func getContext() -> UnsafeMutableRawPointer? {
         return context
