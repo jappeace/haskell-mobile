@@ -8,12 +8,11 @@ module Main where
 import Data.Text (pack)
 import HaskellMobile
   ( MobileApp(..)
-  , AppState(..)
+  , UserState(..)
   , Permission(..)
   , PermissionStatus(..)
   , runMobileApp
   , platformLog
-  , globalAppState
   , requestPermission
   , loggingMobileContext
   )
@@ -34,12 +33,12 @@ permissionDemoApp = MobileApp
 
 -- | Builds a Column with a label and a "Request Camera" button.
 -- The button's callback ID is 0 (first registered), matching --autotest dispatch.
-permissionDemoView :: IO Widget
-permissionDemoView = pure $ Column
+permissionDemoView :: UserState -> IO Widget
+permissionDemoView userState = pure $ Column
   [ Text TextConfig { tcLabel = "Permission Demo", tcFontConfig = Nothing }
   , Button ButtonConfig
       { bcLabel = "Request Camera"
-      , bcAction = requestPermission (appPermissionState globalAppState) PermissionCamera $ \status ->
+      , bcAction = requestPermission (userPermissionState userState) PermissionCamera $ \status ->
           platformLog ("Permission result: " <> pack (show status))
       , bcFontConfig = Nothing
       }

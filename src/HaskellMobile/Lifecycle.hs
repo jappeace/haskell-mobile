@@ -10,16 +10,14 @@ module HaskellMobile.Lifecycle
   , platformLog
   , newMobileContext
   , freeMobileContext
-  , haskellOnLifecycle
   )
 where
 
-import Control.Exception (SomeException, catch)
+import Control.Exception (SomeException)
 import Data.Text (Text, pack, unpack)
 import Foreign.C.String (CString, withCString)
 import Foreign.C.Types (CInt(..))
-import Foreign.Ptr (Ptr)
-import Foreign.StablePtr (StablePtr, castPtrToStablePtr, newStablePtr, deRefStablePtr, freeStablePtr)
+import Foreign.StablePtr (StablePtr, newStablePtr, freeStablePtr)
 
 -- | Lifecycle events that can be received from the host platform.
 -- Maps to Android Activity lifecycle and iOS ScenePhase transitions.
@@ -92,20 +90,3 @@ newMobileContext = newStablePtr
 -- | Release a 'StablePtr' previously created by 'newMobileContext'.
 freeMobileContext :: StablePtr MobileContext -> IO ()
 freeMobileContext = freeStablePtr
-
--- | FFI entry point called from platform code.
--- Takes an opaque context pointer and an event code.
--- Dispatches to the 'onLifecycle' callback. Unknown event codes are silently ignored.
--- Catches any exception thrown by the callback and fires 'onError'.
-haskellOnLifecycle :: Ptr () -> CInt -> IO ()
-haskellOnLifecycle ctxPtr code =
-  case lifecycleFromInt code of
-    Just event -> do
-      ctx <- deRefStablePtr (castPtrToStablePtr ctxPtr)
-      catch (onLifecycle ctx event) $ \exc -> do
-        platformLog ("Lifecycle error: " <> pack (show exc))
-        catch (onError ctx exc) $ \secondaryExc ->
-          platformLog ("onError callback failed: " <> pack (show (secondaryExc :: SomeException)))
-    Nothing -> pure ()
-
-foreign export ccall haskellOnLifecycle :: Ptr () -> CInt -> IO ()

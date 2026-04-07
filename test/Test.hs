@@ -13,18 +13,22 @@ import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Foreign.C.String (newCString, peekCString)
 import Foreign.Marshal.Alloc (free)
-import Foreign.Ptr (Ptr, nullPtr)
-import Foreign.StablePtr (castStablePtrToPtr)
+import Foreign.Ptr (Ptr)
 import HaskellMobile
   ( MobileApp(..)
-  , AppState(..)
+  , UserState(..)
   , runMobileApp
   , getMobileApp
   , haskellGreet
+  , haskellCreateContext
   , haskellRenderUI
   , haskellOnUIEvent
-  , globalAppState
+  , haskellOnLifecycle
+  , freeAppContext
+  , derefAppContext
+  , AppContext(..)
   )
+import HaskellMobile.AppContext (newAppContext)
 import HaskellMobile.Locale
   ( Language(..)
   , Locale(..)
@@ -46,9 +50,6 @@ import HaskellMobile.Lifecycle
   , lifecycleFromInt
   , lifecycleToInt
   , loggingMobileContext
-  , newMobileContext
-  , freeMobileContext
-  , haskellOnLifecycle
   )
 import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), InputType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..), defaultStyle)
 import HaskellMobile.Permission
@@ -68,10 +69,15 @@ main :: IO ()
 main = do
   -- Register the default app so FFI functions that read the IORef work
   runMobileApp mobileApp
-  defaultMain tests
+  -- Create a single FFI context for permission round-trip tests.
+  -- The C desktop stub uses a process-wide g_permission_ctx, so only
+  -- one context can be active for FFI permission dispatch.
+  ffiCtxPtr <- haskellCreateContext
+  ffiAppCtx <- derefAppContext ffiCtxPtr
+  defaultMain (tests (acPermissionState ffiAppCtx) ffiCtxPtr)
 
-tests :: TestTree
-tests = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, styledTests, textAlignTests, registrationTests, localeTests, i18nTests, permissionTests, exceptionHandlerTests]
+tests :: PermissionState -> Ptr AppContext -> TestTree
+tests ffiPermState ffiCtxPtr = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, styledTests, textAlignTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, appContextTests, exceptionHandlerTests ffiCtxPtr]
 
 qcProps :: TestTree
 qcProps = testGroup "(checked by QuickCheck)"
@@ -111,14 +117,13 @@ unitTests = testGroup "Unit tests"
       result @?= "Hello from Haskell, Android!"
   ]
 
--- | Helper: create a context with the given callback, run an action with
--- the opaque 'Ptr ()', then free the context.
-withContext :: (LifecycleEvent -> IO ()) -> (Ptr () -> IO a) -> IO a
+-- | Helper: create an 'AppContext' with the given lifecycle callback,
+-- run an action with the typed 'Ptr AppContext', then free the context.
+withContext :: (LifecycleEvent -> IO ()) -> (Ptr AppContext -> IO a) -> IO a
 withContext callback action = do
-  sptr <- newMobileContext MobileContext { onLifecycle = callback, onError = \_ -> pure () }
-  let ptr = castStablePtrToPtr sptr
+  ptr <- newAppContext MobileContext { onLifecycle = callback, onError = \_ -> pure () }
   result <- action ptr
-  freeMobileContext sptr
+  freeAppContext ptr
   pure result
 
 allEvents :: [LifecycleEvent]
@@ -238,7 +243,9 @@ uiTests = testGroup "UI"
       renderWidget rs widget
 
   , testCase "mobileApp view returns a widget" $ do
-      widget <- maView mobileApp
+      dummyPermState <- newPermissionState
+      let dummyUserState = UserState { userPermissionState = dummyPermState }
+      widget <- maView mobileApp dummyUserState
       -- mobileApp is the counter demo; verify it's a column
       case widget of
         Column _        -> pure ()
@@ -510,10 +517,12 @@ registrationTests = sequentialTestGroup "Registration" AllFinish
 
   , testCase "runMobileApp overwrites previous registration" $ do
       let customCtx = MobileContext { onLifecycle = \_ -> pure (), onError = \_ -> pure () }
-          customApp = MobileApp { maContext = customCtx, maView = pure (Text TextConfig { tcLabel = "custom", tcFontConfig = Nothing }) }
+          customApp = MobileApp { maContext = customCtx, maView = \_userState -> pure (Text TextConfig { tcLabel = "custom", tcFontConfig = Nothing }) }
       runMobileApp customApp
       app <- getMobileApp
-      widget <- maView app
+      dummyPermState <- newPermissionState
+      let dummyUserState = UserState { userPermissionState = dummyPermState }
+      widget <- maView app dummyUserState
       case widget of
         Text config -> tcLabel config @?= "custom"
         _           -> assertFailure "expected Text \"custom\""
@@ -586,13 +595,17 @@ i18nTests = testGroup "I18n"
       translate translations (Locale Nl (Just "BE")) (Key "greeting") @?= Right "Hoi"
   ]
 
-permissionTests :: TestTree
-permissionTests = testGroup "Permission"
+-- | Permission tests.  The @ffiPermState@ parameter is the 'PermissionState'
+-- from a context created once in 'main' via 'haskellCreateContext'.  This
+-- ensures the C desktop stub's @g_permission_ctx@ points to a valid context
+-- for the FFI round-trip tests, without racing with other tests.
+permissionTests :: PermissionState -> TestTree
+permissionTests ffiPermState = testGroup "Permission"
   [ testCase "requestPermission fires callback with PermissionGranted on desktop" $ do
-      -- Uses (appPermissionState globalAppState) because the C desktop stub dispatches
-      -- via haskellOnPermissionResult which targets the global state.
+      -- Uses the shared FFI context because the C desktop stub dispatches
+      -- via haskellOnPermissionResult(g_permission_ctx, ...).
       ref <- newIORef (Nothing :: Maybe PermissionStatus)
-      requestPermission (appPermissionState globalAppState) PermissionCamera
+      requestPermission ffiPermState PermissionCamera
         (\status -> modifyIORef' ref (const (Just status)))
       result <- readIORef ref
       result @?= Just PermissionGranted
@@ -603,47 +616,47 @@ permissionTests = testGroup "Permission"
 
   , testCase "dispatchPermissionResult with PermissionDenied fires callback correctly" $ do
       ref <- newIORef (Nothing :: Maybe PermissionStatus)
-      ps <- newPermissionState
-      modifyIORef' (psCallbacks ps) (\_ ->
+      permState <- newPermissionState
+      modifyIORef' (psCallbacks permState) (\_ ->
         IntMap.singleton 0 (\status -> modifyIORef' ref (const (Just status))))
-      dispatchPermissionResult ps 0 1
+      dispatchPermissionResult permState 0 1
       result <- readIORef ref
       result @?= Just PermissionDenied
 
   , testCase "callback is removed after dispatch (second dispatch is a no-op)" $ do
       ref <- newIORef (0 :: Int)
-      ps <- newPermissionState
-      modifyIORef' (psCallbacks ps) (\_ ->
+      permState <- newPermissionState
+      modifyIORef' (psCallbacks permState) (\_ ->
         IntMap.singleton 0 (\_ -> modifyIORef' ref (+ 1)))
-      dispatchPermissionResult ps 0 0
+      dispatchPermissionResult permState 0 0
       count1 <- readIORef ref
       count1 @?= 1
       -- Second dispatch for same ID should be a no-op (callback removed)
-      dispatchPermissionResult ps 0 0
+      dispatchPermissionResult permState 0 0
       count2 <- readIORef ref
       count2 @?= 1
 
   , testCase "unknown request ID does not crash" $ do
-      ps <- newPermissionState
+      permState <- newPermissionState
       -- Should not throw (logs to stderr)
-      dispatchPermissionResult ps 999 0
+      dispatchPermissionResult permState 999 0
 
   , testCase "unknown status code does not fire callback" $ do
       ref <- newIORef (0 :: Int)
-      ps <- newPermissionState
-      modifyIORef' (psCallbacks ps) (\_ ->
+      permState <- newPermissionState
+      modifyIORef' (psCallbacks permState) (\_ ->
         IntMap.singleton 0 (\_ -> modifyIORef' ref (+ 1)))
-      dispatchPermissionResult ps 0 42
+      dispatchPermissionResult permState 0 42
       count <- readIORef ref
       count @?= 0
 
   , testCase "multiple simultaneous pending requests dispatch independently" $ do
-      -- Uses (appPermissionState globalAppState) — desktop stub auto-grants synchronously
+      -- Uses the shared FFI context for the desktop stub round-trip
       refA <- newIORef (Nothing :: Maybe PermissionStatus)
       refB <- newIORef (Nothing :: Maybe PermissionStatus)
-      requestPermission (appPermissionState globalAppState) PermissionCamera
+      requestPermission ffiPermState PermissionCamera
         (\status -> modifyIORef' refA (const (Just status)))
-      requestPermission (appPermissionState globalAppState) PermissionContacts
+      requestPermission ffiPermState PermissionContacts
         (\status -> modifyIORef' refB (const (Just status)))
       resultA <- readIORef refA
       resultB <- readIORef refB
@@ -668,12 +681,31 @@ permissionTests = testGroup "Permission"
       permissionStatusFromInt 100 @?= Nothing
   ]
 
+-- | Tests for the AppContext FFI path.
+-- Uses 'newAppContext' (not 'haskellCreateContext') to avoid mutating the
+-- global @g_permission_ctx@ — lifecycle dispatch doesn't need it.
+appContextTests :: TestTree
+appContextTests = testGroup "AppContext"
+  [ testCase "newAppContext produces working lifecycle context" $ do
+      ref <- newIORef ([] :: [LifecycleEvent])
+      let ctx = MobileContext { onLifecycle = \event -> modifyIORef' ref (++ [event]), onError = \_ -> pure () }
+      ctxPtr <- newAppContext ctx
+      haskellOnLifecycle ctxPtr 0  -- Create
+      haskellOnLifecycle ctxPtr 2  -- Resume
+      haskellOnLifecycle ctxPtr 5  -- Destroy
+      freeAppContext ctxPtr
+      received <- readIORef ref
+      received @?= [Create, Resume, Destroy]
+  ]
+
 -- | Helper: check whether the registered app's view is an error widget
 -- (a Column whose first child is a Text with "An error occurred").
-viewIsErrorWidget :: IO Bool
-viewIsErrorWidget = do
+viewIsErrorWidget :: Ptr AppContext -> IO Bool
+viewIsErrorWidget ctxPtr = do
+  appCtx <- derefAppContext ctxPtr
   app <- getMobileApp
-  widget <- maView app
+  let userState = UserState { userPermissionState = acPermissionState appCtx }
+  widget <- maView app userState
   case widget of
     Column (Text config : _) -> pure (tcLabel config == "An error occurred")
     Column _                 -> pure False
@@ -687,17 +719,17 @@ viewIsErrorWidget = do
 -- | Tests for the default exception handler that wraps FFI entry points.
 -- Uses 'sequentialTestGroup' because these tests share global mutable state
 -- (mobileApp registration) that would conflict with other tests.
-exceptionHandlerTests :: TestTree
-exceptionHandlerTests = sequentialTestGroup "ExceptionHandler" AllFinish
+exceptionHandlerTests :: Ptr AppContext -> TestTree
+exceptionHandlerTests ffiCtxPtr = sequentialTestGroup "ExceptionHandler" AllFinish
   [ testCase "exception in maView is caught and view replaced with error widget" $ do
       runMobileApp mobileApp
       let crashingApp = MobileApp
             { maContext = defaultMobileContext
-            , maView    = throwIO (userError "test-boom")
+            , maView    = \_userState -> throwIO (userError "test-boom")
             }
       runMobileApp crashingApp
-      haskellRenderUI nullPtr
-      isError <- viewIsErrorWidget
+      haskellRenderUI ffiCtxPtr
+      isError <- viewIsErrorWidget ffiCtxPtr
       assertBool "maView should be replaced with error widget" isError
       runMobileApp mobileApp
 
@@ -705,7 +737,7 @@ exceptionHandlerTests = sequentialTestGroup "ExceptionHandler" AllFinish
       runMobileApp mobileApp
       let crashingApp = MobileApp
             { maContext = defaultMobileContext
-            , maView    = pure $ Button ButtonConfig
+            , maView    = \_userState -> pure $ Button ButtonConfig
                 { bcLabel  = "crash"
                 , bcAction = throwIO (userError "button-boom")
                 , bcFontConfig = Nothing
@@ -713,10 +745,10 @@ exceptionHandlerTests = sequentialTestGroup "ExceptionHandler" AllFinish
             }
       runMobileApp crashingApp
       -- First render to register the button callback
-      haskellRenderUI nullPtr
+      haskellRenderUI ffiCtxPtr
       -- Dispatch the button, which throws — handler overwrites maView
-      haskellOnUIEvent nullPtr 0
-      isError <- viewIsErrorWidget
+      haskellOnUIEvent ffiCtxPtr 0
+      isError <- viewIsErrorWidget ffiCtxPtr
       assertBool "maView should be error widget after button callback exception" isError
       runMobileApp mobileApp
 
@@ -724,7 +756,7 @@ exceptionHandlerTests = sequentialTestGroup "ExceptionHandler" AllFinish
       runMobileApp mobileApp
       -- Transient error: throws once, then succeeds
       shouldThrow <- newIORef True
-      let transientView = do
+      let transientView _userState = do
             throwing <- readIORef shouldThrow
             if throwing
               then do
@@ -737,13 +769,13 @@ exceptionHandlerTests = sequentialTestGroup "ExceptionHandler" AllFinish
             }
       runMobileApp transientApp
       -- First render throws, error widget shown, flag cleared
-      haskellRenderUI nullPtr
-      isError <- viewIsErrorWidget
+      haskellRenderUI ffiCtxPtr
+      isError <- viewIsErrorWidget ffiCtxPtr
       assertBool "should show error widget" isError
       -- Dispatch callback 0 (the dismiss button in the error widget).
       -- This restores the original transientView, which now succeeds.
-      haskellOnUIEvent nullPtr 0
-      isStillError <- viewIsErrorWidget
+      haskellOnUIEvent ffiCtxPtr 0
+      isStillError <- viewIsErrorWidget ffiCtxPtr
       assertBool "should no longer show error widget after dismiss" (not isStillError)
       runMobileApp mobileApp
 
@@ -756,10 +788,10 @@ exceptionHandlerTests = sequentialTestGroup "ExceptionHandler" AllFinish
             }
           crashingApp = MobileApp
             { maContext = ctx
-            , maView    = throwIO (userError "onError-test")
+            , maView    = \_userState -> throwIO (userError "onError-test")
             }
       runMobileApp crashingApp
-      haskellRenderUI nullPtr
+      haskellRenderUI ffiCtxPtr
       firedValue <- readIORef ref
       case firedValue of
         Nothing  -> assertFailure "onError callback should have been fired"
@@ -774,11 +806,11 @@ exceptionHandlerTests = sequentialTestGroup "ExceptionHandler" AllFinish
             }
           crashingApp = MobileApp
             { maContext = ctx
-            , maView    = throwIO (userError "primary-boom")
+            , maView    = \_userState -> throwIO (userError "primary-boom")
             }
       runMobileApp crashingApp
       -- Should not crash despite both maView and onError throwing
-      result <- try @IOException (haskellRenderUI nullPtr)
+      result <- try @IOException (haskellRenderUI ffiCtxPtr)
       case result of
         Left exc -> assertFailure ("haskellRenderUI should not throw, but got: " ++ show exc)
         Right () -> pure ()
@@ -789,13 +821,11 @@ exceptionHandlerTests = sequentialTestGroup "ExceptionHandler" AllFinish
             { onLifecycle = \_ -> throwIO (userError "lifecycle-boom")
             , onError     = \_ -> pure ()
             }
-      sptr <- newMobileContext crashingCtx
-      let ptr = castStablePtrToPtr sptr
+      ctxPtr <- newAppContext crashingCtx
       -- Should not crash
-      result <- try @IOException (haskellOnLifecycle ptr 0)
+      result <- try @IOException (haskellOnLifecycle ctxPtr 0)
       case result of
         Left exc -> assertFailure ("haskellOnLifecycle should not throw, but got: " ++ show exc)
         Right () -> pure ()
-      freeMobileContext sptr
+      freeAppContext ctxPtr
   ]
-

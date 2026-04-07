@@ -35,8 +35,8 @@ extern void haskellOnPermissionResult(void *ctx, int32_t requestId, int32_t stat
 
 /* Android UI bridge (from ui_bridge_android.c) */
 extern void setup_android_ui_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
-extern void android_handle_click(JNIEnv *env, jobject view);
-extern void android_handle_text_change(JNIEnv *env, jobject view, jstring text);
+extern void android_handle_click(JNIEnv *env, jobject view, void *haskellCtx);
+extern void android_handle_text_change(JNIEnv *env, jobject view, jstring text, void *haskellCtx);
 
 /* Android permission bridge (from permission_bridge_android.c) */
 extern void setup_android_permission_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
@@ -59,7 +59,6 @@ JNI_OnLoad(JavaVM *vm, void *reserved)
     hs_init(NULL, NULL);
     haskellRunMain();
     g_haskell_ctx = haskellCreateContext();
-    permission_set_context(g_haskell_ctx);
 
     /* Cache the system locale from Android's Locale.getDefault().toLanguageTag() */
     {
@@ -120,13 +119,13 @@ JNI_METHOD(renderUI)(JNIEnv *env, jobject thiz)
 JNIEXPORT void JNICALL
 JNI_METHOD(onButtonClick)(JNIEnv *env, jobject thiz, jobject view)
 {
-    android_handle_click(env, view);
+    android_handle_click(env, view, g_haskell_ctx);
 }
 
 JNIEXPORT void JNICALL
 JNI_METHOD(onTextChange)(JNIEnv *env, jobject thiz, jobject view, jstring text)
 {
-    android_handle_text_change(env, view, text);
+    android_handle_text_change(env, view, text, g_haskell_ctx);
 }
 
 /* Lifecycle JNI callbacks */

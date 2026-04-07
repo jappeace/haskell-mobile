@@ -44,7 +44,6 @@ extern void haskellOnUITextChange(void *ctx, int callbackId, const char *text);
 /* ---- Global state (valid only on the UI thread) ---- */
 static JNIEnv  *g_env      = NULL;
 static jobject  g_activity  = NULL;   /* global ref to Activity */
-static void    *g_haskell_ctx = NULL; /* opaque Haskell context */
 
 /* ---- Per-button callback IDs stored as view tags ---- */
 
@@ -512,7 +511,7 @@ void setup_android_ui_bridge(JNIEnv *env, jobject activity, void *haskellCtx)
 {
     g_env = env;
     g_activity = (*env)->NewGlobalRef(env, activity);
-    g_haskell_ctx = haskellCtx;
+    (void)haskellCtx; /* context is now owned by jni_bridge.c */
 
 #ifdef DYNAMIC_NODE_POOL
     if (!g_nodes) {
@@ -539,7 +538,7 @@ void setup_android_ui_bridge(JNIEnv *env, jobject activity, void *haskellCtx)
  * Handle a click event from Java. Looks up the callbackId from the
  * view's tag and dispatches to Haskell.
  */
-void android_handle_click(JNIEnv *env, jobject view)
+void android_handle_click(JNIEnv *env, jobject view, void *haskellCtx)
 {
     /* Update g_env in case we're called from a different JNI attach */
     g_env = env;
@@ -554,7 +553,7 @@ void android_handle_click(JNIEnv *env, jobject view)
     (*env)->DeleteLocalRef(env, tagObj);
 
     LOGI("Click dispatched: callbackId=%d", callbackId);
-    haskellOnUIEvent(g_haskell_ctx, callbackId);
+    haskellOnUIEvent(haskellCtx, callbackId);
 }
 
 /*
@@ -562,7 +561,7 @@ void android_handle_click(JNIEnv *env, jobject view)
  * the view's tag and dispatches to Haskell with the new text.
  * Does NOT trigger a re-render (avoids EditText cursor/flicker).
  */
-void android_handle_text_change(JNIEnv *env, jobject view, jstring text)
+void android_handle_text_change(JNIEnv *env, jobject view, jstring text, void *haskellCtx)
 {
     g_env = env;
 
@@ -579,7 +578,7 @@ void android_handle_text_change(JNIEnv *env, jobject view, jstring text)
     if (!ctext) return;
 
     LOGI("Text change dispatched: callbackId=%d, text=\"%s\"", callbackId, ctext);
-    haskellOnUITextChange(g_haskell_ctx, callbackId, ctext);
+    haskellOnUITextChange(haskellCtx, callbackId, ctext);
 
     (*env)->ReleaseStringUTFChars(env, text, ctext);
 }

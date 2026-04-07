@@ -22,13 +22,11 @@ static os_log_t g_log;
 /* Haskell FFI export (dispatches result back to Haskell callback) */
 extern void haskellOnPermissionResult(void *ctx, int32_t requestId, int32_t statusCode);
 
-/* ---- Global state ---- */
-static void *g_haskell_ctx = NULL;
-
 /* ---- Location manager delegate ---- */
 
 @interface PermissionLocationDelegate : NSObject <CLLocationManagerDelegate>
 @property (nonatomic, assign) int32_t requestId;
+@property (nonatomic, assign) void *haskellCtx;
 @property (nonatomic, strong) CLLocationManager *manager;
 @end
 
@@ -44,7 +42,7 @@ static void *g_haskell_ctx = NULL;
         ? PERMISSION_GRANTED : PERMISSION_DENIED;
 
     LOGI("location authorization changed: %d -> result=%d", (int)status, result);
-    haskellOnPermissionResult(g_haskell_ctx, self.requestId, result);
+    haskellOnPermissionResult(self.haskellCtx, self.requestId, result);
 }
 
 @end
@@ -86,7 +84,7 @@ static int32_t ios_permission_check(int32_t permissionCode)
     }
 }
 
-static void ios_permission_request(int32_t permissionCode, int32_t requestId)
+static void ios_permission_request(void *ctx, int32_t permissionCode, int32_t requestId)
 {
     LOGI("permission_request(code=%d, id=%d)", permissionCode, requestId);
 
@@ -94,7 +92,7 @@ static void ios_permission_request(int32_t permissionCode, int32_t requestId)
     case PERMISSION_CAMERA: {
         [AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo completionHandler:^(BOOL granted) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                haskellOnPermissionResult(g_haskell_ctx, requestId,
+                haskellOnPermissionResult(ctx, requestId,
                     granted ? PERMISSION_GRANTED : PERMISSION_DENIED);
             });
         }];
@@ -103,7 +101,7 @@ static void ios_permission_request(int32_t permissionCode, int32_t requestId)
     case PERMISSION_MICROPHONE: {
         [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio completionHandler:^(BOOL granted) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                haskellOnPermissionResult(g_haskell_ctx, requestId,
+                haskellOnPermissionResult(ctx, requestId,
                     granted ? PERMISSION_GRANTED : PERMISSION_DENIED);
             });
         }];
@@ -113,7 +111,7 @@ static void ios_permission_request(int32_t permissionCode, int32_t requestId)
         CNContactStore *store = [[CNContactStore alloc] init];
         [store requestAccessForEntityType:CNEntityTypeContacts completionHandler:^(BOOL granted, NSError *error) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                haskellOnPermissionResult(g_haskell_ctx, requestId,
+                haskellOnPermissionResult(ctx, requestId,
                     granted ? PERMISSION_GRANTED : PERMISSION_DENIED);
             });
         }];
@@ -122,6 +120,7 @@ static void ios_permission_request(int32_t permissionCode, int32_t requestId)
     case PERMISSION_LOCATION: {
         g_location_delegate = [[PermissionLocationDelegate alloc] init];
         g_location_delegate.requestId = requestId;
+        g_location_delegate.haskellCtx = ctx;
         g_location_delegate.manager = [[CLLocationManager alloc] init];
         g_location_delegate.manager.delegate = g_location_delegate;
         [g_location_delegate.manager requestWhenInUseAuthorization];
@@ -130,11 +129,11 @@ static void ios_permission_request(int32_t permissionCode, int32_t requestId)
     case PERMISSION_BLUETOOTH:
     case PERMISSION_STORAGE:
         /* Auto-grant (see ios_permission_check comment) */
-        haskellOnPermissionResult(g_haskell_ctx, requestId, PERMISSION_GRANTED);
+        haskellOnPermissionResult(ctx, requestId, PERMISSION_GRANTED);
         break;
     default:
         LOGE("permission_request: unknown code %d", permissionCode);
-        haskellOnPermissionResult(g_haskell_ctx, requestId, PERMISSION_DENIED);
+        haskellOnPermissionResult(ctx, requestId, PERMISSION_DENIED);
         break;
     }
 }
@@ -148,10 +147,8 @@ static void ios_permission_request(int32_t permissionCode, int32_t requestId)
 void setup_ios_permission_bridge(void *haskellCtx)
 {
     g_log = os_log_create("me.jappie.haskellmobile", LOG_TAG);
-    g_haskell_ctx = haskellCtx;
 
     permission_register_impl(ios_permission_request, ios_permission_check);
-    permission_set_context(haskellCtx);
 
     LOGI("iOS permission bridge initialized");
 }
