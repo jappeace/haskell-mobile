@@ -505,23 +505,21 @@ in {
         if dynamicNodePool then ["-DDYNAMIC_NODE_POOL"]
         else if maxNodes != 256 then ["-DMAX_NODES=${toString maxNodes}"]
         else [];
-      # Inject OTHER_CFLAGS into project.yml when non-default pool settings used
+      # Inject OTHER_CFLAGS into project.yml when non-default pool settings used.
+      # Uses single-quoted -c and argv to avoid shell quoting issues.
+      flagYaml = ''["$$(inherited)", ${builtins.concatStringsSep ", " (map (f: ''"${f}"'') nodePoolCFlags)}]'';
       patchProjectYml =
         if nodePoolCFlags == [] then ""
         else ''
-          # Inject node pool flags into OTHER_CFLAGS
-          ${pkgs.python3}/bin/python3 -c "
-import sys, re
-yml = open('$out/share/ios/project.yml').read()
-flags = ${builtins.toJSON nodePoolCFlags}
-flag_str = ', '.join(['\"' + f + '\"' for f in flags])
-# Insert OTHER_CFLAGS after OTHER_LDFLAGS line
+          ${pkgs.python3}/bin/python3 -c '
+import sys
+yml = open(sys.argv[1]).read()
 yml = yml.replace(
-    'OTHER_LDFLAGS:',
-    'OTHER_CFLAGS: [\"$$(inherited)\", ' + flag_str + ']\n        OTHER_LDFLAGS:'
+    "OTHER_LDFLAGS:",
+    "OTHER_CFLAGS: " + sys.argv[2] + "\n        OTHER_LDFLAGS:"
 )
-open('$out/share/ios/project.yml', 'w').write(yml)
-"
+open(sys.argv[1], "w").write(yml)
+' "$out/share/ios/project.yml" '${flagYaml}'
         '';
     in
     pkgs.stdenv.mkDerivation {
