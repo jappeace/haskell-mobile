@@ -1,3 +1,4 @@
+{-# LANGUAGE ImportQualifiedPost #-}
 -- | Declarative UI widget ADT.
 --
 -- Pure data describing the UI tree. Rendering is handled by
@@ -12,11 +13,17 @@ module HaskellMobile.Widget
   , Widget(..)
   , WidgetStyle(..)
   , TextAlignment(..)
+  , Color(..)
+  , colorFromText
+  , colorToHex
   , defaultStyle
   )
 where
 
+import Data.Char (digitToInt, isHexDigit, intToDigit)
 import Data.Text (Text)
+import Data.Text qualified as Text
+import Data.Word (Word8)
 
 -- | Font configuration for text-bearing widgets.
 -- Only 'Text', 'Button', and 'TextInput' can carry a 'FontConfig'.
@@ -71,6 +78,43 @@ data TextAlignment
   | AlignEnd     -- ^ Right-aligned (LTR) or left-aligned (RTL).
   deriving (Show, Eq)
 
+-- | An RGBA color with 8-bit channels.
+data Color = Color
+  { colorRed   :: Word8
+  , colorGreen :: Word8
+  , colorBlue  :: Word8
+  , colorAlpha :: Word8
+  } deriving (Show, Eq)
+
+-- | Parse a hex color string: @"#RGB"@, @"#RRGGBB"@, or @"#AARRGGBB"@.
+-- Returns 'Nothing' on invalid input.
+colorFromText :: Text -> Maybe Color
+colorFromText raw = do
+  ('#', digits) <- Text.uncons raw
+  let hex = Text.unpack digits
+  if all isHexDigit hex
+    then case hex of
+      [r1, g1, b1] ->
+        let expand ch = let val = digitToInt ch in fromIntegral (val * 16 + val)
+        in Just (Color (expand r1) (expand g1) (expand b1) 255)
+      [r1, r2, g1, g2, b1, b2] ->
+        Just (Color (hexByte r1 r2) (hexByte g1 g2) (hexByte b1 b2) 255)
+      [a1, a2, r1, r2, g1, g2, b1, b2] ->
+        Just (Color (hexByte r1 r2) (hexByte g1 g2) (hexByte b1 b2) (hexByte a1 a2))
+      _ -> Nothing
+    else Nothing
+
+-- | Convert two hex characters to a Word8.
+hexByte :: Char -> Char -> Word8
+hexByte high low = fromIntegral (digitToInt high * 16 + digitToInt low)
+
+-- | Convert a 'Color' to a hex string in @"#AARRGGBB"@ format for the C bridge.
+colorToHex :: Color -> Text
+colorToHex (Color r g b a) = Text.pack ('#' : toHexByte a ++ toHexByte r ++ toHexByte g ++ toHexByte b)
+  where
+    toHexByte :: Word8 -> String
+    toHexByte byte = [intToDigit (fromIntegral byte `div` 16), intToDigit (fromIntegral byte `mod` 16)]
+
 -- | Visual style overrides for a widget node.
 -- Font size is not here — it belongs in the config records of
 -- text-bearing widgets ('TextConfig', 'ButtonConfig', 'TextInputConfig').
@@ -79,10 +123,10 @@ data WidgetStyle = WidgetStyle
     -- ^ Uniform padding in platform-native units (px on Android, pt on iOS).
   , wsTextAlign       :: Maybe TextAlignment
     -- ^ Horizontal text alignment override.
-  , wsTextColor       :: Maybe Text
-    -- ^ Text color as hex string: @"#RGB"@, @"#RRGGBB"@, or @"#AARRGGBB"@.
-  , wsBackgroundColor :: Maybe Text
-    -- ^ Background color as hex string: @"#RGB"@, @"#RRGGBB"@, or @"#AARRGGBB"@.
+  , wsTextColor       :: Maybe Color
+    -- ^ Text color.
+  , wsBackgroundColor :: Maybe Color
+    -- ^ Background color.
   } deriving (Show, Eq)
 
 -- | No style overrides — all fields are 'Nothing'.

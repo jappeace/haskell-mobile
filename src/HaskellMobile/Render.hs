@@ -19,7 +19,7 @@ import Data.Int (Int32)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Text (Text)
-import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), InputType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..))
+import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), InputType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..), colorToHex)
 import HaskellMobile.UIBridge qualified as Bridge
 import System.IO (hPutStrLn, stderr)
 
@@ -145,10 +145,10 @@ applyStyle nodeId style = do
     Just alignment -> Bridge.setNumProp nodeId Bridge.PropGravity (textAlignToDouble alignment)
     Nothing        -> pure ()
   case wsTextColor style of
-    Just color -> Bridge.setStrProp nodeId Bridge.PropColor color
+    Just color -> Bridge.setStrProp nodeId Bridge.PropColor (colorToHex color)
     Nothing    -> pure ()
   case wsBackgroundColor style of
-    Just color -> Bridge.setStrProp nodeId Bridge.PropBgColor color
+    Just color -> Bridge.setStrProp nodeId Bridge.PropBgColor (colorToHex color)
     Nothing    -> pure ()
 
 -- | Full render: clear the screen, reset callbacks, build the widget

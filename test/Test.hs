@@ -51,7 +51,7 @@ import HaskellMobile.Lifecycle
   , lifecycleToInt
   , loggingMobileContext
   )
-import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), InputType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..), defaultStyle)
+import HaskellMobile.Widget (ButtonConfig(..), Color(..), FontConfig(..), InputType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..), colorFromText, colorToHex, defaultStyle)
 import HaskellMobile.Permission
   ( Permission(..)
   , PermissionStatus(..)
@@ -511,7 +511,7 @@ colorTests = testGroup "Colors"
   [ testCase "Styled with textColor renders and callback fires" $ do
       ref <- newIORef (0 :: Int)
       rs <- newRenderState
-      renderWidget rs $ Styled (WidgetStyle Nothing Nothing (Just "#FF0000") Nothing)
+      renderWidget rs $ Styled (WidgetStyle Nothing Nothing (Just (Color 255 0 0 255)) Nothing)
         (Button ButtonConfig
           { bcLabel = "red", bcAction = modifyIORef' ref (+ 1), bcFontConfig = Nothing })
       dispatchEvent rs 0
@@ -520,13 +520,13 @@ colorTests = testGroup "Colors"
 
   , testCase "Styled with backgroundColor renders without error" $ do
       rs <- newRenderState
-      renderWidget rs $ Styled (WidgetStyle Nothing Nothing Nothing (Just "#00FF00"))
+      renderWidget rs $ Styled (WidgetStyle Nothing Nothing Nothing (Just (Color 0 255 0 255)))
         (Text TextConfig { tcLabel = "green bg", tcFontConfig = Nothing })
 
   , testCase "both textColor and backgroundColor together" $ do
       ref <- newIORef (0 :: Int)
       rs <- newRenderState
-      renderWidget rs $ Styled (WidgetStyle Nothing Nothing (Just "#FF0000") (Just "#00FF00"))
+      renderWidget rs $ Styled (WidgetStyle Nothing Nothing (Just (Color 255 0 0 255)) (Just (Color 0 255 0 255)))
         (Button ButtonConfig
           { bcLabel = "colored", bcAction = modifyIORef' ref (+ 1), bcFontConfig = Nothing })
       dispatchEvent rs 0
@@ -540,9 +540,27 @@ colorTests = testGroup "Colors"
   , testCase "nested Styled with different colors renders" $ do
       rs <- newRenderState
       renderWidget rs $
-        Styled (WidgetStyle Nothing Nothing (Just "#FF0000") Nothing)
-          (Styled (WidgetStyle Nothing Nothing Nothing (Just "#0000FF"))
+        Styled (WidgetStyle Nothing Nothing (Just (Color 255 0 0 255)) Nothing)
+          (Styled (WidgetStyle Nothing Nothing Nothing (Just (Color 0 0 255 255)))
             (Text TextConfig { tcLabel = "nested colors", tcFontConfig = Nothing }))
+
+  , testCase "colorFromText parses #RRGGBB" $
+      colorFromText "#FF0000" @?= Just (Color 255 0 0 255)
+
+  , testCase "colorFromText parses #RGB" $
+      colorFromText "#F00" @?= Just (Color 255 0 0 255)
+
+  , testCase "colorFromText parses #AARRGGBB" $
+      colorFromText "#80FF0000" @?= Just (Color 255 0 0 128)
+
+  , testCase "colorFromText rejects invalid input" $ do
+      colorFromText "" @?= Nothing
+      colorFromText "FF0000" @?= Nothing
+      colorFromText "#GG0000" @?= Nothing
+
+  , testCase "colorToHex roundtrips through colorFromText" $ do
+      let color = Color 255 128 0 255
+      colorFromText (colorToHex color) @?= Just color
   ]
 
 -- | Tests for the IORef registration pattern.
