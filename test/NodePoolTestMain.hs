@@ -7,14 +7,13 @@
 module Main where
 
 import Data.Text (pack)
-import HaskellMobile (runMobileApp)
+import HaskellMobile (MobileApp(..), UserState(..), runMobileApp)
 import HaskellMobile.Lifecycle (loggingMobileContext)
-import HaskellMobile.Types (MobileApp(..))
 import HaskellMobile.Widget (TextConfig(..), Widget(..))
 
 -- | Render 300 nodes: 1 Column parent + 299 Text children.
-nodePoolTestView :: IO Widget
-nodePoolTestView = pure $ Column $
+nodePoolTestView :: UserState -> IO Widget
+nodePoolTestView _userState = pure $ Column $
   map (\itemNumber -> Text TextConfig
     { tcLabel = "Item " <> pack (show (itemNumber :: Int))
     , tcFontConfig = Nothing

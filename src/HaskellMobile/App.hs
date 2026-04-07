@@ -15,7 +15,7 @@ import System.IO.Unsafe (unsafePerformIO)
 mobileApp :: MobileApp
 mobileApp = MobileApp
   { maContext = loggingMobileContext
-  , maView = counterView
+  , maView = \_userState ->counterView
   }
 
 -- | Global counter state for the demo app.
@@ -45,7 +45,7 @@ counterView = do
 scrollDemoApp :: MobileApp
 scrollDemoApp = MobileApp
   { maContext = loggingMobileContext
-  , maView    = scrollDemoView
+  , maView    = \_userState ->scrollDemoView
   }
 
 -- | Builds a ScrollView containing 20 text items followed by a button.
@@ -65,7 +65,7 @@ scrollDemoView = pure $ ScrollView
 textInputDemoApp :: MobileApp
 textInputDemoApp = MobileApp
   { maContext = loggingMobileContext
-  , maView    = textInputDemoView
+  , maView    = \_userState ->textInputDemoView
   }
 
 -- | Builds a Column with a label and two TextInputs of different InputType.

@@ -27,6 +27,7 @@ import Data.Int (Int32)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Foreign.C.Types (CInt(..))
+import Foreign.Ptr (Ptr, nullPtr)
 import System.IO (hPutStrLn, stderr)
 
 -- | Dangerous permissions that require runtime consent on mobile.
@@ -46,22 +47,30 @@ data PermissionStatus
   deriving (Show, Eq, Ord, Enum, Bounded)
 
 -- | Mutable state for the permission callback registry.
--- Holds pending callbacks and the next request ID counter.
+-- Holds pending callbacks, the next request ID counter, and
+-- the opaque context pointer passed to the C bridge for dispatch.
 data PermissionState = PermissionState
-  { psCallbacks :: IORef (IntMap (PermissionStatus -> IO ()))
+  { psCallbacks  :: IORef (IntMap (PermissionStatus -> IO ()))
     -- ^ Map from requestId -> result callback
-  , psNextId    :: IORef Int32
+  , psNextId     :: IORef Int32
     -- ^ Next available request ID
+  , psContextPtr :: IORef (Ptr ())
+    -- ^ Opaque context pointer passed to the C bridge.
+    -- Set by 'AppContext.newAppContext' after the 'StablePtr' is created.
   }
 
 -- | Create a fresh 'PermissionState' with no pending callbacks.
+-- The context pointer is initially null and must be set via
+-- 'psContextPtr' before calling 'requestPermission'.
 newPermissionState :: IO PermissionState
 newPermissionState = do
-  callbacks <- newIORef IntMap.empty
-  nextId    <- newIORef 0
+  callbacks  <- newIORef IntMap.empty
+  nextId     <- newIORef 0
+  contextPtr <- newIORef nullPtr
   pure PermissionState
-    { psCallbacks = callbacks
-    , psNextId    = nextId
+    { psCallbacks  = callbacks
+    , psNextId     = nextId
+    , psContextPtr = contextPtr
     }
 
 -- | Convert a 'Permission' to its C bridge integer code.
@@ -84,12 +93,15 @@ permissionStatusFromInt _ = Nothing
 -- | Request a runtime permission.  Registers @callback@ and calls the
 -- C bridge asynchronously.  The callback fires when the platform
 -- responds (or synchronously on desktop via the auto-grant stub).
+-- The opaque context pointer stored in 'psContextPtr' is threaded
+-- through to the C bridge so it can dispatch results back.
 requestPermission :: PermissionState -> Permission -> (PermissionStatus -> IO ()) -> IO ()
 requestPermission permissionState permission callback = do
   requestId <- readIORef (psNextId permissionState)
   modifyIORef' (psCallbacks permissionState) (IntMap.insert (fromIntegral requestId) callback)
   writeIORef (psNextId permissionState) (requestId + 1)
-  c_permissionRequest (permissionToInt permission) (fromIntegral requestId)
+  ctx <- readIORef (psContextPtr permissionState)
+  c_permissionRequest ctx (permissionToInt permission) (fromIntegral requestId)
 
 -- | Check whether a permission is currently granted (synchronous).
 checkPermission :: Permission -> IO PermissionStatus
@@ -119,8 +131,9 @@ dispatchPermissionResult permissionState requestId statusCode =
           callback status
 
 -- | FFI import: request a permission via the C bridge.
+-- Takes an opaque context pointer, permission code, and request ID.
 foreign import ccall "permission_request"
-  c_permissionRequest :: CInt -> CInt -> IO ()
+  c_permissionRequest :: Ptr () -> CInt -> CInt -> IO ()
 
 -- | FFI import: check a permission via the C bridge.
 foreign import ccall "permission_check"

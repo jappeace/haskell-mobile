@@ -23,7 +23,7 @@ extern void haskellOnPermissionResult(void *ctx, int32_t requestId, int32_t stat
 /* ---- Global state (valid only on the UI thread) ---- */
 static JNIEnv  *g_env          = NULL;
 static jobject  g_activity      = NULL;   /* global ref to Activity */
-static void    *g_haskell_ctx   = NULL;
+static void    *g_haskell_ctx   = NULL;   /* stored per-request for async JNI callback */
 
 /* Cached JNI method IDs */
 static jmethodID g_method_requestPermission;
@@ -31,13 +31,16 @@ static jmethodID g_method_checkPermission;
 
 /* ---- Permission bridge implementations ---- */
 
-static void android_permission_request(int32_t permissionCode, int32_t requestId)
+static void android_permission_request(void *ctx, int32_t permissionCode, int32_t requestId)
 {
     JNIEnv *env = g_env;
     if (!env || !g_activity) {
         LOGE("permission_request: bridge not initialized");
         return;
     }
+
+    /* Store context for the async JNI callback */
+    g_haskell_ctx = ctx;
 
     LOGI("permission_request(code=%d, id=%d)", permissionCode, requestId);
     (*env)->CallVoidMethod(env, g_activity, g_method_requestPermission,
@@ -88,7 +91,6 @@ void setup_android_permission_bridge(JNIEnv *env, jobject activity, void *haskel
     }
 
     permission_register_impl(android_permission_request, android_permission_check);
-    permission_set_context(haskellCtx);
 
     LOGI("Android permission bridge initialized");
 }

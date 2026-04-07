@@ -27,9 +27,10 @@
  */
 
 /* Request a runtime permission asynchronously.
+ * ctx:            opaque Haskell context pointer (passed through to callback).
  * permissionCode: one of PERMISSION_* constants.
  * requestId:      opaque ID from Haskell (used to dispatch the result). */
-void permission_request(int32_t permissionCode, int32_t requestId);
+void permission_request(void *ctx, int32_t permissionCode, int32_t requestId);
 
 /* Check whether a permission is currently granted (synchronous).
  * Returns PERMISSION_GRANTED or PERMISSION_DENIED. */
@@ -38,11 +39,7 @@ int32_t permission_check(int32_t permissionCode);
 /* Register platform-specific implementations.
  * Called by platform setup functions (setup_android_permission_bridge, etc). */
 void permission_register_impl(
-    void (*request)(int32_t, int32_t),
+    void (*request)(void *, int32_t, int32_t),
     int32_t (*check)(int32_t));
-
-/* Store the opaque Haskell context pointer for dispatching results back.
- * Called during platform initialisation. */
-void permission_set_context(void *ctx);
 
 #endif /* PERMISSION_BRIDGE_H */

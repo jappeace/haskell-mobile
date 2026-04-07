@@ -52,10 +52,10 @@ extern void haskellLogLocale(void);
 
 /* ---- Global state (valid only on the main thread) ---- */
 static UIViewController *g_viewController = nil;
-static void             *g_haskell_ctx    = NULL;
 
 /* ---- Singleton handler for button taps ---- */
 @interface IOSBridgeHandler : NSObject
+@property (nonatomic, assign) void *haskellCtx;
 + (instancetype)shared;
 - (void)handleTap:(UIButton *)sender;
 @end
@@ -74,7 +74,7 @@ static void             *g_haskell_ctx    = NULL;
 - (void)handleTap:(UIButton *)sender {
     int32_t callbackId = (int32_t)sender.tag;
     LOGI("Click dispatched: callbackId=%d", callbackId);
-    haskellOnUIEvent(g_haskell_ctx, callbackId);
+    haskellOnUIEvent(self.haskellCtx, callbackId);
 }
 
 @end
@@ -441,7 +441,7 @@ void setup_ios_ui_bridge(void *viewController, void *haskellCtx)
     g_log = os_log_create("me.jappie.haskellmobile", LOG_TAG);
 
     g_viewController = (__bridge UIViewController *)viewController;
-    g_haskell_ctx = haskellCtx;
+    [IOSBridgeHandler shared].haskellCtx = haskellCtx;
 
 #ifdef DYNAMIC_NODE_POOL
     if (!g_nodes) {

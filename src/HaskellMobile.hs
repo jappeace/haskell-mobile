@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module HaskellMobile
   ( MobileApp(..)
+  , UserState(..)
   , runMobileApp
   , getMobileApp
   -- FFI exports
@@ -9,6 +10,8 @@ module HaskellMobile
   , haskellCreateContext
   , haskellRenderUI
   , haskellOnUIEvent
+  , haskellOnLifecycle
+  , haskellOnPermissionResult
   -- Error handling
   , errorWidget
   -- Re-exports from Lifecycle
@@ -19,6 +22,11 @@ module HaskellMobile
   , platformLog
   , newMobileContext
   , freeMobileContext
+  -- Re-exports from AppContext
+  , AppContext(..)
+  , newAppContext
+  , freeAppContext
+  , derefAppContext
   -- Re-exports from Locale
   , Language(..)
   , Locale(..)
@@ -38,9 +46,6 @@ module HaskellMobile
   , PermissionState(..)
   , requestPermission
   , checkPermission
-  -- App state
-  , AppState(..)
-  , globalAppState
   )
 where
 
@@ -48,8 +53,8 @@ import Control.Exception (SomeException, catch)
 import Data.Text (pack)
 import Foreign.C.String (CString, newCString, peekCString)
 import Foreign.C.Types (CInt(..))
-import Foreign.Ptr (Ptr, nullPtr)
-import Foreign.StablePtr (castStablePtrToPtr)
+import Foreign.Ptr (Ptr, nullPtr, castPtr)
+import HaskellMobile.AppContext (AppContext(..), newAppContext, freeAppContext, derefAppContext)
 import HaskellMobile.Lifecycle
   ( LifecycleEvent(..)
   , MobileContext(..)
@@ -58,6 +63,7 @@ import HaskellMobile.Lifecycle
   , platformLog
   , newMobileContext
   , freeMobileContext
+  , lifecycleFromInt
   )
 import HaskellMobile.I18n (Key(..), TranslateFailure(..), translate)
 import HaskellMobile.Locale (Language(..), Locale(..), LocaleFailure(..), getSystemLocale, parseLocale, localeToText, languageToCode, languageFromCode)
@@ -65,49 +71,34 @@ import HaskellMobile.Permission
   ( Permission(..)
   , PermissionStatus(..)
   , PermissionState(..)
-  , newPermissionState
   , requestPermission
   , checkPermission
   , dispatchPermissionResult
   )
-import HaskellMobile.Render (RenderState, newRenderState, renderWidget, dispatchEvent, dispatchTextEvent)
-import HaskellMobile.Types (MobileApp(..), runMobileApp, getMobileApp)
+import HaskellMobile.Render (renderWidget, dispatchEvent, dispatchTextEvent)
+import HaskellMobile.Types (MobileApp(..), UserState(..), runMobileApp, getMobileApp)
 import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), TextConfig(..), Widget(..))
-import System.IO.Unsafe (unsafePerformIO)
-
--- | Combined runtime state for the app.
--- Single global replaces individual globals for render and permission state.
-data AppState = AppState
-  { appRenderState     :: RenderState
-  , appPermissionState :: PermissionState
-  }
-
--- | The one global mutable state, initialised once on first use.
--- Safe because all UI calls happen on the main thread.
-globalAppState :: AppState
-globalAppState = unsafePerformIO $
-  AppState <$> newRenderState <*> newPermissionState
-{-# NOINLINE globalAppState #-}
 
 -- | Wrap an IO action in a catch-all exception handler.
 -- On failure, logs the exception, overwrites the registered app's view
 -- with an error widget, and fires the user's 'onError' callback.
-withExceptionHandler :: IO () -> IO ()
-withExceptionHandler action =
-  catch action handleException
+withExceptionHandler :: Ptr AppContext -> IO () -> IO ()
+withExceptionHandler ctxPtr action =
+  catch action (handleException ctxPtr)
 
 -- | Handle an uncaught exception from an FFI entry point.
 -- Overwrites the registered app's 'maView' with an error widget so
 -- that subsequent renders show the error on screen. The error widget
 -- includes a dismiss button that restores the original view.
 -- Also logs via 'platformLog' and best-effort fires 'onError'.
-handleException :: SomeException -> IO ()
-handleException exc = do
+handleException :: Ptr AppContext -> SomeException -> IO ()
+handleException ctxPtr exc = do
+  appCtx <- derefAppContext ctxPtr
   app <- getMobileApp
   let originalView = maView app
-  runMobileApp app { maView = pure (errorWidget originalView exc) }
+  runMobileApp app { maView = \_userState -> pure (errorWidget originalView exc) }
   platformLog ("Uncaught exception: " <> pack (show exc))
-  renderWidget (appRenderState globalAppState) (errorWidget originalView exc)
+  renderWidget (acRenderState appCtx) (errorWidget originalView exc)
   fireUserErrorCallback exc
 
 -- | Best-effort: read the registered app's 'onError' callback and fire it.
@@ -121,15 +112,17 @@ fireUserErrorCallback exc =
       platformLog ("onError callback failed: " <> pack (show (secondaryExc :: SomeException))))
 
 -- | Render the current view: read the registered app and render its widget.
-renderView :: IO ()
-renderView = do
+renderView :: Ptr AppContext -> IO ()
+renderView ctxPtr = do
+  appCtx <- derefAppContext ctxPtr
   app <- getMobileApp
-  widget <- maView app
-  renderWidget (appRenderState globalAppState) widget
+  let userState = UserState { userPermissionState = acPermissionState appCtx }
+  widget <- maView app userState
+  renderWidget (acRenderState appCtx) widget
 
 -- | A widget that displays an error message with a dismiss button.
 -- The dismiss button restores the original view via a closure.
-errorWidget :: IO Widget -> SomeException -> Widget
+errorWidget :: (UserState -> IO Widget) -> SomeException -> Widget
 errorWidget originalView exc = Column
   [ Text TextConfig
       { tcLabel      = "An error occurred"
@@ -157,56 +150,78 @@ haskellGreet cname = do
 
 foreign export ccall haskellGreet :: CString -> IO CString
 
--- | Create a 'MobileContext' and return it as an opaque pointer
--- for C code. Called by platform bridges after 'haskellRunMain'.
--- Reads the context from the registered 'MobileApp'.
+-- | Create an 'AppContext' (bundling 'MobileContext' + 'RenderState' +
+-- 'PermissionState') and return it as a typed pointer for C code.
+-- Called by platform bridges after 'haskellRunMain'.
+-- The context pointer is written into the 'PermissionState' so that
+-- 'requestPermission' can thread it through to the C bridge.
 -- Returns 'nullPtr' if the app is not registered or an exception occurs.
-haskellCreateContext :: IO (Ptr ())
+haskellCreateContext :: IO (Ptr AppContext)
 haskellCreateContext =
   catch
     (do app <- getMobileApp
-        castStablePtrToPtr <$> newMobileContext (maContext app))
+        newAppContext (maContext app))
     (\exc -> do
-      handleException (exc :: SomeException)
-      pure nullPtr)
+      platformLog ("haskellCreateContext failed: " <> pack (show (exc :: SomeException)))
+      pure (castPtr nullPtr))
 
-foreign export ccall haskellCreateContext :: IO (Ptr ())
+foreign export ccall haskellCreateContext :: IO (Ptr AppContext)
 
--- | Render the UI tree. Calls 'maView' from the registered 'MobileApp'
+-- | Render the UI tree. Dereferences the context pointer to obtain the
+-- 'RenderState', calls 'maView' from the registered 'MobileApp'
 -- to get the widget description, then issues ui_* calls through the
 -- registered bridge callbacks. Catches exceptions and shows error widget.
-haskellRenderUI :: Ptr () -> IO ()
-haskellRenderUI _ctxPtr =
-  withExceptionHandler renderView
+haskellRenderUI :: Ptr AppContext -> IO ()
+haskellRenderUI ctxPtr =
+  withExceptionHandler ctxPtr (renderView ctxPtr)
 
-foreign export ccall haskellRenderUI :: Ptr () -> IO ()
+foreign export ccall haskellRenderUI :: Ptr AppContext -> IO ()
 
 -- | Handle a UI event from native code. Dispatches the callback
 -- identified by @callbackId@, then re-renders the UI.
-haskellOnUIEvent :: Ptr () -> CInt -> IO ()
-haskellOnUIEvent _ctxPtr callbackId =
-  withExceptionHandler $ do
-    dispatchEvent (appRenderState globalAppState) (fromIntegral callbackId)
-    renderView
+haskellOnUIEvent :: Ptr AppContext -> CInt -> IO ()
+haskellOnUIEvent ctxPtr callbackId =
+  withExceptionHandler ctxPtr $ do
+    appCtx <- derefAppContext ctxPtr
+    dispatchEvent (acRenderState appCtx) (fromIntegral callbackId)
+    renderView ctxPtr
 
-foreign export ccall haskellOnUIEvent :: Ptr () -> CInt -> IO ()
+foreign export ccall haskellOnUIEvent :: Ptr AppContext -> CInt -> IO ()
 
 -- | Handle a text change event from native code. Dispatches the callback
 -- identified by @callbackId@ with the new text value. Does NOT re-render
 -- to avoid EditText cursor/flicker issues on Android.
-haskellOnUITextChange :: Ptr () -> CInt -> CString -> IO ()
-haskellOnUITextChange _ctxPtr callbackId cstr =
-  withExceptionHandler $ do
+haskellOnUITextChange :: Ptr AppContext -> CInt -> CString -> IO ()
+haskellOnUITextChange ctxPtr callbackId cstr =
+  withExceptionHandler ctxPtr $ do
+    appCtx <- derefAppContext ctxPtr
     str <- peekCString cstr
-    dispatchTextEvent (appRenderState globalAppState) (fromIntegral callbackId) (pack str)
+    dispatchTextEvent (acRenderState appCtx) (fromIntegral callbackId) (pack str)
 
-foreign export ccall haskellOnUITextChange :: Ptr () -> CInt -> CString -> IO ()
+foreign export ccall haskellOnUITextChange :: Ptr AppContext -> CInt -> CString -> IO ()
 
--- | Handle a permission result from native code.  Dispatches to the
+-- | Handle a permission result from native code. Dispatches to the
 -- callback registered by 'requestPermission'.
-haskellOnPermissionResult :: Ptr () -> CInt -> CInt -> IO ()
-haskellOnPermissionResult _ctxPtr requestId statusCode =
-  withExceptionHandler $
-    dispatchPermissionResult (appPermissionState globalAppState) requestId statusCode
+haskellOnPermissionResult :: Ptr AppContext -> CInt -> CInt -> IO ()
+haskellOnPermissionResult ctxPtr requestId statusCode =
+  withExceptionHandler ctxPtr $ do
+    appCtx <- derefAppContext ctxPtr
+    dispatchPermissionResult (acPermissionState appCtx) requestId statusCode
 
-foreign export ccall haskellOnPermissionResult :: Ptr () -> CInt -> CInt -> IO ()
+foreign export ccall haskellOnPermissionResult :: Ptr AppContext -> CInt -> CInt -> IO ()
+
+-- | FFI entry point called from platform code.
+-- Takes a context pointer and an event code.
+-- Dereferences as 'AppContext' and dispatches to the 'onLifecycle' callback
+-- of the inner 'MobileContext'. Unknown event codes are silently ignored.
+-- Catches exceptions and fires 'onError'.
+haskellOnLifecycle :: Ptr AppContext -> CInt -> IO ()
+haskellOnLifecycle ctxPtr code =
+  withExceptionHandler ctxPtr $
+    case lifecycleFromInt code of
+      Just event -> do
+        appCtx <- derefAppContext ctxPtr
+        onLifecycle (acMobileContext appCtx) event
+      Nothing -> pure ()
+
+foreign export ccall haskellOnLifecycle :: Ptr AppContext -> CInt -> IO ()
