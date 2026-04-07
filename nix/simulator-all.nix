@@ -44,6 +44,17 @@ let
     name = "haskell-mobile-textinput-simulator-app";
   };
 
+  permissionIos = import ./ios.nix {
+    inherit sources;
+    mainModule = ../test/PermissionDemoMain.hs;
+    simulator = true;
+  };
+  permissionSimApp = lib.mkSimulatorApp {
+    iosLib = permissionIos;
+    iosSrc = ../ios;
+    name = "haskell-mobile-permission-simulator-app";
+  };
+
   xcodegen = pkgs.xcodegen;
 
   testScripts = builtins.path { path = ../test; name = "test-scripts"; };
@@ -67,6 +78,7 @@ DEVICE_TYPE="iPhone 16"
 COUNTER_SHARE_DIR="${counterSimApp}/share/ios"
 SCROLL_SHARE_DIR="${scrollSimApp}/share/ios"
 TEXTINPUT_SHARE_DIR="${textinputSimApp}/share/ios"
+PERMISSION_SHARE_DIR="${permissionSimApp}/share/ios"
 TEST_SCRIPTS="${testScripts}"
 
 # --- Temp working directory ---
@@ -77,6 +89,7 @@ SIM_UDID=""
 PHASE1_OK=0
 PHASE2_OK=0
 PHASE3_OK=0
+PHASE4_OK=0
 
 cleanup() {
     echo ""
@@ -109,6 +122,7 @@ mkdir -p "$WORK_DIR/counter/lib" "$WORK_DIR/counter/include"
 cp "$COUNTER_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/counter/lib/"
 cp "$COUNTER_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/counter/include/"
 cp "$COUNTER_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/counter/include/"
+cp "$COUNTER_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/counter/include/"
 cp -r "$COUNTER_SHARE_DIR/HaskellMobile" "$WORK_DIR/counter/"
 cp "$COUNTER_SHARE_DIR/project.yml" "$WORK_DIR/counter/"
 chmod -R u+w "$WORK_DIR/counter"
@@ -143,6 +157,7 @@ mkdir -p "$WORK_DIR/scroll/lib" "$WORK_DIR/scroll/include"
 cp "$SCROLL_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/scroll/lib/"
 cp "$SCROLL_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/scroll/include/"
 cp "$SCROLL_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/scroll/include/"
+cp "$SCROLL_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/scroll/include/"
 cp -r "$SCROLL_SHARE_DIR/HaskellMobile" "$WORK_DIR/scroll/"
 cp "$SCROLL_SHARE_DIR/project.yml" "$WORK_DIR/scroll/"
 chmod -R u+w "$WORK_DIR/scroll"
@@ -177,6 +192,7 @@ mkdir -p "$WORK_DIR/textinput/lib" "$WORK_DIR/textinput/include"
 cp "$TEXTINPUT_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/textinput/lib/"
 cp "$TEXTINPUT_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/textinput/include/"
 cp "$TEXTINPUT_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/textinput/include/"
+cp "$TEXTINPUT_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/textinput/include/"
 cp -r "$TEXTINPUT_SHARE_DIR/HaskellMobile" "$WORK_DIR/textinput/"
 cp "$TEXTINPUT_SHARE_DIR/project.yml" "$WORK_DIR/textinput/"
 chmod -R u+w "$WORK_DIR/textinput"
@@ -204,6 +220,41 @@ if [ -z "$TEXTINPUT_APP" ]; then
     exit 1
 fi
 echo "TextInput app: $TEXTINPUT_APP"
+
+# --- Stage and build permission demo app ---
+echo "=== Staging permission demo app ==="
+mkdir -p "$WORK_DIR/permission/lib" "$WORK_DIR/permission/include"
+cp "$PERMISSION_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/permission/lib/"
+cp "$PERMISSION_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/permission/include/"
+cp "$PERMISSION_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/permission/include/"
+cp "$PERMISSION_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/permission/include/"
+cp -r "$PERMISSION_SHARE_DIR/HaskellMobile" "$WORK_DIR/permission/"
+cp "$PERMISSION_SHARE_DIR/project.yml" "$WORK_DIR/permission/"
+chmod -R u+w "$WORK_DIR/permission"
+
+echo "=== Generating permission Xcode project ==="
+cd "$WORK_DIR/permission"
+${xcodegen}/bin/xcodegen generate
+
+echo "=== Building permission demo app for simulator ==="
+xcodebuild build \
+    -project HaskellMobile.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk iphonesimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/permission-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+PERMISSION_APP=$(find "$WORK_DIR/permission-build" -name "*.app" -type d | head -1)
+if [ -z "$PERMISSION_APP" ]; then
+    echo "ERROR: Could not find permission .app bundle"
+    exit 1
+fi
+echo "Permission app: $PERMISSION_APP"
 
 # --- Discover latest iOS runtime ---
 echo "=== Discovering iOS runtime ==="
@@ -266,11 +317,12 @@ sleep 5
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP WORK_DIR
+export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
 PHASE3_EXIT=0
+PHASE4_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -317,6 +369,8 @@ echo "--- locale ---"
 run_with_retry "locale"    bash "$TEST_SCRIPTS/ios/locale.sh"    || PHASE1_EXIT=1
 echo "--- textinput ---"
 run_with_retry "textinput" bash "$TEST_SCRIPTS/ios/textinput.sh" || PHASE3_EXIT=1
+echo "--- permission ---"
+run_with_retry "permission" bash "$TEST_SCRIPTS/ios/permission.sh" || PHASE4_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -347,8 +401,18 @@ else
     echo "PHASE 3 FAILED"
 fi
 
+if [ $PHASE4_EXIT -eq 0 ]; then
+    PHASE4_OK=1
+    echo ""
+    echo "PHASE 4 PASSED"
+else
+    PHASE4_OK=0
+    echo ""
+    echo "PHASE 4 FAILED"
+fi
+
 # ===========================================================================
-# PHASE 3 — Final report
+# Final report
 # ===========================================================================
 echo ""
 echo "============================================================"
@@ -375,6 +439,13 @@ if [ $PHASE3_OK -eq 1 ]; then
     echo "PASS  Phase 3 — TextInput demo app"
 else
     echo "FAIL  Phase 3 — TextInput demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE4_OK -eq 1 ]; then
+    echo "PASS  Phase 4 — Permission demo app"
+else
+    echo "FAIL  Phase 4 — Permission demo app"
     FINAL_EXIT=1
 fi
 

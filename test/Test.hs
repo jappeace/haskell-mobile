@@ -6,6 +6,7 @@ import Test.Tasty.HUnit
 
 import Data.Either (isLeft)
 import Data.List (sort)
+import Data.IntMap.Strict qualified as IntMap
 import Data.IORef (newIORef, readIORef, modifyIORef')
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
@@ -15,9 +16,11 @@ import Foreign.Ptr (Ptr)
 import Foreign.StablePtr (castStablePtrToPtr)
 import HaskellMobile
   ( MobileApp(..)
+  , AppState(..)
   , runMobileApp
   , getMobileApp
   , haskellGreet
+  , globalAppState
   )
 import HaskellMobile.Locale
   ( Language(..)
@@ -44,6 +47,17 @@ import HaskellMobile.Lifecycle
   , haskellOnLifecycle
   )
 import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), InputType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..), defaultStyle)
+import HaskellMobile.Permission
+  ( Permission(..)
+  , PermissionStatus(..)
+  , PermissionState(..)
+  , newPermissionState
+  , requestPermission
+  , checkPermission
+  , dispatchPermissionResult
+  , permissionToInt
+  , permissionStatusFromInt
+  )
 import HaskellMobile.Render (newRenderState, renderWidget, dispatchEvent, dispatchTextEvent)
 
 main :: IO ()
@@ -53,7 +67,7 @@ main = do
   defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, styledTests, textAlignTests, registrationTests, localeTests, i18nTests]
+tests = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, styledTests, textAlignTests, registrationTests, localeTests, i18nTests, permissionTests]
 
 qcProps :: TestTree
 qcProps = testGroup "(checked by QuickCheck)"
@@ -565,4 +579,86 @@ i18nTests = testGroup "I18n"
             , (Locale Nl (Just "BE"),   Map.fromList [(Key "greeting", "Hoi")])
             ]
       translate translations (Locale Nl (Just "BE")) (Key "greeting") @?= Right "Hoi"
+  ]
+
+permissionTests :: TestTree
+permissionTests = testGroup "Permission"
+  [ testCase "requestPermission fires callback with PermissionGranted on desktop" $ do
+      -- Uses (appPermissionState globalAppState) because the C desktop stub dispatches
+      -- via haskellOnPermissionResult which targets the global state.
+      ref <- newIORef (Nothing :: Maybe PermissionStatus)
+      requestPermission (appPermissionState globalAppState) PermissionCamera
+        (\status -> modifyIORef' ref (const (Just status)))
+      result <- readIORef ref
+      result @?= Just PermissionGranted
+
+  , testCase "checkPermission returns PermissionGranted on desktop" $ do
+      status <- checkPermission PermissionLocation
+      status @?= PermissionGranted
+
+  , testCase "dispatchPermissionResult with PermissionDenied fires callback correctly" $ do
+      ref <- newIORef (Nothing :: Maybe PermissionStatus)
+      ps <- newPermissionState
+      modifyIORef' (psCallbacks ps) (\_ ->
+        IntMap.singleton 0 (\status -> modifyIORef' ref (const (Just status))))
+      dispatchPermissionResult ps 0 1
+      result <- readIORef ref
+      result @?= Just PermissionDenied
+
+  , testCase "callback is removed after dispatch (second dispatch is a no-op)" $ do
+      ref <- newIORef (0 :: Int)
+      ps <- newPermissionState
+      modifyIORef' (psCallbacks ps) (\_ ->
+        IntMap.singleton 0 (\_ -> modifyIORef' ref (+ 1)))
+      dispatchPermissionResult ps 0 0
+      count1 <- readIORef ref
+      count1 @?= 1
+      -- Second dispatch for same ID should be a no-op (callback removed)
+      dispatchPermissionResult ps 0 0
+      count2 <- readIORef ref
+      count2 @?= 1
+
+  , testCase "unknown request ID does not crash" $ do
+      ps <- newPermissionState
+      -- Should not throw (logs to stderr)
+      dispatchPermissionResult ps 999 0
+
+  , testCase "unknown status code does not fire callback" $ do
+      ref <- newIORef (0 :: Int)
+      ps <- newPermissionState
+      modifyIORef' (psCallbacks ps) (\_ ->
+        IntMap.singleton 0 (\_ -> modifyIORef' ref (+ 1)))
+      dispatchPermissionResult ps 0 42
+      count <- readIORef ref
+      count @?= 0
+
+  , testCase "multiple simultaneous pending requests dispatch independently" $ do
+      -- Uses (appPermissionState globalAppState) — desktop stub auto-grants synchronously
+      refA <- newIORef (Nothing :: Maybe PermissionStatus)
+      refB <- newIORef (Nothing :: Maybe PermissionStatus)
+      requestPermission (appPermissionState globalAppState) PermissionCamera
+        (\status -> modifyIORef' refA (const (Just status)))
+      requestPermission (appPermissionState globalAppState) PermissionContacts
+        (\status -> modifyIORef' refB (const (Just status)))
+      resultA <- readIORef refA
+      resultB <- readIORef refB
+      resultA @?= Just PermissionGranted
+      resultB @?= Just PermissionGranted
+
+  , testCase "permissionToInt covers all constructors" $ do
+      permissionToInt PermissionLocation   @?= 0
+      permissionToInt PermissionBluetooth  @?= 1
+      permissionToInt PermissionCamera     @?= 2
+      permissionToInt PermissionMicrophone @?= 3
+      permissionToInt PermissionContacts   @?= 4
+      permissionToInt PermissionStorage    @?= 5
+
+  , testCase "permissionStatusFromInt roundtrips valid codes" $ do
+      permissionStatusFromInt 0 @?= Just PermissionGranted
+      permissionStatusFromInt 1 @?= Just PermissionDenied
+
+  , testCase "permissionStatusFromInt returns Nothing for unknown codes" $ do
+      permissionStatusFromInt 2 @?= Nothing
+      permissionStatusFromInt (-1) @?= Nothing
+      permissionStatusFromInt 100 @?= Nothing
   ]

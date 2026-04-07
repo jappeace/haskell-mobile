@@ -15,6 +15,11 @@ targets:
       properties:
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: "1"
+        NSLocationWhenInUseUsageDescription: "This app needs your location."
+        NSBluetoothAlwaysUsageDescription: "This app needs Bluetooth access."
+        NSCameraUsageDescription: "This app needs camera access."
+        NSMicrophoneUsageDescription: "This app needs microphone access."
+        NSContactsUsageDescription: "This app needs access to your contacts."
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
           UISceneConfigurations: {}
@@ -24,4 +29,4 @@ targets:
         SWIFT_OBJC_BRIDGING_HEADER: HaskellMobile/HaskellMobile-Bridging-Header.h
         LIBRARY_SEARCH_PATHS: ["$(inherited)", "$(PROJECT_DIR)/lib"]
         HEADER_SEARCH_PATHS: ["$(inherited)", "$(PROJECT_DIR)/include"]
-        OTHER_LDFLAGS: ["$(inherited)", "-lHaskellMobile", "-lz", "-liconv", "-lffi", "-lc++"]
+        OTHER_LDFLAGS: ["$(inherited)", "-lHaskellMobile", "-lz", "-liconv", "-lffi", "-lc++", "-framework", "AVFoundation", "-framework", "Contacts", "-framework", "CoreLocation"]

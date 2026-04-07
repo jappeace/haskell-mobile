@@ -59,4 +59,10 @@ void setSystemLocale(const char *locale);
  * or falls back to LANG env var (desktop) or "en" (default). */
 const char* getSystemLocale(void);
 
+/* Dispatch a permission result from native code back to Haskell.
+ * requestId: opaque ID from the original permission_request() call.
+ * statusCode: PERMISSION_GRANTED (0) or PERMISSION_DENIED (1).
+ * ctx must be a pointer returned by haskellCreateContext(). */
+void haskellOnPermissionResult(void *ctx, int32_t requestId, int32_t statusCode);
+
 #endif /* HASKELL_MOBILE_H */

@@ -1,6 +1,8 @@
 package me.jappie.haskellmobile;
 
 import android.app.Activity;
+import android.content.pm.PackageManager;
+import android.Manifest;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -24,6 +26,58 @@ public class MainActivity extends Activity implements View.OnClickListener {
     private native void onLifecycleStop();
     private native void onLifecycleDestroy();
     private native void onLifecycleLowMemory();
+    private native void onPermissionResult(int requestCode, int statusCode);
+
+    /**
+     * Map a permission code (from PermissionBridge.h) to an Android permission string.
+     * Must match the PERMISSION_* constants in the C header.
+     */
+    private String permissionCodeToString(int permissionCode) {
+        switch (permissionCode) {
+            case 0: return Manifest.permission.ACCESS_FINE_LOCATION;
+            case 1: return Manifest.permission.BLUETOOTH_SCAN;
+            case 2: return Manifest.permission.CAMERA;
+            case 3: return Manifest.permission.RECORD_AUDIO;
+            case 4: return Manifest.permission.READ_CONTACTS;
+            case 5: return Manifest.permission.READ_EXTERNAL_STORAGE;
+            default: return null;
+        }
+    }
+
+    /**
+     * Request a runtime permission. Called from native code via JNI.
+     * permissionCode: one of PERMISSION_* constants from PermissionBridge.h.
+     * requestId: opaque ID passed back in the result callback.
+     */
+    public void requestPermission(int permissionCode, int requestId) {
+        String permission = permissionCodeToString(permissionCode);
+        if (permission == null) {
+            onPermissionResult(requestId, 1); // PERMISSION_DENIED
+            return;
+        }
+        if (checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
+            onPermissionResult(requestId, 0); // PERMISSION_GRANTED
+            return;
+        }
+        requestPermissions(new String[]{ permission }, requestId);
+    }
+
+    /**
+     * Check whether a permission is currently granted. Called from native code via JNI.
+     * Returns 0 (PERMISSION_GRANTED) or 1 (PERMISSION_DENIED).
+     */
+    public int checkPermission(int permissionCode) {
+        String permission = permissionCodeToString(permissionCode);
+        if (permission == null) return 1;
+        return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED ? 0 : 1;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        int statusCode = (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) ? 0 : 1;
+        onPermissionResult(requestCode, statusCode);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

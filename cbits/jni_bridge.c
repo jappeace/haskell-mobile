@@ -13,6 +13,7 @@
 #include <string.h>
 #include "HsFFI.h"
 #include "JniBridge.h"
+#include "PermissionBridge.h"
 
 /* Runs the user's Haskell main via RTS API (cbits/run_main.c) */
 extern void haskellRunMain(void);
@@ -30,11 +31,15 @@ extern void haskellOnLifecycle(void *ctx, int eventType);
 extern void haskellRenderUI(void *ctx);
 extern void haskellOnUIEvent(void *ctx, int callbackId);
 extern void haskellOnUITextChange(void *ctx, int callbackId, const char *text);
+extern void haskellOnPermissionResult(void *ctx, int32_t requestId, int32_t statusCode);
 
 /* Android UI bridge (from ui_bridge_android.c) */
 extern void setup_android_ui_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
 extern void android_handle_click(JNIEnv *env, jobject view);
 extern void android_handle_text_change(JNIEnv *env, jobject view, jstring text);
+
+/* Android permission bridge (from permission_bridge_android.c) */
+extern void setup_android_permission_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
 
 /* Lifecycle event codes (must match HaskellMobile.h) */
 #define LIFECYCLE_CREATE     0
@@ -54,6 +59,7 @@ JNI_OnLoad(JavaVM *vm, void *reserved)
     hs_init(NULL, NULL);
     haskellRunMain();
     g_haskell_ctx = haskellCreateContext();
+    permission_set_context(g_haskell_ctx);
 
     /* Cache the system locale from Android's Locale.getDefault().toLanguageTag() */
     {
@@ -107,6 +113,7 @@ JNIEXPORT void JNICALL
 JNI_METHOD(renderUI)(JNIEnv *env, jobject thiz)
 {
     setup_android_ui_bridge(env, thiz, g_haskell_ctx);
+    setup_android_permission_bridge(env, thiz, g_haskell_ctx);
     haskellRenderUI(g_haskell_ctx);
 }
 

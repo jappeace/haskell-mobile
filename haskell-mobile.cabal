@@ -69,6 +69,7 @@ library
       HaskellMobile.Render
       HaskellMobile.Locale
       HaskellMobile.I18n
+      HaskellMobile.Permission
   hs-source-dirs:
       src
   build-depends:
@@ -79,6 +80,7 @@ library
       cbits/platform_log.c
       cbits/ui_bridge.c
       cbits/locale.c
+      cbits/permission_bridge.c
   include-dirs:
       include
 
