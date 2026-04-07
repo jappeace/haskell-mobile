@@ -71,6 +71,18 @@ let
     name = "haskell-mobile-permission-apk";
   };
 
+  nodepoolAndroid = import ./android.nix {
+    inherit sources androidArch;
+    mainModule = ../test/NodePoolTestMain.hs;
+    dynamicNodePool = true;
+  };
+  nodepoolApk = lib.mkApk {
+    sharedLibs = [{ lib = nodepoolAndroid; inherit abiDir; }];
+    androidSrc = ../android;
+    apkName = "haskell-mobile-nodepool.apk";
+    name = "haskell-mobile-nodepool-apk";
+  };
+
   androidComposition = pkgs.androidenv.composeAndroidPackages {
     platformVersions = [ emulatorApiLevel ];
     includeEmulator = true;
@@ -113,6 +125,7 @@ COUNTER_APK="${counterApk}/haskell-mobile.apk"
 SCROLL_APK="${scrollApk}/haskell-mobile-scroll.apk"
 TEXTINPUT_APK="${textinputApk}/haskell-mobile-textinput.apk"
 PERMISSION_APK="${permissionApk}/haskell-mobile-permission.apk"
+NODEPOOL_APK="${nodepoolApk}/haskell-mobile-nodepool.apk"
 PACKAGE="me.jappie.haskellmobile"
 ACTIVITY=".MainActivity"
 DEVICE_NAME="test_all"
@@ -157,6 +170,7 @@ PHASE1_OK=0
 PHASE2_OK=0
 PHASE3_OK=0
 PHASE4_OK=0
+PHASE5_OK=0
 
 cleanup() {
     echo ""
@@ -273,12 +287,13 @@ sleep 30
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK PERMISSION_APK PACKAGE ACTIVITY WORK_DIR
+export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK PERMISSION_APK NODEPOOL_APK PACKAGE ACTIVITY WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
 PHASE3_EXIT=0
 PHASE4_EXIT=0
+PHASE5_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -327,6 +342,8 @@ echo "--- textinput ---"
 run_with_retry "textinput" bash "$TEST_SCRIPTS/android/textinput.sh" || PHASE3_EXIT=1
 echo "--- permission ---"
 run_with_retry "permission" bash "$TEST_SCRIPTS/android/permission.sh" || PHASE4_EXIT=1
+echo "--- node-pool ---"
+run_with_retry "node-pool" bash "$TEST_SCRIPTS/android/node-pool.sh" || PHASE5_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -367,8 +384,18 @@ else
     echo "PHASE 4 FAILED"
 fi
 
+if [ $PHASE5_EXIT -eq 0 ]; then
+    PHASE5_OK=1
+    echo ""
+    echo "PHASE 5 PASSED"
+else
+    PHASE5_OK=0
+    echo ""
+    echo "PHASE 5 FAILED"
+fi
+
 # ===========================================================================
-# PHASE 3 — Final report
+# Final report
 # ===========================================================================
 echo ""
 echo "============================================================"
@@ -402,6 +429,13 @@ if [ $PHASE4_OK -eq 1 ]; then
     echo "PASS  Phase 4 — Permission demo app"
 else
     echo "FAIL  Phase 4 — Permission demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE5_OK -eq 1 ]; then
+    echo "PASS  Phase 5 — Node pool stress test (300 nodes, dynamic pool)"
+else
+    echo "FAIL  Phase 5 — Node pool stress test (300 nodes, dynamic pool)"
     FINAL_EXIT=1
 fi
 

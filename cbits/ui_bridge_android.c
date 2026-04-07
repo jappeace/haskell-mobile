@@ -18,9 +18,24 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
-/* Maximum number of native views we can hold at once.
- * Re-renders clear all nodes, so this only bounds a single frame. */
-#define MAX_NODES 256
+/* --- Node pool configuration ---
+ *
+ * Two compile-time flags control the pool strategy:
+ *   -DMAX_NODES=N         Override the static pool size (default 256).
+ *   -DDYNAMIC_NODE_POOL   Use malloc/realloc; MAX_NODES is ignored.
+ *
+ * Re-renders clear all nodes, so the pool only bounds a single frame. */
+#ifdef DYNAMIC_NODE_POOL
+  static jobject *g_nodes         = NULL;
+  static int32_t  g_pool_capacity = 0;
+  #define INITIAL_POOL_SIZE 256
+#else
+  #ifndef MAX_NODES
+  #define MAX_NODES 256
+  #endif
+  static jobject  g_nodes[MAX_NODES];
+#endif
+static int32_t g_next_node_id = 1;
 
 /* Haskell FFI exports (declared here since this file is compiled by NDK) */
 extern void haskellOnUIEvent(void *ctx, int callbackId);
@@ -30,10 +45,6 @@ extern void haskellOnUITextChange(void *ctx, int callbackId, const char *text);
 static JNIEnv  *g_env      = NULL;
 static jobject  g_activity  = NULL;   /* global ref to Activity */
 static void    *g_haskell_ctx = NULL; /* opaque Haskell context */
-
-/* Node pool: indexed by nodeId (1-based, 0 = invalid) */
-static jobject  g_nodes[MAX_NODES];
-static int32_t  g_next_node_id = 1;
 
 /* ---- Per-button callback IDs stored as view tags ---- */
 
@@ -221,9 +232,34 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
 }
 
 /* ---- Node pool helpers ---- */
+
+#ifdef DYNAMIC_NODE_POOL
+/* Grow the pool so that nodeId < g_pool_capacity. */
+static int ensure_pool_capacity(int32_t needed)
+{
+    if (needed < g_pool_capacity) return 0;
+    int32_t new_cap = g_pool_capacity ? g_pool_capacity : INITIAL_POOL_SIZE;
+    while (new_cap <= needed) new_cap *= 2;
+    jobject *new_pool = realloc(g_nodes, (size_t)new_cap * sizeof(jobject));
+    if (!new_pool) {
+        LOGE("Node pool realloc failed (requested %d slots)", new_cap);
+        return -1;
+    }
+    memset(new_pool + g_pool_capacity, 0,
+           (size_t)(new_cap - g_pool_capacity) * sizeof(jobject));
+    g_nodes = new_pool;
+    g_pool_capacity = new_cap;
+    return 0;
+}
+#endif
+
 static jobject get_node(int32_t nodeId)
 {
+#ifdef DYNAMIC_NODE_POOL
+    if (nodeId < 1 || nodeId >= g_pool_capacity) return NULL;
+#else
     if (nodeId < 1 || nodeId >= MAX_NODES) return NULL;
+#endif
     return g_nodes[nodeId];
 }
 
@@ -231,10 +267,17 @@ static jobject get_node(int32_t nodeId)
 
 static int32_t android_create_node(int32_t nodeType)
 {
+#ifdef DYNAMIC_NODE_POOL
+    if (ensure_pool_capacity(g_next_node_id) != 0) {
+        LOGE("Node pool exhausted (realloc failed at %d)", g_next_node_id);
+        return 0;
+    }
+#else
     if (g_next_node_id >= MAX_NODES) {
         LOGE("Node pool exhausted (max %d)", MAX_NODES);
         return 0;
     }
+#endif
 
     JNIEnv *env = g_env;
     jobject view = NULL;
@@ -453,6 +496,8 @@ static void android_clear(void)
         }
     }
     g_next_node_id = 1;
+    /* Dynamic mode: keep the allocation to avoid malloc/free churn each frame.
+     * Static mode: nothing extra to do — array is stack-allocated. */
     LOGI("clear()");
 }
 
@@ -469,7 +514,16 @@ void setup_android_ui_bridge(JNIEnv *env, jobject activity, void *haskellCtx)
     g_activity = (*env)->NewGlobalRef(env, activity);
     g_haskell_ctx = haskellCtx;
 
+#ifdef DYNAMIC_NODE_POOL
+    if (!g_nodes) {
+        g_pool_capacity = INITIAL_POOL_SIZE;
+        g_nodes = calloc((size_t)g_pool_capacity, sizeof(jobject));
+    } else {
+        memset(g_nodes, 0, (size_t)g_pool_capacity * sizeof(jobject));
+    }
+#else
     memset(g_nodes, 0, sizeof(g_nodes));
+#endif
     g_next_node_id = 1;
 
     if (resolve_jni_ids(env, activity) != 0) {

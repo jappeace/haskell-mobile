@@ -20,9 +20,26 @@ static os_log_t g_log;
 #define LOGI(fmt, ...) os_log_info(g_log, fmt, ##__VA_ARGS__)
 #define LOGE(fmt, ...) os_log_error(g_log, fmt, ##__VA_ARGS__)
 
-/* Maximum number of native views we can hold at once.
- * Re-renders clear all nodes, so this only bounds a single frame. */
-#define MAX_NODES 256
+/* --- Node pool configuration ---
+ *
+ * Two compile-time flags control the pool strategy:
+ *   -DMAX_NODES=N         Override the static pool size (default 256).
+ *   -DDYNAMIC_NODE_POOL   Use malloc/realloc; MAX_NODES is ignored.
+ *
+ * Re-renders clear all nodes, so the pool only bounds a single frame. */
+#ifdef DYNAMIC_NODE_POOL
+  static __strong UIView **g_nodes         = NULL;
+  static __strong UIView **g_content_views = NULL;
+  static int32_t  g_pool_capacity = 0;
+  #define INITIAL_POOL_SIZE 256
+#else
+  #ifndef MAX_NODES
+  #define MAX_NODES 256
+  #endif
+  static __strong UIView *g_nodes[MAX_NODES];
+  static __strong UIView *g_content_views[MAX_NODES];
+#endif
+static int32_t g_next_node_id = 1;
 
 /* Haskell FFI exports (declared here since this file is compiled by Xcode) */
 extern void haskellOnUIEvent(void *ctx, int callbackId);
@@ -36,13 +53,6 @@ extern void haskellLogLocale(void);
 /* ---- Global state (valid only on the main thread) ---- */
 static UIViewController *g_viewController = nil;
 static void             *g_haskell_ctx    = NULL;
-
-/* Node pool: indexed by nodeId (1-based, 0 = invalid) */
-static __strong UIView *g_nodes[MAX_NODES];
-static int32_t          g_next_node_id = 1;
-
-/* For ScrollView nodes: the inner UIStackView that holds children */
-static __strong UIView *g_content_views[MAX_NODES];
 
 /* ---- Singleton handler for button taps ---- */
 @interface IOSBridgeHandler : NSObject
@@ -70,9 +80,48 @@ static __strong UIView *g_content_views[MAX_NODES];
 @end
 
 /* ---- Node pool helpers ---- */
+
+#ifdef DYNAMIC_NODE_POOL
+/* Grow both pools so that nodeId < g_pool_capacity.
+ * ARC pointers: allocate new array with calloc (nil-init), copy old
+ * pointers, free old array.  ARC retains are on the individual view
+ * assignments, not the array allocation itself. */
+static int ensure_pool_capacity(int32_t needed)
+{
+    if (needed < g_pool_capacity) return 0;
+    int32_t new_cap = g_pool_capacity ? g_pool_capacity : INITIAL_POOL_SIZE;
+    while (new_cap <= needed) new_cap *= 2;
+
+    __strong UIView **new_nodes = (__strong UIView **)calloc((size_t)new_cap, sizeof(UIView *));
+    __strong UIView **new_content = (__strong UIView **)calloc((size_t)new_cap, sizeof(UIView *));
+    if (!new_nodes || !new_content) {
+        LOGE("Node pool calloc failed (requested %d slots)", new_cap);
+        free(new_nodes);
+        free(new_content);
+        return -1;
+    }
+    if (g_nodes) {
+        memcpy(new_nodes, g_nodes, (size_t)g_pool_capacity * sizeof(UIView *));
+        free(g_nodes);
+    }
+    if (g_content_views) {
+        memcpy(new_content, g_content_views, (size_t)g_pool_capacity * sizeof(UIView *));
+        free(g_content_views);
+    }
+    g_nodes = new_nodes;
+    g_content_views = new_content;
+    g_pool_capacity = new_cap;
+    return 0;
+}
+#endif
+
 static UIView *get_node(int32_t nodeId)
 {
+#ifdef DYNAMIC_NODE_POOL
+    if (nodeId < 1 || nodeId >= g_pool_capacity) return nil;
+#else
     if (nodeId < 1 || nodeId >= MAX_NODES) return nil;
+#endif
     return g_nodes[nodeId];
 }
 
@@ -103,10 +152,17 @@ static UIBridgeCallbacks g_ios_callbacks = {
 
 static int32_t ios_create_node(int32_t nodeType)
 {
+#ifdef DYNAMIC_NODE_POOL
+    if (ensure_pool_capacity(g_next_node_id) != 0) {
+        LOGE("Node pool exhausted (realloc failed at %d)", g_next_node_id);
+        return 0;
+    }
+#else
     if (g_next_node_id >= MAX_NODES) {
         LOGE("Node pool exhausted (max %d)", MAX_NODES);
         return 0;
     }
+#endif
 
     UIView *view = nil;
 
@@ -289,7 +345,15 @@ static void ios_add_child(int32_t parentId, int32_t childId)
     if (!parent || !child) return;
 
     /* For ScrollView nodes, children go into the content stack, not the scroll view itself */
-    UIView *addTarget = g_content_views[parentId] ? g_content_views[parentId] : parent;
+    UIView *addTarget = nil;
+#ifdef DYNAMIC_NODE_POOL
+    if (parentId >= 0 && parentId < g_pool_capacity)
+        addTarget = g_content_views[parentId];
+#else
+    if (parentId >= 0 && parentId < MAX_NODES)
+        addTarget = g_content_views[parentId];
+#endif
+    if (!addTarget) addTarget = parent;
     if ([addTarget isKindOfClass:[UIStackView class]]) {
         [(UIStackView *)addTarget addArrangedSubview:child];
     } else {
@@ -352,9 +416,14 @@ static void ios_clear(void)
             [g_nodes[i] removeFromSuperview];
             g_nodes[i] = nil;
         }
+        /* Clear content_views in the same pass */
+#ifdef DYNAMIC_NODE_POOL
+        if (g_content_views && i < g_pool_capacity)
+#endif
+        g_content_views[i] = nil;
     }
     g_next_node_id = 1;
-    memset(g_content_views, 0, sizeof(g_content_views));
+    /* Dynamic mode: keep allocations to avoid malloc/free churn each frame. */
     LOGI("clear()");
 }
 
@@ -374,8 +443,21 @@ void setup_ios_ui_bridge(void *viewController, void *haskellCtx)
     g_viewController = (__bridge UIViewController *)viewController;
     g_haskell_ctx = haskellCtx;
 
+#ifdef DYNAMIC_NODE_POOL
+    if (!g_nodes) {
+        g_pool_capacity = INITIAL_POOL_SIZE;
+        g_nodes = (__strong UIView **)calloc((size_t)g_pool_capacity, sizeof(UIView *));
+        g_content_views = (__strong UIView **)calloc((size_t)g_pool_capacity, sizeof(UIView *));
+    } else {
+        for (int i = 0; i < g_pool_capacity; i++) {
+            g_nodes[i] = nil;
+            g_content_views[i] = nil;
+        }
+    }
+#else
     memset(g_nodes, 0, sizeof(g_nodes));
     memset(g_content_views, 0, sizeof(g_content_views));
+#endif
     g_next_node_id = 1;
 
     ui_register_callbacks(&g_ios_callbacks);

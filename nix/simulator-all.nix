@@ -55,6 +55,18 @@ let
     name = "haskell-mobile-permission-simulator-app";
   };
 
+  nodepoolIos = import ./ios.nix {
+    inherit sources;
+    mainModule = ../test/NodePoolTestMain.hs;
+    simulator = true;
+  };
+  nodepoolSimApp = lib.mkSimulatorApp {
+    iosLib = nodepoolIos;
+    iosSrc = ../ios;
+    name = "haskell-mobile-nodepool-simulator-app";
+    dynamicNodePool = true;
+  };
+
   xcodegen = pkgs.xcodegen;
 
   testScripts = builtins.path { path = ../test; name = "test-scripts"; };
@@ -79,6 +91,7 @@ COUNTER_SHARE_DIR="${counterSimApp}/share/ios"
 SCROLL_SHARE_DIR="${scrollSimApp}/share/ios"
 TEXTINPUT_SHARE_DIR="${textinputSimApp}/share/ios"
 PERMISSION_SHARE_DIR="${permissionSimApp}/share/ios"
+NODEPOOL_SHARE_DIR="${nodepoolSimApp}/share/ios"
 TEST_SCRIPTS="${testScripts}"
 
 # --- Temp working directory ---
@@ -90,6 +103,7 @@ PHASE1_OK=0
 PHASE2_OK=0
 PHASE3_OK=0
 PHASE4_OK=0
+PHASE5_OK=0
 
 cleanup() {
     echo ""
@@ -256,6 +270,41 @@ if [ -z "$PERMISSION_APP" ]; then
 fi
 echo "Permission app: $PERMISSION_APP"
 
+# --- Stage and build node-pool test app ---
+echo "=== Staging node-pool test app ==="
+mkdir -p "$WORK_DIR/nodepool/lib" "$WORK_DIR/nodepool/include"
+cp "$NODEPOOL_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/nodepool/lib/"
+cp "$NODEPOOL_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/nodepool/include/"
+cp "$NODEPOOL_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/nodepool/include/"
+cp "$NODEPOOL_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/nodepool/include/"
+cp -r "$NODEPOOL_SHARE_DIR/HaskellMobile" "$WORK_DIR/nodepool/"
+cp "$NODEPOOL_SHARE_DIR/project.yml" "$WORK_DIR/nodepool/"
+chmod -R u+w "$WORK_DIR/nodepool"
+
+echo "=== Generating node-pool Xcode project ==="
+cd "$WORK_DIR/nodepool"
+${xcodegen}/bin/xcodegen generate
+
+echo "=== Building node-pool test app for simulator ==="
+xcodebuild build \
+    -project HaskellMobile.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk iphonesimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/nodepool-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+NODEPOOL_APP=$(find "$WORK_DIR/nodepool-build" -name "*.app" -type d | head -1)
+if [ -z "$NODEPOOL_APP" ]; then
+    echo "ERROR: Could not find node-pool .app bundle"
+    exit 1
+fi
+echo "NodePool app: $NODEPOOL_APP"
+
 # --- Discover latest iOS runtime ---
 echo "=== Discovering iOS runtime ==="
 RUNTIME=$(xcrun simctl list runtimes -j \
@@ -317,12 +366,13 @@ sleep 5
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP WORK_DIR
+export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP NODEPOOL_APP WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
 PHASE3_EXIT=0
 PHASE4_EXIT=0
+PHASE5_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -371,6 +421,8 @@ echo "--- textinput ---"
 run_with_retry "textinput" bash "$TEST_SCRIPTS/ios/textinput.sh" || PHASE3_EXIT=1
 echo "--- permission ---"
 run_with_retry "permission" bash "$TEST_SCRIPTS/ios/permission.sh" || PHASE4_EXIT=1
+echo "--- node-pool ---"
+run_with_retry "node-pool" bash "$TEST_SCRIPTS/ios/node-pool.sh" || PHASE5_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -411,6 +463,16 @@ else
     echo "PHASE 4 FAILED"
 fi
 
+if [ $PHASE5_EXIT -eq 0 ]; then
+    PHASE5_OK=1
+    echo ""
+    echo "PHASE 5 PASSED"
+else
+    PHASE5_OK=0
+    echo ""
+    echo "PHASE 5 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -446,6 +508,13 @@ if [ $PHASE4_OK -eq 1 ]; then
     echo "PASS  Phase 4 — Permission demo app"
 else
     echo "FAIL  Phase 4 — Permission demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE5_OK -eq 1 ]; then
+    echo "PASS  Phase 5 — Node pool stress test (300 nodes, dynamic pool)"
+else
+    echo "FAIL  Phase 5 — Node pool stress test (300 nodes, dynamic pool)"
     FINAL_EXIT=1
 fi
 

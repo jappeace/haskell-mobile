@@ -44,6 +44,19 @@ let
     name = "haskell-mobile-watchos-textinput-simulator-app";
   };
 
+  # watchOS uses a Swift dictionary (unbounded) — no DYNAMIC_NODE_POOL needed.
+  # This test just confirms 300 nodes render successfully.
+  nodepoolWatchos = import ./watchos.nix {
+    inherit sources;
+    mainModule = ../test/NodePoolTestMain.hs;
+    simulator = true;
+  };
+  nodepoolSimApp = lib.mkWatchOSSimulatorApp {
+    watchosLib = nodepoolWatchos;
+    watchosSrc = ../watchos;
+    name = "haskell-mobile-watchos-nodepool-simulator-app";
+  };
+
   xcodegen = pkgs.xcodegen;
 
   testScripts = builtins.path { path = ../test; name = "test-scripts"; };
@@ -67,6 +80,7 @@ DEVICE_TYPE="Apple Watch Series 9 (45mm)"
 COUNTER_SHARE_DIR="${counterSimApp}/share/watchos"
 SCROLL_SHARE_DIR="${scrollSimApp}/share/watchos"
 TEXTINPUT_SHARE_DIR="${textinputSimApp}/share/watchos"
+NODEPOOL_SHARE_DIR="${nodepoolSimApp}/share/watchos"
 TEST_SCRIPTS="${testScripts}"
 
 # --- Temp working directory ---
@@ -77,6 +91,7 @@ SIM_UDID=""
 PHASE1_OK=0
 PHASE2_OK=0
 PHASE3_OK=0
+PHASE4_OK=0
 
 cleanup() {
     echo ""
@@ -208,6 +223,40 @@ if [ -z "$TEXTINPUT_APP" ]; then
 fi
 echo "TextInput app: $TEXTINPUT_APP"
 
+# --- Stage and build node-pool test app ---
+echo "=== Staging node-pool test app ==="
+mkdir -p "$WORK_DIR/nodepool/lib" "$WORK_DIR/nodepool/include"
+cp "$NODEPOOL_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/nodepool/lib/"
+cp "$NODEPOOL_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/nodepool/include/"
+cp "$NODEPOOL_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/nodepool/include/"
+cp -r "$NODEPOOL_SHARE_DIR/HaskellMobile" "$WORK_DIR/nodepool/"
+cp "$NODEPOOL_SHARE_DIR/project.yml" "$WORK_DIR/nodepool/"
+chmod -R u+w "$WORK_DIR/nodepool"
+
+echo "=== Generating node-pool Xcode project ==="
+cd "$WORK_DIR/nodepool"
+${xcodegen}/bin/xcodegen generate
+
+echo "=== Building node-pool test app for watchOS simulator ==="
+xcodebuild build \
+    -project HaskellMobile.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk watchsimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/nodepool-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+NODEPOOL_APP=$(find "$WORK_DIR/nodepool-build" -name "*.app" -type d | head -1)
+if [ -z "$NODEPOOL_APP" ]; then
+    echo "ERROR: Could not find node-pool .app bundle"
+    exit 1
+fi
+echo "NodePool app: $NODEPOOL_APP"
+
 # --- Discover latest watchOS runtime ---
 echo "=== Discovering watchOS runtime ==="
 RUNTIME=$(xcrun simctl list runtimes -j \
@@ -271,11 +320,12 @@ sleep 5
 # ===========================================================================
 # Log subsystem differs from bundle ID for watchOS (bundle ID has .watchkitapp suffix)
 LOG_SUBSYSTEM="me.jappie.haskellmobile"
-export SIM_UDID BUNDLE_ID LOG_SUBSYSTEM COUNTER_APP SCROLL_APP TEXTINPUT_APP WORK_DIR
+export SIM_UDID BUNDLE_ID LOG_SUBSYSTEM COUNTER_APP SCROLL_APP TEXTINPUT_APP NODEPOOL_APP WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
 PHASE3_EXIT=0
+PHASE4_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -315,6 +365,8 @@ echo "--- locale ---"
 run_with_retry "locale"    bash "$TEST_SCRIPTS/watchos/locale.sh"    || PHASE1_EXIT=1
 echo "--- textinput ---"
 run_with_retry "textinput" bash "$TEST_SCRIPTS/watchos/textinput.sh" || PHASE3_EXIT=1
+echo "--- node-pool ---"
+run_with_retry "node-pool" bash "$TEST_SCRIPTS/watchos/node-pool.sh" || PHASE4_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -345,8 +397,18 @@ else
     echo "PHASE 3 FAILED"
 fi
 
+if [ $PHASE4_EXIT -eq 0 ]; then
+    PHASE4_OK=1
+    echo ""
+    echo "PHASE 4 PASSED"
+else
+    PHASE4_OK=0
+    echo ""
+    echo "PHASE 4 FAILED"
+fi
+
 # ===========================================================================
-# PHASE 3 — Final report
+# Final report
 # ===========================================================================
 echo ""
 echo "============================================================"
@@ -373,6 +435,13 @@ if [ $PHASE3_OK -eq 1 ]; then
     echo "PASS  Phase 3 — TextInput demo app"
 else
     echo "FAIL  Phase 3 — TextInput demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE4_OK -eq 1 ]; then
+    echo "PASS  Phase 4 — Node pool stress test (300 nodes)"
+else
+    echo "FAIL  Phase 4 — Node pool stress test (300 nodes)"
     FINAL_EXIT=1
 fi
 

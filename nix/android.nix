@@ -4,6 +4,8 @@
 , mainModule ? ../app/MobileMain.hs
 , consumerCabalFile ? null
 , consumerCabal2Nix ? null
+, maxNodes ? 256            # static pool size (ignored when dynamicNodePool=true)
+, dynamicNodePool ? false   # use malloc/realloc instead of fixed array
 }:
 let
   lib = import ./lib.nix { inherit sources androidArch; };
@@ -13,5 +15,5 @@ let
 in
 lib.mkAndroidLib {
   haskellMobileSrc = ../.;
-  inherit mainModule crossDeps;
+  inherit mainModule crossDeps maxNodes dynamicNodePool;
 }

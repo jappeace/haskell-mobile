@@ -1,0 +1,27 @@
+{-# LANGUAGE OverloadedStrings #-}
+-- | Mobile entry point for the node-pool stress-test app.
+--
+-- Renders 300 nodes (1 Column + 299 Text children) to exceed the
+-- default MAX_NODES=256 limit.  Used by integration tests to verify
+-- that configurable / dynamic node pools work end-to-end.
+module Main where
+
+import Data.Text (pack)
+import HaskellMobile (runMobileApp)
+import HaskellMobile.Lifecycle (loggingMobileContext)
+import HaskellMobile.Types (MobileApp(..))
+import HaskellMobile.Widget (TextConfig(..), Widget(..))
+
+-- | Render 300 nodes: 1 Column parent + 299 Text children.
+nodePoolTestView :: IO Widget
+nodePoolTestView = pure $ Column $
+  map (\itemNumber -> Text TextConfig
+    { tcLabel = "Item " <> pack (show (itemNumber :: Int))
+    , tcFontConfig = Nothing
+    }) [1..299]
+
+main :: IO ()
+main = runMobileApp MobileApp
+  { maContext = loggingMobileContext
+  , maView    = nodePoolTestView
+  }
