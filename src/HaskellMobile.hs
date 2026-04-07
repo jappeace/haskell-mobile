@@ -11,7 +11,6 @@ module HaskellMobile
   , haskellOnUIEvent
   -- Error handling
   , errorWidget
-  , dismissError
   -- Re-exports from Lifecycle
   , LifecycleEvent(..)
   , MobileContext(..)
@@ -46,7 +45,6 @@ module HaskellMobile
 where
 
 import Control.Exception (SomeException, catch)
-import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Text (pack)
 import Foreign.C.String (CString, newCString, peekCString)
 import Foreign.C.Types (CInt(..))
@@ -82,32 +80,34 @@ import System.IO.Unsafe (unsafePerformIO)
 data AppState = AppState
   { appRenderState     :: RenderState
   , appPermissionState :: PermissionState
-  , appErrorState      :: IORef (Maybe SomeException)
   }
 
 -- | The one global mutable state, initialised once on first use.
 -- Safe because all UI calls happen on the main thread.
 globalAppState :: AppState
 globalAppState = unsafePerformIO $
-  AppState <$> newRenderState <*> newPermissionState <*> newIORef Nothing
+  AppState <$> newRenderState <*> newPermissionState
 {-# NOINLINE globalAppState #-}
 
 -- | Wrap an IO action in a catch-all exception handler.
--- On failure, logs the exception, stores it in the global error state,
--- renders the error widget, and fires the user's 'onError' callback.
+-- On failure, logs the exception, overwrites the registered app's view
+-- with an error widget, and fires the user's 'onError' callback.
 withExceptionHandler :: IO () -> IO ()
 withExceptionHandler action =
   catch action handleException
 
 -- | Handle an uncaught exception from an FFI entry point.
--- Stores the exception first so it is visible even if logging or
--- rendering fail. Then logs via 'platformLog', renders an error widget
--- on screen, and best-effort fires the user's 'onError' callback.
+-- Overwrites the registered app's 'maView' with an error widget so
+-- that subsequent renders show the error on screen. The error widget
+-- includes a dismiss button that restores the original view.
+-- Also logs via 'platformLog' and best-effort fires 'onError'.
 handleException :: SomeException -> IO ()
 handleException exc = do
-  writeIORef (appErrorState globalAppState) (Just exc)
+  app <- getMobileApp
+  let originalView = maView app
+  runMobileApp app { maView = pure (errorWidget originalView exc) }
   platformLog ("Uncaught exception: " <> pack (show exc))
-  renderWidget (appRenderState globalAppState) (errorWidget exc)
+  renderWidget (appRenderState globalAppState) (errorWidget originalView exc)
   fireUserErrorCallback exc
 
 -- | Best-effort: read the registered app's 'onError' callback and fire it.
@@ -120,22 +120,17 @@ fireUserErrorCallback exc =
     (\secondaryExc ->
       platformLog ("onError callback failed: " <> pack (show (secondaryExc :: SomeException))))
 
--- | Check the global error state. If an exception is stored, render the
--- error widget. Otherwise render the normal app view.
-renderCurrentView :: IO ()
-renderCurrentView = do
-  errorState <- readIORef (appErrorState globalAppState)
-  case errorState of
-    Just exc -> renderWidget (appRenderState globalAppState) (errorWidget exc)
-    Nothing  -> do
-      app <- getMobileApp
-      widget <- maView app
-      renderWidget (appRenderState globalAppState) widget
+-- | Render the current view: read the registered app and render its widget.
+renderView :: IO ()
+renderView = do
+  app <- getMobileApp
+  widget <- maView app
+  renderWidget (appRenderState globalAppState) widget
 
 -- | A widget that displays an error message with a dismiss button.
--- Shows the exception text and a button to clear the error state.
-errorWidget :: SomeException -> Widget
-errorWidget exc = Column
+-- The dismiss button restores the original view via a closure.
+errorWidget :: IO Widget -> SomeException -> Widget
+errorWidget originalView exc = Column
   [ Text TextConfig
       { tcLabel      = "An error occurred"
       , tcFontConfig = Just (FontConfig 20.0)
@@ -146,14 +141,12 @@ errorWidget exc = Column
       }
   , Button ButtonConfig
       { bcLabel      = "Dismiss"
-      , bcAction     = dismissError
+      , bcAction     = do
+          app <- getMobileApp
+          runMobileApp app { maView = originalView }
       , bcFontConfig = Nothing
       }
   ]
-
--- | Clear the stored error, allowing the normal view to render on next cycle.
-dismissError :: IO ()
-dismissError = writeIORef (appErrorState globalAppState) Nothing
 
 -- | Takes a name as CString, returns "Hello from Haskell, <name>!" as CString.
 -- Caller is responsible for freeing the returned CString.
@@ -184,7 +177,7 @@ foreign export ccall haskellCreateContext :: IO (Ptr ())
 -- registered bridge callbacks. Catches exceptions and shows error widget.
 haskellRenderUI :: Ptr () -> IO ()
 haskellRenderUI _ctxPtr =
-  withExceptionHandler renderCurrentView
+  withExceptionHandler renderView
 
 foreign export ccall haskellRenderUI :: Ptr () -> IO ()
 
@@ -194,7 +187,7 @@ haskellOnUIEvent :: Ptr () -> CInt -> IO ()
 haskellOnUIEvent _ctxPtr callbackId =
   withExceptionHandler $ do
     dispatchEvent (appRenderState globalAppState) (fromIntegral callbackId)
-    renderCurrentView
+    renderView
 
 foreign export ccall haskellOnUIEvent :: Ptr () -> CInt -> IO ()
 

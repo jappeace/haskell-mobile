@@ -24,7 +24,6 @@ import HaskellMobile
   , haskellRenderUI
   , haskellOnUIEvent
   , globalAppState
-  , dismissError
   )
 import HaskellMobile.Locale
   ( Language(..)
@@ -669,80 +668,87 @@ permissionTests = testGroup "Permission"
       permissionStatusFromInt 100 @?= Nothing
   ]
 
--- | Helper: reset the global error state and restore the default mobileApp.
-resetErrorState :: IO ()
-resetErrorState = do
-  writeIORef (appErrorState globalAppState) Nothing
-  runMobileApp mobileApp
+-- | Helper: check whether the registered app's view is an error widget
+-- (a Column whose first child is a Text with "An error occurred").
+viewIsErrorWidget :: IO Bool
+viewIsErrorWidget = do
+  app <- getMobileApp
+  widget <- maView app
+  case widget of
+    Column (Text config : _) -> pure (tcLabel config == "An error occurred")
+    Column _                 -> pure False
+    Text _                   -> pure False
+    Button _                 -> pure False
+    TextInput _              -> pure False
+    Row _                    -> pure False
+    ScrollView _             -> pure False
+    Styled _ _               -> pure False
 
 -- | Tests for the default exception handler that wraps FFI entry points.
 -- Uses 'sequentialTestGroup' because these tests share global mutable state
--- (appErrorState, mobileApp registration) that would conflict with other tests.
+-- (mobileApp registration) that would conflict with other tests.
 exceptionHandlerTests :: TestTree
 exceptionHandlerTests = sequentialTestGroup "ExceptionHandler" AllFinish
-  [ testCase "exception in maView is caught and error state set" $ do
-      resetErrorState
+  [ testCase "exception in maView is caught and view replaced with error widget" $ do
+      runMobileApp mobileApp
       let crashingApp = MobileApp
             { maContext = defaultMobileContext
             , maView    = throwIO (userError "test-boom")
             }
       runMobileApp crashingApp
       haskellRenderUI nullPtr
-      errorState <- readIORef (appErrorState globalAppState)
-      case errorState of
-        Nothing  -> assertFailure "expected error state to be set"
-        Just exc -> assertBool "exception should contain test-boom" ("test-boom" `isInfixOf` show exc)
-      resetErrorState
+      isError <- viewIsErrorWidget
+      assertBool "maView should be replaced with error widget" isError
+      runMobileApp mobileApp
 
   , testCase "exception in button callback is caught" $ do
-      resetErrorState
-      ref <- newIORef False
+      runMobileApp mobileApp
       let crashingApp = MobileApp
             { maContext = defaultMobileContext
             , maView    = pure $ Button ButtonConfig
                 { bcLabel  = "crash"
-                , bcAction = do
-                    writeIORef ref True
-                    throwIO (userError "button-boom")
+                , bcAction = throwIO (userError "button-boom")
                 , bcFontConfig = Nothing
                 }
             }
       runMobileApp crashingApp
       -- First render to register the button callback
       haskellRenderUI nullPtr
-      -- Reset error state from any render issues, then dispatch
-      writeIORef (appErrorState globalAppState) Nothing
+      -- Dispatch the button, which throws — handler overwrites maView
       haskellOnUIEvent nullPtr 0
-      errorState <- readIORef (appErrorState globalAppState)
-      case errorState of
-        Nothing  -> assertFailure "expected error state to be set after button callback exception"
-        Just exc -> assertBool "exception should contain button-boom" ("button-boom" `isInfixOf` show exc)
-      resetErrorState
-
-  , testCase "dismiss clears error and re-renders normal view" $ do
-      resetErrorState
-      -- Trigger an error first
-      let crashingApp = MobileApp
-            { maContext = defaultMobileContext
-            , maView    = throwIO (userError "dismiss-test")
-            }
-      runMobileApp crashingApp
-      haskellRenderUI nullPtr
-      errorState <- readIORef (appErrorState globalAppState)
-      assertBool "error state should be set" (case errorState of Just _ -> True; Nothing -> False)
-      -- Now restore a good app and dismiss
+      isError <- viewIsErrorWidget
+      assertBool "maView should be error widget after button callback exception" isError
       runMobileApp mobileApp
-      dismissError
-      clearedState <- readIORef (appErrorState globalAppState)
-      assertBool "error state should be Nothing after dismiss" (case clearedState of Nothing -> True; Just _ -> False)
-      -- Re-render should succeed without error
+
+  , testCase "dismiss restores original view after transient error" $ do
+      runMobileApp mobileApp
+      -- Transient error: throws once, then succeeds
+      shouldThrow <- newIORef True
+      let transientView = do
+            throwing <- readIORef shouldThrow
+            if throwing
+              then do
+                writeIORef shouldThrow False
+                throwIO (userError "transient-error")
+              else pure $ Text TextConfig { tcLabel = "recovered", tcFontConfig = Nothing }
+          transientApp = MobileApp
+            { maContext = defaultMobileContext
+            , maView    = transientView
+            }
+      runMobileApp transientApp
+      -- First render throws, error widget shown, flag cleared
       haskellRenderUI nullPtr
-      finalState <- readIORef (appErrorState globalAppState)
-      assertBool "error state should remain Nothing after re-render" (case finalState of Nothing -> True; Just _ -> False)
-      resetErrorState
+      isError <- viewIsErrorWidget
+      assertBool "should show error widget" isError
+      -- Dispatch callback 0 (the dismiss button in the error widget).
+      -- This restores the original transientView, which now succeeds.
+      haskellOnUIEvent nullPtr 0
+      isStillError <- viewIsErrorWidget
+      assertBool "should no longer show error widget after dismiss" (not isStillError)
+      runMobileApp mobileApp
 
   , testCase "onError callback fires on exception" $ do
-      resetErrorState
+      runMobileApp mobileApp
       ref <- newIORef (Nothing :: Maybe String)
       let ctx = MobileContext
             { onLifecycle = \_ -> pure ()
@@ -758,10 +764,10 @@ exceptionHandlerTests = sequentialTestGroup "ExceptionHandler" AllFinish
       case firedValue of
         Nothing  -> assertFailure "onError callback should have been fired"
         Just msg -> assertBool "onError should receive the exception" ("onError-test" `isInfixOf` msg)
-      resetErrorState
+      runMobileApp mobileApp
 
   , testCase "exception in onError does not crash" $ do
-      resetErrorState
+      runMobileApp mobileApp
       let ctx = MobileContext
             { onLifecycle = \_ -> pure ()
             , onError     = \_ -> throwIO (userError "secondary-boom")
@@ -776,7 +782,7 @@ exceptionHandlerTests = sequentialTestGroup "ExceptionHandler" AllFinish
       case result of
         Left exc -> assertFailure ("haskellRenderUI should not throw, but got: " ++ show exc)
         Right () -> pure ()
-      resetErrorState
+      runMobileApp mobileApp
 
   , testCase "exception in lifecycle handler is caught" $ do
       let crashingCtx = MobileContext
