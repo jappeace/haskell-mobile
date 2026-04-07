@@ -14,6 +14,7 @@ concurrency:
 jobs:
   android:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
     - uses: actions/checkout@v4
     - name: Local cache
@@ -42,6 +43,7 @@ jobs:
   # armv7a (armeabi-v7a) — 32-bit ARM, used by Wear OS watches
   android-armv7a-emulator:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
     - uses: actions/checkout@v4
     - name: Local cache
@@ -69,6 +71,7 @@ jobs:
 
   ios:
     runs-on: macos-latest
+    timeout-minutes: 20
     steps:
     - uses: actions/checkout@v4
     - name: Local cache
