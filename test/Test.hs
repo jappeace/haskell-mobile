@@ -5,14 +5,15 @@ import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit
 
 import Data.Either (isLeft)
-import Data.List (sort)
+import Data.List (isInfixOf, sort)
 import Data.IntMap.Strict qualified as IntMap
-import Data.IORef (newIORef, readIORef, modifyIORef')
+import Control.Exception (IOException, throwIO, try)
+import Data.IORef (newIORef, readIORef, modifyIORef', writeIORef)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Foreign.C.String (newCString, peekCString)
 import Foreign.Marshal.Alloc (free)
-import Foreign.Ptr (Ptr)
+import Foreign.Ptr (Ptr, nullPtr)
 import Foreign.StablePtr (castStablePtrToPtr)
 import HaskellMobile
   ( MobileApp(..)
@@ -20,7 +21,10 @@ import HaskellMobile
   , runMobileApp
   , getMobileApp
   , haskellGreet
+  , haskellRenderUI
+  , haskellOnUIEvent
   , globalAppState
+  , dismissError
   )
 import HaskellMobile.Locale
   ( Language(..)
@@ -39,6 +43,7 @@ import HaskellMobile.App (mobileApp)
 import HaskellMobile.Lifecycle
   ( LifecycleEvent(..)
   , MobileContext(..)
+  , defaultMobileContext
   , lifecycleFromInt
   , lifecycleToInt
   , loggingMobileContext
@@ -67,7 +72,7 @@ main = do
   defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, styledTests, textAlignTests, registrationTests, localeTests, i18nTests, permissionTests]
+tests = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, styledTests, textAlignTests, registrationTests, localeTests, i18nTests, permissionTests, exceptionHandlerTests]
 
 qcProps :: TestTree
 qcProps = testGroup "(checked by QuickCheck)"
@@ -111,7 +116,7 @@ unitTests = testGroup "Unit tests"
 -- the opaque 'Ptr ()', then free the context.
 withContext :: (LifecycleEvent -> IO ()) -> (Ptr () -> IO a) -> IO a
 withContext callback action = do
-  sptr <- newMobileContext MobileContext { onLifecycle = callback }
+  sptr <- newMobileContext MobileContext { onLifecycle = callback, onError = \_ -> pure () }
   let ptr = castStablePtrToPtr sptr
   result <- action ptr
   freeMobileContext sptr
@@ -495,8 +500,9 @@ textAlignTests = testGroup "TextAlignment"
   ]
 
 -- | Tests for the IORef registration pattern.
+-- Uses 'sequentialTestGroup' because these tests modify the global mobileApp registration.
 registrationTests :: TestTree
-registrationTests = testGroup "Registration"
+registrationTests = sequentialTestGroup "Registration" AllFinish
   [ testCase "getMobileApp returns the registered app" $ do
       app <- getMobileApp
       -- The app was registered in main before defaultMain.
@@ -504,7 +510,7 @@ registrationTests = testGroup "Registration"
       mapM_ (onLifecycle (maContext app)) [Create, Destroy]
 
   , testCase "runMobileApp overwrites previous registration" $ do
-      let customCtx = MobileContext { onLifecycle = \_ -> pure () }
+      let customCtx = MobileContext { onLifecycle = \_ -> pure (), onError = \_ -> pure () }
           customApp = MobileApp { maContext = customCtx, maView = pure (Text TextConfig { tcLabel = "custom", tcFontConfig = Nothing }) }
       runMobileApp customApp
       app <- getMobileApp
@@ -662,3 +668,128 @@ permissionTests = testGroup "Permission"
       permissionStatusFromInt (-1) @?= Nothing
       permissionStatusFromInt 100 @?= Nothing
   ]
+
+-- | Helper: reset the global error state and restore the default mobileApp.
+resetErrorState :: IO ()
+resetErrorState = do
+  writeIORef (appErrorState globalAppState) Nothing
+  runMobileApp mobileApp
+
+-- | Tests for the default exception handler that wraps FFI entry points.
+-- Uses 'sequentialTestGroup' because these tests share global mutable state
+-- (appErrorState, mobileApp registration) that would conflict with other tests.
+exceptionHandlerTests :: TestTree
+exceptionHandlerTests = sequentialTestGroup "ExceptionHandler" AllFinish
+  [ testCase "exception in maView is caught and error state set" $ do
+      resetErrorState
+      let crashingApp = MobileApp
+            { maContext = defaultMobileContext
+            , maView    = throwIO (userError "test-boom")
+            }
+      runMobileApp crashingApp
+      haskellRenderUI nullPtr
+      errorState <- readIORef (appErrorState globalAppState)
+      case errorState of
+        Nothing  -> assertFailure "expected error state to be set"
+        Just exc -> assertBool "exception should contain test-boom" ("test-boom" `isInfixOf` show exc)
+      resetErrorState
+
+  , testCase "exception in button callback is caught" $ do
+      resetErrorState
+      ref <- newIORef False
+      let crashingApp = MobileApp
+            { maContext = defaultMobileContext
+            , maView    = pure $ Button ButtonConfig
+                { bcLabel  = "crash"
+                , bcAction = do
+                    writeIORef ref True
+                    throwIO (userError "button-boom")
+                , bcFontConfig = Nothing
+                }
+            }
+      runMobileApp crashingApp
+      -- First render to register the button callback
+      haskellRenderUI nullPtr
+      -- Reset error state from any render issues, then dispatch
+      writeIORef (appErrorState globalAppState) Nothing
+      haskellOnUIEvent nullPtr 0
+      errorState <- readIORef (appErrorState globalAppState)
+      case errorState of
+        Nothing  -> assertFailure "expected error state to be set after button callback exception"
+        Just exc -> assertBool "exception should contain button-boom" ("button-boom" `isInfixOf` show exc)
+      resetErrorState
+
+  , testCase "dismiss clears error and re-renders normal view" $ do
+      resetErrorState
+      -- Trigger an error first
+      let crashingApp = MobileApp
+            { maContext = defaultMobileContext
+            , maView    = throwIO (userError "dismiss-test")
+            }
+      runMobileApp crashingApp
+      haskellRenderUI nullPtr
+      errorState <- readIORef (appErrorState globalAppState)
+      assertBool "error state should be set" (case errorState of Just _ -> True; Nothing -> False)
+      -- Now restore a good app and dismiss
+      runMobileApp mobileApp
+      dismissError
+      clearedState <- readIORef (appErrorState globalAppState)
+      assertBool "error state should be Nothing after dismiss" (case clearedState of Nothing -> True; Just _ -> False)
+      -- Re-render should succeed without error
+      haskellRenderUI nullPtr
+      finalState <- readIORef (appErrorState globalAppState)
+      assertBool "error state should remain Nothing after re-render" (case finalState of Nothing -> True; Just _ -> False)
+      resetErrorState
+
+  , testCase "onError callback fires on exception" $ do
+      resetErrorState
+      ref <- newIORef (Nothing :: Maybe String)
+      let ctx = MobileContext
+            { onLifecycle = \_ -> pure ()
+            , onError     = \exc -> writeIORef ref (Just (show exc))
+            }
+          crashingApp = MobileApp
+            { maContext = ctx
+            , maView    = throwIO (userError "onError-test")
+            }
+      runMobileApp crashingApp
+      haskellRenderUI nullPtr
+      firedValue <- readIORef ref
+      case firedValue of
+        Nothing  -> assertFailure "onError callback should have been fired"
+        Just msg -> assertBool "onError should receive the exception" ("onError-test" `isInfixOf` msg)
+      resetErrorState
+
+  , testCase "exception in onError does not crash" $ do
+      resetErrorState
+      let ctx = MobileContext
+            { onLifecycle = \_ -> pure ()
+            , onError     = \_ -> throwIO (userError "secondary-boom")
+            }
+          crashingApp = MobileApp
+            { maContext = ctx
+            , maView    = throwIO (userError "primary-boom")
+            }
+      runMobileApp crashingApp
+      -- Should not crash despite both maView and onError throwing
+      result <- try @IOException (haskellRenderUI nullPtr)
+      case result of
+        Left exc -> assertFailure ("haskellRenderUI should not throw, but got: " ++ show exc)
+        Right () -> pure ()
+      resetErrorState
+
+  , testCase "exception in lifecycle handler is caught" $ do
+      let crashingCtx = MobileContext
+            { onLifecycle = \_ -> throwIO (userError "lifecycle-boom")
+            , onError     = \_ -> pure ()
+            }
+      sptr <- newMobileContext crashingCtx
+      let ptr = castStablePtrToPtr sptr
+      -- Should not crash
+      result <- try @IOException (haskellOnLifecycle ptr 0)
+      case result of
+        Left exc -> assertFailure ("haskellOnLifecycle should not throw, but got: " ++ show exc)
+        Right () -> pure ()
+      freeMobileContext sptr
+  ]
+
