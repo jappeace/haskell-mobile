@@ -16,10 +16,11 @@ import Foreign.Ptr (Ptr)
 import Foreign.StablePtr (castStablePtrToPtr)
 import HaskellMobile
   ( MobileApp(..)
+  , AppState(..)
   , runMobileApp
   , getMobileApp
   , haskellGreet
-  , globalPermissionState
+  , globalAppState
   )
 import HaskellMobile.Locale
   ( Language(..)
@@ -583,10 +584,10 @@ i18nTests = testGroup "I18n"
 permissionTests :: TestTree
 permissionTests = testGroup "Permission"
   [ testCase "requestPermission fires callback with PermissionGranted on desktop" $ do
-      -- Uses globalPermissionState because the C desktop stub dispatches
+      -- Uses (appPermissionState globalAppState) because the C desktop stub dispatches
       -- via haskellOnPermissionResult which targets the global state.
       ref <- newIORef (Nothing :: Maybe PermissionStatus)
-      requestPermission globalPermissionState PermissionCamera
+      requestPermission (appPermissionState globalAppState) PermissionCamera
         (\status -> modifyIORef' ref (const (Just status)))
       result <- readIORef ref
       result @?= Just PermissionGranted
@@ -632,12 +633,12 @@ permissionTests = testGroup "Permission"
       count @?= 0
 
   , testCase "multiple simultaneous pending requests dispatch independently" $ do
-      -- Uses globalPermissionState — desktop stub auto-grants synchronously
+      -- Uses (appPermissionState globalAppState) — desktop stub auto-grants synchronously
       refA <- newIORef (Nothing :: Maybe PermissionStatus)
       refB <- newIORef (Nothing :: Maybe PermissionStatus)
-      requestPermission globalPermissionState PermissionCamera
+      requestPermission (appPermissionState globalAppState) PermissionCamera
         (\status -> modifyIORef' refA (const (Just status)))
-      requestPermission globalPermissionState PermissionContacts
+      requestPermission (appPermissionState globalAppState) PermissionContacts
         (\status -> modifyIORef' refB (const (Just status)))
       resultA <- readIORef refA
       resultB <- readIORef refB

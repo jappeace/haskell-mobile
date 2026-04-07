@@ -34,7 +34,9 @@ module HaskellMobile
   , PermissionState(..)
   , requestPermission
   , checkPermission
-  , globalPermissionState
+  -- App state
+  , AppState(..)
+  , globalAppState
   )
 where
 
@@ -67,17 +69,19 @@ import HaskellMobile.Render (RenderState, newRenderState, renderWidget, dispatch
 import HaskellMobile.Types (MobileApp(..), runMobileApp, getMobileApp)
 import System.IO.Unsafe (unsafePerformIO)
 
--- | Global render state, shared across all render/event cycles.
--- Safe because all UI calls happen on the main thread.
-globalRenderState :: RenderState
-globalRenderState = unsafePerformIO newRenderState
-{-# NOINLINE globalRenderState #-}
+-- | Combined runtime state for the app.
+-- Single global replaces individual globals for render and permission state.
+data AppState = AppState
+  { appRenderState     :: RenderState
+  , appPermissionState :: PermissionState
+  }
 
--- | Global permission state, shared across all permission requests.
+-- | The one global mutable state, initialised once on first use.
 -- Safe because all UI calls happen on the main thread.
-globalPermissionState :: PermissionState
-globalPermissionState = unsafePerformIO newPermissionState
-{-# NOINLINE globalPermissionState #-}
+globalAppState :: AppState
+globalAppState = unsafePerformIO $
+  AppState <$> newRenderState <*> newPermissionState
+{-# NOINLINE globalAppState #-}
 
 -- | Takes a name as CString, returns "Hello from Haskell, <name>!" as CString.
 -- Caller is responsible for freeing the returned CString.
@@ -105,7 +109,7 @@ haskellRenderUI :: Ptr () -> IO ()
 haskellRenderUI _ctxPtr = do
   app <- getMobileApp
   widget <- maView app
-  renderWidget globalRenderState widget
+  renderWidget (appRenderState globalAppState) widget
 
 foreign export ccall haskellRenderUI :: Ptr () -> IO ()
 
@@ -113,10 +117,10 @@ foreign export ccall haskellRenderUI :: Ptr () -> IO ()
 -- identified by @callbackId@, then re-renders the UI.
 haskellOnUIEvent :: Ptr () -> CInt -> IO ()
 haskellOnUIEvent _ctxPtr callbackId = do
-  dispatchEvent globalRenderState (fromIntegral callbackId)
+  dispatchEvent (appRenderState globalAppState) (fromIntegral callbackId)
   app <- getMobileApp
   widget <- maView app
-  renderWidget globalRenderState widget
+  renderWidget (appRenderState globalAppState) widget
 
 foreign export ccall haskellOnUIEvent :: Ptr () -> CInt -> IO ()
 
@@ -126,7 +130,7 @@ foreign export ccall haskellOnUIEvent :: Ptr () -> CInt -> IO ()
 haskellOnUITextChange :: Ptr () -> CInt -> CString -> IO ()
 haskellOnUITextChange _ctxPtr callbackId cstr = do
   str <- peekCString cstr
-  dispatchTextEvent globalRenderState (fromIntegral callbackId) (pack str)
+  dispatchTextEvent (appRenderState globalAppState) (fromIntegral callbackId) (pack str)
 
 foreign export ccall haskellOnUITextChange :: Ptr () -> CInt -> CString -> IO ()
 
@@ -134,6 +138,6 @@ foreign export ccall haskellOnUITextChange :: Ptr () -> CInt -> CString -> IO ()
 -- callback registered by 'requestPermission'.
 haskellOnPermissionResult :: Ptr () -> CInt -> CInt -> IO ()
 haskellOnPermissionResult _ctxPtr requestId statusCode =
-  dispatchPermissionResult globalPermissionState requestId statusCode
+  dispatchPermissionResult (appPermissionState globalAppState) requestId statusCode
 
 foreign export ccall haskellOnPermissionResult :: Ptr () -> CInt -> CInt -> IO ()

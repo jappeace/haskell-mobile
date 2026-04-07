@@ -2,36 +2,14 @@
 -- | Default implementation of the mobile app.
 -- Provides 'loggingMobileContext' as the application context and a simple
 -- counter demo as the default UI.
-module HaskellMobile.App (mobileApp, scrollDemoApp, textInputDemoApp, permissionDemoApp) where
+module HaskellMobile.App (mobileApp, scrollDemoApp, textInputDemoApp) where
 
 import Data.IORef (IORef, newIORef, readIORef, modifyIORef')
 import Data.Text (pack)
-import HaskellMobile.Lifecycle (loggingMobileContext, platformLog)
-import HaskellMobile.Permission (Permission(..), PermissionState, requestPermission)
 import HaskellMobile.Types (MobileApp(..))
+import HaskellMobile.Lifecycle (loggingMobileContext)
 import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), InputType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..))
 import System.IO.Unsafe (unsafePerformIO)
-
--- | Permission demo: requests camera permission on button tap.
--- Used by integration tests to verify the permission FFI bridge end-to-end.
-permissionDemoApp :: PermissionState -> MobileApp
-permissionDemoApp permissionState = MobileApp
-  { maContext = loggingMobileContext
-  , maView    = permissionDemoView permissionState
-  }
-
--- | Builds a Column with a label and a "Request Camera" button.
--- The button's callback ID is 0 (first registered), matching --autotest dispatch.
-permissionDemoView :: PermissionState -> IO Widget
-permissionDemoView permissionState = pure $ Column
-  [ Text TextConfig { tcLabel = "Permission Demo", tcFontConfig = Nothing }
-  , Button ButtonConfig
-      { bcLabel = "Request Camera"
-      , bcAction = requestPermission permissionState PermissionCamera $ \status ->
-          platformLog ("Permission result: " <> pack (show status))
-      , bcFontConfig = Nothing
-      }
-  ]
 
 -- | The default mobile app — logs every lifecycle event and shows a counter.
 mobileApp :: MobileApp
