@@ -14,6 +14,7 @@ module HaskellMobile.Lifecycle
   )
 where
 
+import Control.Exception (SomeException, catch)
 import Data.Text (Text, pack, unpack)
 import Foreign.C.String (CString, withCString)
 import Foreign.C.Types (CInt(..))
@@ -58,12 +59,15 @@ lifecycleToInt LowMemory = 6
 -- (or test) owns its own independent context — no global mutable state.
 data MobileContext = MobileContext
   { onLifecycle :: LifecycleEvent -> IO ()
+  , onError     :: SomeException -> IO ()
   }
 
 -- | A no-op context. Suitable as a default when no callbacks are needed.
+-- Logs errors via 'platformLog' by default so they are not silently swallowed.
 defaultMobileContext :: MobileContext
 defaultMobileContext = MobileContext
   { onLifecycle = \_ -> pure ()
+  , onError     = \exc -> platformLog ("Error: " <> pack (show exc))
   }
 
 foreign import ccall "haskellMobileLog" c_haskellMobileLog :: CString -> IO ()
@@ -77,6 +81,7 @@ platformLog msg = withCString (unpack msg) c_haskellMobileLog
 loggingMobileContext :: MobileContext
 loggingMobileContext = MobileContext
   { onLifecycle = \event -> platformLog ("Lifecycle: " <> pack (show event))
+  , onError     = \exc -> platformLog ("Error: " <> pack (show exc))
   }
 
 -- | Pin a 'MobileContext' on the GHC heap and return a 'StablePtr' to it.
@@ -91,12 +96,16 @@ freeMobileContext = freeStablePtr
 -- | FFI entry point called from platform code.
 -- Takes an opaque context pointer and an event code.
 -- Dispatches to the 'onLifecycle' callback. Unknown event codes are silently ignored.
+-- Catches any exception thrown by the callback and fires 'onError'.
 haskellOnLifecycle :: Ptr () -> CInt -> IO ()
 haskellOnLifecycle ctxPtr code =
   case lifecycleFromInt code of
     Just event -> do
       ctx <- deRefStablePtr (castPtrToStablePtr ctxPtr)
-      onLifecycle ctx event
+      catch (onLifecycle ctx event) $ \exc -> do
+        platformLog ("Lifecycle error: " <> pack (show exc))
+        catch (onError ctx exc) $ \secondaryExc ->
+          platformLog ("onError callback failed: " <> pack (show (secondaryExc :: SomeException)))
     Nothing -> pure ()
 
 foreign export ccall haskellOnLifecycle :: Ptr () -> CInt -> IO ()
