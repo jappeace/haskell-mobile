@@ -19,4 +19,8 @@ in {
   ios-lib = import ./ios.nix { inherit sources; };
   # iOS combined test script (boot + run via CI: nix-build ... -o out && ./out/bin/test-all-ios)
   simulator-all = import ./simulator-all.nix { inherit sources; };
+  # watchOS library for artifact upload
+  watchos-lib = import ./watchos.nix { inherit sources; };
+  # watchOS combined test script (boot + run via CI)
+  watchos-simulator-all = import ./watchos-simulator-all.nix { inherit sources; };
 } else {})

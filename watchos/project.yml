@@ -1,0 +1,27 @@
+name: HaskellMobile
+options:
+  bundleIdPrefix: me.jappie
+  deploymentTarget:
+    watchOS: "9.0"
+
+targets:
+  HaskellMobile:
+    type: application
+    platform: watchOS
+    sources:
+      - HaskellMobile
+    info:
+      path: HaskellMobile/Info.plist
+      properties:
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        WKApplication: true
+        WKRunsIndependentlyOfCompanionApp: true
+        WKCompanionAppBundleIdentifier: me.jappie.haskellmobile
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: me.jappie.haskellmobile.watchkitapp
+        SWIFT_OBJC_BRIDGING_HEADER: HaskellMobile/HaskellMobile-Bridging-Header.h
+        LIBRARY_SEARCH_PATHS: ["$(inherited)", "$(PROJECT_DIR)/lib"]
+        HEADER_SEARCH_PATHS: ["$(inherited)", "$(PROJECT_DIR)/include"]
+        OTHER_LDFLAGS: ["$(inherited)", "-lHaskellMobile", "-lz", "-liconv", "-lffi", "-lc++"]

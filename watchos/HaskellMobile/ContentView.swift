@@ -1,0 +1,125 @@
+import SwiftUI
+
+/// Recursive SwiftUI renderer for the Haskell widget tree.
+struct NodeView: View {
+    @ObservedObject var node: WatchUINode
+
+    var body: some View {
+        let content = nodeContent
+            .ifLet(node.fontSize) { view, size in
+                view.font(.system(size: size))
+            }
+            .ifLet(node.padding) { view, pad in
+                view.padding(pad)
+            }
+        return content
+    }
+
+    @ViewBuilder
+    private var nodeContent: some View {
+        switch node.nodeType {
+        case 0: // UI_NODE_TEXT
+            Text(node.text)
+        case 1: // UI_NODE_BUTTON
+            Button(node.text) {
+                HaskellBridge.onUIEvent(node.callbackId)
+            }
+        case 2: // UI_NODE_COLUMN
+            VStack {
+                ForEach(node.children) { child in
+                    NodeView(node: child)
+                }
+            }
+        case 3: // UI_NODE_ROW
+            HStack {
+                ForEach(node.children) { child in
+                    NodeView(node: child)
+                }
+            }
+        case 4: // UI_NODE_TEXT_INPUT
+            TextInputNodeView(node: node)
+        case 5: // UI_NODE_SCROLL_VIEW
+            ScrollView {
+                VStack {
+                    ForEach(node.children) { child in
+                        NodeView(node: child)
+                    }
+                }
+            }
+        default:
+            EmptyView()
+        }
+    }
+}
+
+/// Separate view for text input to manage local editing state.
+struct TextInputNodeView: View {
+    @ObservedObject var node: WatchUINode
+    @State private var editingText: String = ""
+
+    var body: some View {
+        TextField(node.hint, text: $editingText, onCommit: {
+            HaskellBridge.onUITextChange(node.callbackId, editingText)
+        })
+        .onAppear {
+            editingText = node.text
+        }
+    }
+}
+
+/// ContentView wraps the Haskell-driven node tree.
+struct ContentView: View {
+    @ObservedObject var state = WatchUIBridgeState.shared
+
+    var body: some View {
+        Group {
+            if let root = state.rootNode {
+                NodeView(node: root)
+            } else {
+                Text("Loading...")
+            }
+        }
+        .onAppear {
+            setup_watchos_ui_bridge(HaskellBridge.getContext())
+            HaskellBridge.renderUI()
+
+            // CI auto-test: simulate button tap 3s after the initial render.
+            if CommandLine.arguments.contains("--autotest") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    HaskellBridge.onUIEvent(0)
+                }
+            }
+
+            // CI auto-test: exercise both "+" and "-" buttons.
+            if CommandLine.arguments.contains("--autotest-buttons") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    HaskellBridge.onUIEvent(0)  // + -> Counter: 1
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                    HaskellBridge.onUIEvent(0)  // + -> Counter: 2
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 7) {
+                    HaskellBridge.onUIEvent(1)  // - -> Counter: 1
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 9) {
+                    HaskellBridge.onUIEvent(1)  // - -> Counter: 0
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 11) {
+                    HaskellBridge.onUIEvent(1)  // - -> Counter: -1
+                }
+            }
+        }
+    }
+}
+
+/// Conditional modifier helper.
+extension View {
+    @ViewBuilder
+    func ifLet<T, Content: View>(_ value: T?, transform: (Self, T) -> Content) -> some View {
+        if let value = value {
+            transform(self, value)
+        } else {
+            self
+        }
+    }
+}

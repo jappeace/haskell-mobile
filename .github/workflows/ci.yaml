@@ -93,3 +93,31 @@ jobs:
       run: gh run cancel ${{ github.run_id }}
       env:
         GH_TOKEN: ${{ github.token }}
+
+  watchos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Local cache
+      uses: actions/cache@v4
+      with:
+        path: /nix/store
+        key: "${{ runner.os }}-nix-watchos-cache"
+        restore-keys: |
+          ${{ runner.os }}-nix-watchos-
+          ${{ runner.os }}-nix-ios-
+    - uses: cachix/install-nix-action@v31
+      with:
+        extra_nix_config: |
+          access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+          extra-substituters = https://nix-cache.jappie.me
+          extra-trusted-public-keys = nix-cache.jappie.me:WjkKcvFtHih2i+n7bdsrJ3HuGboJiU2hA2CZbf9I9oc=
+    - run: nix-build nix/ci.nix -A watchos-simulator-all -A watchos-lib
+    - name: Run combined watchOS simulator test
+      run: nix-build nix/ci.nix -A watchos-simulator-all -o result-watchos && ./result-watchos/bin/test-all-watchos
+    - name: Cancel workflow on failure
+      if: failure()
+      continue-on-error: true
+      run: gh run cancel ${{ github.run_id }}
+      env:
+        GH_TOKEN: ${{ github.token }}

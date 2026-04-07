@@ -1,10 +1,12 @@
 # Reusable builder functions for haskell-mobile based projects.
 #
-# Returns an attrset of 4 builder functions:
-#   mkAndroidLib  — cross-compile Haskell to .so for Android (aarch64 or armv7a)
-#   mkApk         — package .so + Java + resources into signed APK
-#   mkIOSLib      — compile Haskell to .a for iOS (device or simulator)
-#   mkSimulatorApp — stage iOS sources + pre-built library for xcodebuild
+# Returns an attrset of 6 builder functions:
+#   mkAndroidLib       — cross-compile Haskell to .so for Android (aarch64 or armv7a)
+#   mkApk              — package .so + Java + resources into signed APK
+#   mkIOSLib           — compile Haskell to .a for iOS (device or simulator)
+#   mkSimulatorApp     — stage iOS sources + pre-built library for xcodebuild
+#   mkWatchOSLib       — compile Haskell to .a for watchOS (device or simulator)
+#   mkWatchOSSimulatorApp — stage watchOS sources + pre-built library for xcodebuild
 #
 # Usage:
 #   let lib = import ./lib.nix { sources = import ../npins; };
@@ -487,6 +489,128 @@ in {
         cp ${iosLib}/lib/libHaskellMobile.a $out/share/ios/lib/
         cp ${iosLib}/include/HaskellMobile.h $out/share/ios/include/
         cp ${iosLib}/include/UIBridge.h $out/share/ios/include/
+      '';
+
+      installPhase = "true";
+    };
+
+  # ---------------------------------------------------------------------------
+  # mkWatchOSLib: Compile Haskell to static .a for watchOS (device or simulator)
+  # ---------------------------------------------------------------------------
+  mkWatchOSLib =
+    { haskellMobileSrc
+    , mainModule
+    , simulator ? false
+    , pname ? "haskell-mobile-watchos"
+    , extraModuleCopy ? ""
+    , crossDeps ? null          # output of ios-deps.nix (lib/, hi/, pkgdb/)
+    }:
+    let
+      iosPkgs = import sources.nixpkgs {};
+      iosGhc = iosPkgs.haskellPackages.ghc;
+      mac2watchos = import (haskellMobileSrc + "/nix/mac2watchos.nix") {
+        inherit sources; pkgs = iosPkgs;
+      };
+      gmpStatic = iosPkgs.gmp.overrideAttrs (old: {
+        dontDisableStatic = true;
+      });
+    in
+    iosPkgs.stdenv.mkDerivation {
+      inherit pname;
+      version = "0.1.0.0";
+
+      src = haskellMobileSrc + "/src";
+
+      nativeBuildInputs = [ iosGhc iosPkgs.cctools ];
+      buildInputs = [ iosPkgs.libffi gmpStatic ];
+
+      buildPhase = ''
+        mkdir -p HaskellMobile
+        cp ${haskellMobileSrc}/src/HaskellMobile/Types.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/Lifecycle.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/Widget.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/UIBridge.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/Render.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/Locale.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/I18n.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile.hs .
+
+        # Default App.hs — only copy if not already present
+        if [ ! -f HaskellMobile/App.hs ]; then
+          cp ${haskellMobileSrc}/src/HaskellMobile/App.hs HaskellMobile/
+        fi
+
+        # Extra module copies
+        ${extraModuleCopy}
+
+        cp ${mainModule} Main.hs
+
+        # Copy C sources into writable build dir (GHC writes .o next to them)
+        mkdir -p cbits
+        cp ${haskellMobileSrc}/cbits/platform_log.c cbits/
+        cp ${haskellMobileSrc}/cbits/ui_bridge.c cbits/
+        cp ${haskellMobileSrc}/cbits/run_main.c cbits/
+        cp ${haskellMobileSrc}/cbits/locale.c cbits/
+
+        ghc -staticlib \
+          -O2 \
+          -o libHaskellMobile.a \
+          -I${haskellMobileSrc}/include \
+          ${if crossDeps != null then "-package-db ${crossDeps}/pkgdb -i${crossDeps}/hi" else ""} \
+          -optl-lffi \
+          -optl-Wl,-u,_haskellRunMain \
+          -optl-Wl,-u,_haskellGreet \
+          -optl-Wl,-u,_haskellOnLifecycle \
+          -optl-Wl,-u,_haskellCreateContext \
+          -optl-Wl,-u,_haskellRenderUI \
+          -optl-Wl,-u,_haskellOnUIEvent \
+          -optl-Wl,-u,_haskellLogLocale \
+          cbits/platform_log.c \
+          cbits/ui_bridge.c \
+          cbits/run_main.c \
+          cbits/locale.c \
+          Main.hs \
+          HaskellMobile.hs
+      '';
+
+      installPhase = ''
+        mkdir -p $out/lib $out/include
+
+        echo "Merging static archives into libHaskellMobile.a"
+        libtool -static -o libCombined.a libHaskellMobile.a \
+          ${gmpStatic}/lib/libgmp.a \
+          ${if crossDeps != null then "${crossDeps}/lib/*.a" else ""}
+        mv libCombined.a libHaskellMobile.a
+
+        ${mac2watchos}/bin/mac2watchos ${if simulator then "-s" else ""} libHaskellMobile.a
+        cp libHaskellMobile.a $out/lib/
+        cp ${haskellMobileSrc}/include/HaskellMobile.h $out/include/HaskellMobile.h
+        cp ${haskellMobileSrc}/include/UIBridge.h $out/include/UIBridge.h
+      '';
+    };
+
+  # ---------------------------------------------------------------------------
+  # mkWatchOSSimulatorApp: Stage watchOS sources + pre-built library for xcodebuild
+  # ---------------------------------------------------------------------------
+  mkWatchOSSimulatorApp =
+    { watchosLib
+    , watchosSrc
+    , name ? "watchos-simulator-app"
+    }:
+    pkgs.stdenv.mkDerivation {
+      inherit name;
+
+      dontUnpack = true;
+
+      buildPhase = ''
+        mkdir -p $out/share/watchos/lib $out/share/watchos/include
+
+        cp -r ${watchosSrc}/HaskellMobile $out/share/watchos/
+        cp ${watchosSrc}/project.yml $out/share/watchos/project.yml
+
+        cp ${watchosLib}/lib/libHaskellMobile.a $out/share/watchos/lib/
+        cp ${watchosLib}/include/HaskellMobile.h $out/share/watchos/include/
+        cp ${watchosLib}/include/UIBridge.h $out/share/watchos/include/
       '';
 
       installPhase = "true";
