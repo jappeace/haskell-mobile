@@ -52,6 +52,8 @@ struct NodeView: View {
                     }
                 }
             }
+        case 6: // UI_NODE_IMAGE
+            ImageNodeView(node: node)
         default:
             EmptyView()
         }
@@ -69,6 +71,36 @@ struct TextInputNodeView: View {
         })
         .onAppear {
             editingText = node.text
+        }
+    }
+}
+
+/// SwiftUI renderer for Image nodes.
+/// Supports resource name, raw data, and file path sources with configurable scale type.
+struct ImageNodeView: View {
+    @ObservedObject var node: WatchUINode
+
+    var body: some View {
+        if let resourceName = node.imageResource {
+            imageWithScaleType(Image(resourceName))
+        } else if let data = node.imageData, let uiImage = UIImage(data: data) {
+            imageWithScaleType(Image(uiImage: uiImage))
+        } else if let filePath = node.imageFile, let uiImage = UIImage(contentsOfFile: filePath) {
+            imageWithScaleType(Image(uiImage: uiImage))
+        } else {
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func imageWithScaleType(_ image: Image) -> some View {
+        switch node.scaleType {
+        case 1:
+            image.resizable().scaledToFill()
+        case 2:
+            image
+        default:
+            image.resizable().scaledToFit()
         }
     }
 }

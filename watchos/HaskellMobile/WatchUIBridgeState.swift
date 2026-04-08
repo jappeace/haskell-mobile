@@ -39,6 +39,12 @@ class WatchUIBridgeState: ObservableObject {
         case 3: // UI_PROP_BG_COLOR
             os_log("setStrProp(node=%d, bgColor=\"%{public}s\")", log: bridgeLog, type: .info, nodeId, value)
             node.backgroundColor = value
+        case 4: // UI_PROP_IMAGE_RESOURCE
+            os_log("setStrProp(node=%d, imageResource=\"%{public}s\")", log: bridgeLog, type: .info, nodeId, value)
+            node.imageResource = value
+        case 5: // UI_PROP_IMAGE_FILE
+            os_log("setStrProp(node=%d, imageFile=\"%{public}s\")", log: bridgeLog, type: .info, nodeId, value)
+            node.imageFile = value
         default:
             os_log("setStrProp: unknown propId %d", log: bridgeLog, type: .info, propId)
         }
@@ -56,6 +62,9 @@ class WatchUIBridgeState: ObservableObject {
         case 2: // UI_PROP_INPUT_TYPE
             os_log("setNumProp(node=%d, inputType=%.0f)", log: bridgeLog, type: .info, nodeId, value)
             node.inputType = Int32(value)
+        case 4: // UI_PROP_SCALE_TYPE
+            os_log("setNumProp(node=%d, scaleType=%.0f)", log: bridgeLog, type: .info, nodeId, value)
+            node.scaleType = Int32(value)
         default:
             os_log("setNumProp: unknown propId %d", log: bridgeLog, type: .info, propId)
         }
@@ -84,6 +93,12 @@ class WatchUIBridgeState: ObservableObject {
     func setRoot(nodeId: Int32) {
         rootNode = nodes[nodeId]
         os_log("setRoot(node=%d)", log: bridgeLog, type: .info, nodeId)
+    }
+
+    func setImageData(nodeId: Int32, data: UnsafePointer<UInt8>?, length: Int32) {
+        guard let node = nodes[nodeId], let data = data else { return }
+        node.imageData = Data(bytes: data, count: Int(length))
+        os_log("setImageData(node=%d, %d bytes)", log: bridgeLog, type: .info, nodeId, length)
     }
 
     func clear() {
@@ -135,6 +150,11 @@ func watchos_destroy_node(_ nodeId: Int32) {
 @_cdecl("watchos_set_root")
 func watchos_set_root(_ nodeId: Int32) {
     WatchUIBridgeState.shared.setRoot(nodeId: nodeId)
+}
+
+@_cdecl("watchos_set_image_data")
+func watchos_set_image_data(_ nodeId: Int32, _ data: UnsafePointer<UInt8>?, _ length: Int32) {
+    WatchUIBridgeState.shared.setImageData(nodeId: nodeId, data: data, length: length)
 }
 
 @_cdecl("watchos_clear")

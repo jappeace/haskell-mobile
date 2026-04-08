@@ -48,6 +48,15 @@ void ui_set_num_prop(int32_t nodeId, int32_t propId, double value)
             nodeId, propId, value);
 }
 
+void ui_set_image_data(int32_t nodeId, const uint8_t *data, int32_t length)
+{
+    if (g_callbacks && g_callbacks->setImageData) {
+        g_callbacks->setImageData(nodeId, data, length);
+        return;
+    }
+    fprintf(stderr, "[UIBridge stub] setImageData(node=%d, %d bytes)\n", nodeId, length);
+}
+
 void ui_set_handler(int32_t nodeId, int32_t eventType, int32_t callbackId)
 {
     if (g_callbacks && g_callbacks->setHandler) {

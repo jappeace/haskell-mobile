@@ -10,6 +10,9 @@ module HaskellMobile.Widget
   , ButtonConfig(..)
   , InputType(..)
   , TextInputConfig(..)
+  , ScaleType(..)
+  , ImageSource(..)
+  , ImageConfig(..)
   , Widget(..)
   , WidgetStyle(..)
   , TextAlignment(..)
@@ -20,6 +23,7 @@ module HaskellMobile.Widget
   )
 where
 
+import Data.ByteString (ByteString)
 import Data.Char (digitToInt, isHexDigit, intToDigit)
 import Data.Text (Text)
 import Data.Text qualified as Text
@@ -138,6 +142,28 @@ defaultStyle = WidgetStyle
   , wsBackgroundColor = Nothing
   }
 
+-- | How an image should be scaled within its bounds.
+data ScaleType
+  = ScaleFit   -- ^ Scale to fit within bounds, preserving aspect ratio.
+  | ScaleFill  -- ^ Scale to fill bounds, preserving aspect ratio (may crop).
+  | ScaleNone  -- ^ No scaling; display at native resolution.
+  deriving (Show, Eq)
+
+-- | Source of image data for an 'Image' widget.
+data ImageSource
+  = ImageResource Text      -- ^ Platform resource name (e.g. @"icon_logo"@).
+  | ImageData ByteString    -- ^ Raw image bytes (PNG/JPEG).
+  | ImageFile Text          -- ^ Absolute file path to an image on disk.
+  deriving (Show, Eq)
+
+-- | Configuration for an image widget.
+data ImageConfig = ImageConfig
+  { icSource    :: ImageSource
+    -- ^ Where the image data comes from.
+  , icScaleType :: ScaleType
+    -- ^ How the image is scaled.
+  } deriving (Show, Eq)
+
 -- | A declarative description of a UI element.
 data Widget
   = Text TextConfig
@@ -152,5 +178,7 @@ data Widget
     -- ^ A horizontal container laying out children left-to-right.
   | ScrollView [Widget]
     -- ^ A vertically scrollable container.
+  | Image ImageConfig
+    -- ^ An image widget displaying resource, file, or raw data.
   | Styled WidgetStyle Widget
     -- ^ Apply visual style overrides to a child widget.

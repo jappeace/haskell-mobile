@@ -19,7 +19,7 @@ import Data.Int (Int32)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Text (Text)
-import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), InputType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..), colorToHex)
+import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..), colorToHex)
 import HaskellMobile.UIBridge qualified as Bridge
 import System.IO (hPutStrLn, stderr)
 
@@ -115,6 +115,14 @@ renderNode rs (ScrollView children) = do
   nodeId <- Bridge.createNode Bridge.NodeScrollView
   renderChildren rs nodeId children
   pure nodeId
+renderNode _rs (Image config) = do
+  nodeId <- Bridge.createNode Bridge.NodeImage
+  case icSource config of
+    ImageResource name -> Bridge.setStrProp nodeId Bridge.PropImageResource name
+    ImageData bytes    -> Bridge.setImageData nodeId bytes
+    ImageFile path     -> Bridge.setStrProp nodeId Bridge.PropImageFile path
+  Bridge.setNumProp nodeId Bridge.PropScaleType (scaleTypeToDouble (icScaleType config))
+  pure nodeId
 renderNode rs (Styled style child) = do
   nodeId <- renderNode rs child
   applyStyle nodeId style
@@ -127,6 +135,12 @@ renderChildren rs parentId children =
     childId <- renderNode rs child
     Bridge.addChild parentId childId
   ) children
+
+-- | Map a 'ScaleType' to the numeric code sent to the platform bridge.
+scaleTypeToDouble :: ScaleType -> Double
+scaleTypeToDouble ScaleFit  = 0
+scaleTypeToDouble ScaleFill = 1
+scaleTypeToDouble ScaleNone = 2
 
 -- | Map a 'TextAlignment' to the numeric code sent to the platform bridge.
 textAlignToDouble :: TextAlignment -> Double

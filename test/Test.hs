@@ -4,6 +4,7 @@ import Test.Tasty
 import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit
 
+import Data.ByteString qualified as BS
 import Data.Either (isLeft)
 import Data.List (isInfixOf, sort)
 import Data.IntMap.Strict qualified as IntMap
@@ -42,7 +43,7 @@ import HaskellMobile.I18n
   , TranslateFailure(..)
   , translate
   )
-import HaskellMobile.App (mobileApp)
+import HaskellMobile.App (imageDemoApp, mobileApp)
 import HaskellMobile.Lifecycle
   ( LifecycleEvent(..)
   , MobileContext(..)
@@ -51,7 +52,7 @@ import HaskellMobile.Lifecycle
   , lifecycleToInt
   , loggingMobileContext
   )
-import HaskellMobile.Widget (ButtonConfig(..), Color(..), FontConfig(..), InputType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..), colorFromText, colorToHex, defaultStyle)
+import HaskellMobile.Widget (ButtonConfig(..), Color(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..), colorFromText, colorToHex, defaultStyle)
 import HaskellMobile.Permission
   ( Permission(..)
   , PermissionStatus(..)
@@ -77,7 +78,7 @@ main = do
   defaultMain (tests (acPermissionState ffiAppCtx) ffiCtxPtr)
 
 tests :: PermissionState -> Ptr AppContext -> TestTree
-tests ffiPermState ffiCtxPtr = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, styledTests, textAlignTests, colorTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, appContextTests, exceptionHandlerTests ffiCtxPtr]
+tests ffiPermState ffiCtxPtr = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, imageTests, styledTests, textAlignTests, colorTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, appContextTests, exceptionHandlerTests ffiCtxPtr]
 
 qcProps :: TestTree
 qcProps = testGroup "(checked by QuickCheck)"
@@ -252,6 +253,7 @@ uiTests = testGroup "UI"
         Text _          -> assertFailure "expected Column, got Text"
         Button _        -> assertFailure "expected Column, got Button"
         TextInput _     -> assertFailure "expected Column, got TextInput"
+        Image _         -> assertFailure "expected Column, got Image"
         Row _           -> assertFailure "expected Column, got Row"
         ScrollView _    -> assertFailure "expected Column, got ScrollView"
         Styled _ _      -> assertFailure "expected Column, got Styled"
@@ -416,6 +418,48 @@ textInputTests = testGroup "TextInput"
       nVal <- readIORef numberRef
       tVal @?= show ("Alice" :: String)
       nVal @?= show ("60.0" :: String)
+  ]
+
+-- | Tests for the Image widget binding.
+imageTests :: TestTree
+imageTests = testGroup "Image"
+  [ testCase "Image with resource renders without error" $ do
+      rs <- newRenderState
+      renderWidget rs $ Image ImageConfig
+        { icSource = ImageResource "ic_launcher", icScaleType = ScaleFit }
+
+  , testCase "Image with ByteString data renders without error" $ do
+      rs <- newRenderState
+      let bytes = BS.pack [0x89, 0x50, 0x4E, 0x47, 0x00, 0x00, 0x00, 0x00]
+      renderWidget rs $ Image ImageConfig
+        { icSource = ImageData bytes, icScaleType = ScaleFill }
+
+  , testCase "Image with file path renders without error" $ do
+      rs <- newRenderState
+      renderWidget rs $ Image ImageConfig
+        { icSource = ImageFile "/nonexistent/test.png", icScaleType = ScaleNone }
+
+  , testCase "Image inside Column renders" $ do
+      rs <- newRenderState
+      renderWidget rs $ Column
+        [ Text TextConfig { tcLabel = "header", tcFontConfig = Nothing }
+        , Image ImageConfig
+            { icSource = ImageResource "logo", icScaleType = ScaleFit }
+        ]
+
+  , testCase "Styled Image renders without error" $ do
+      rs <- newRenderState
+      renderWidget rs $ Styled defaultStyle
+        (Image ImageConfig
+          { icSource = ImageResource "icon", icScaleType = ScaleNone })
+
+  , testCase "imageDemoApp view returns a Column" $ do
+      dummyPermState <- newPermissionState
+      let dummyUserState = UserState { userPermissionState = dummyPermState }
+      widget <- maView imageDemoApp dummyUserState
+      case widget of
+        Column _ -> pure ()
+        _        -> assertFailure "expected Column from imageDemoApp"
   ]
 
 -- | Tests for the Styled widget wrapper.
@@ -770,6 +814,7 @@ viewIsErrorWidget ctxPtr = do
     Text _                   -> pure False
     Button _                 -> pure False
     TextInput _              -> pure False
+    Image _                  -> pure False
     Row _                    -> pure False
     ScrollView _             -> pure False
     Styled _ _               -> pure False

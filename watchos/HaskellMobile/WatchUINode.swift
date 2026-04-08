@@ -15,6 +15,10 @@ class WatchUINode: ObservableObject, Identifiable {
     @Published var callbackId: Int32 = -1
     @Published var textColor: String?
     @Published var backgroundColor: String?
+    @Published var imageResource: String?
+    @Published var imageFile: String?
+    @Published var imageData: Data?
+    @Published var scaleType: Int32 = 0
     @Published var children: [WatchUINode] = []
 
     init(id: Int32, nodeType: Int32) {
