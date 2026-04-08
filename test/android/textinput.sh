@@ -23,7 +23,7 @@ fi
 sleep 5
 
 LOGCAT_FILE="$WORK_DIR/textinput_logcat.txt"
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1
+"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1 || true
 
 assert_logcat "$LOGCAT_FILE" "createNode.*type=4" "createNode(type=4) TextInput node"
 assert_logcat "$LOGCAT_FILE" "setNumProp.*inputType=1.*android=8194" "setNumProp InputNumber -> TYPE_CLASS_NUMBER|DECIMAL"

@@ -23,7 +23,7 @@ fi
 sleep 5
 
 LOGCAT_FILE="$WORK_DIR/image_logcat.txt"
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1
+"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1 || true
 
 # All 3 Image nodes created (type=6)
 assert_logcat "$LOGCAT_FILE" "createNode.*type=6" "createNode(type=6) Image node"

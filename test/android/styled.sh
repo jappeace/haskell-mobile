@@ -26,7 +26,7 @@ fi
 sleep 5
 
 LOGCAT_FILE="$WORK_DIR/styled_logcat.txt"
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1
+"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1 || true
 
 assert_logcat "$LOGCAT_FILE" "setNumProp.*fontSize" "setNumProp dispatched for fontSize"
 assert_logcat "$LOGCAT_FILE" "setNumProp.*padding"  "setNumProp dispatched for padding"

@@ -25,7 +25,7 @@ sleep 5
 wait_for_logcat "setRoot" 30
 
 LOGFILE="$WORK_DIR/logcat_nodepool.txt"
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGFILE" 2>&1
+"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGFILE" 2>&1 || true
 
 # Assert: setRoot was called (full UI rendered)
 assert_logcat "$LOGFILE" "setRoot" "setRoot called — full UI rendered"

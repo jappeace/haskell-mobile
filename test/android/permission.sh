@@ -25,7 +25,7 @@ tap_button "Request Camera" || { echo "FAIL: could not tap Request Camera"; EXIT
 sleep 3
 
 LOGCAT_FILE="$WORK_DIR/permission_logcat.txt"
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1
+"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1 || true
 
 assert_logcat "$LOGCAT_FILE" "Permission result: PermissionGranted" "permission callback fires with PermissionGranted"
 assert_logcat "$LOGCAT_FILE" "permission_request\|PermissionBridge" "permission bridge log present"

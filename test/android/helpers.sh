@@ -40,7 +40,7 @@ FATAL_PATTERNS="UnsatisfiedLinkError|dlopen failed|cannot locate symbol|SIGABRT|
 # Returns 1 if no fatal error detected.
 check_fatal_logcat() {
     local logcat_poll="$WORK_DIR/logcat_fatal.txt"
-    "$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:E' > "$logcat_poll" 2>&1
+    "$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:E' > "$logcat_poll" 2>&1 || true
     if grep -qE "$FATAL_PATTERNS" "$logcat_poll" 2>/dev/null; then
         echo ""
         echo "=== FATAL: Native library loading error detected ==="
@@ -57,7 +57,7 @@ check_fatal_logcat() {
 dump_logcat() {
     local label="$1"
     local logcat_dump="$WORK_DIR/logcat_dump_${label}.txt"
-    "$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:W' > "$logcat_dump" 2>&1
+    "$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:W' > "$logcat_dump" 2>&1 || true
     echo ""
     echo "=== Logcat dump ($label) — last 40 warning/error lines ==="
     tail -40 "$logcat_dump"
@@ -75,7 +75,7 @@ wait_for_logcat() {
     local logcat_poll="$WORK_DIR/logcat_poll.txt"
     local elapsed=0
     while [ $elapsed -lt "$timeout_seconds" ]; do
-        "$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$logcat_poll" 2>&1
+        "$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$logcat_poll" 2>&1 || true
         if grep -q "$pattern" "$logcat_poll" 2>/dev/null; then
             echo "Found '$pattern' after ~${elapsed}s"
             return 0

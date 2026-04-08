@@ -23,7 +23,7 @@ fi
 
 # Dump final logcat for assertions
 LOGCAT_FILE="$WORK_DIR/lifecycle_logcat.txt"
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1
+"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1 || true
 
 assert_logcat "$LOGCAT_FILE" "Lifecycle: Create" "Lifecycle: Create"
 assert_logcat "$LOGCAT_FILE" "Lifecycle: Resume" "Lifecycle: Resume"

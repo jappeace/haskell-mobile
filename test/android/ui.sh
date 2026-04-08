@@ -23,7 +23,7 @@ fi
 sleep 5
 
 LOGCAT_FILE="$WORK_DIR/ui_logcat.txt"
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1
+"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1 || true
 
 assert_logcat "$LOGCAT_FILE" "setRoot" "initial setRoot"
 assert_logcat "$LOGCAT_FILE" "setStrProp.*Counter: 0" "initial Counter: 0"
@@ -33,7 +33,7 @@ assert_logcat "$LOGCAT_FILE" "setHandler.*click" "setHandler click"
 tap_button "+" || "$ADB" -s "$EMULATOR_SERIAL" shell input tap 300 600
 sleep 5
 
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1
+"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1 || true
 
 assert_logcat "$LOGCAT_FILE" "Click dispatched" "Click dispatched after + tap"
 assert_logcat "$LOGCAT_FILE" "setStrProp.*Counter: 1" "Counter: 1 after + tap"

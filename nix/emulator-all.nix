@@ -98,7 +98,7 @@ let
     platformVersions = [ emulatorApiLevel ];
     includeEmulator = true;
     includeSystemImages = true;
-    systemImageTypes = [ "google_apis_playstore" ];
+    systemImageTypes = [ "google_apis" ];
     abiVersions = [ "x86_64" ];
     cmdLineToolsVersion = "8.0";
   };
@@ -107,7 +107,7 @@ let
   sdkRoot = "${sdk}/libexec/android-sdk";
 
   platformVersion = emulatorApiLevel;
-  systemImageType = "google_apis_playstore";
+  systemImageType = "google_apis";
   abiVersion = "x86_64";
   imagePackage = "system-images;android-${platformVersion};${systemImageType};${abiVersion}";
 
@@ -228,7 +228,7 @@ echo "n" | "$AVDMANAGER" create avd \
     -p "$ANDROID_AVD_HOME/$DEVICE_NAME.avd"
 
 cat >> "$ANDROID_AVD_HOME/$DEVICE_NAME.avd/config.ini" << 'AVDCONF'
-hw.ramSize = 4096
+hw.ramSize = 6144
 hw.gpu.enabled = yes
 hw.gpu.mode = swiftshader_indirect
 disk.dataPartition.size = 2G
@@ -266,7 +266,7 @@ echo "=== Booting emulator ==="
     -port "$PORT" \
     -gpu swiftshader_indirect \
     -no-snapshot \
-    -memory 4096 \
+    -memory 6144 \
     $ACCEL_FLAG \
     &
 EMU_PID=$!

@@ -26,7 +26,7 @@ if [ $WAIT_RC -eq 2 ]; then
 fi
 
 LOGCAT_FILE="$WORK_DIR/locale_logcat.txt"
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1
+"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1 || true
 
 assert_logcat "$LOGCAT_FILE" "Locale raw:" "Locale raw tag logged"
 assert_logcat "$LOGCAT_FILE" "Locale parsed:" "Locale parsed tag logged"
