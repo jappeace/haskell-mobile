@@ -204,6 +204,10 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     jclass actClass = (*env)->GetObjectClass(env, activity);
     g_method_registerTextWatcher = (*env)->GetMethodID(env, actClass,
         "registerTextWatcher", "(Landroid/widget/EditText;)V");
+    if (!g_method_registerTextWatcher) {
+        LOGE("registerTextWatcher not found — text input events disabled");
+        (*env)->ExceptionClear(env);
+    }
 
     /* EditText.setInputType(int) */
     g_method_setInputType = (*env)->GetMethodID(env, g_class_EditText,
@@ -236,6 +240,12 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     /* View.setBackgroundColor(int) — sets ARGB background color */
     g_method_setBackgroundColor = (*env)->GetMethodID(env, viewClass,
         "setBackgroundColor", "(I)V");
+
+    /* Clear any pending exception from optional method lookups above */
+    if ((*env)->ExceptionCheck(env)) {
+        LOGE("JNI exception during resolve_jni_ids — clearing");
+        (*env)->ExceptionClear(env);
+    }
 
     return 0;
 }
@@ -492,8 +502,12 @@ static void android_set_handler(int32_t nodeId, int32_t eventType, int32_t callb
         break;
     case UI_EVENT_TEXT_CHANGE:
         /* Register a TextWatcher via our Java helper */
-        (*env)->CallVoidMethod(env, g_activity, g_method_registerTextWatcher, view);
-        LOGI("setHandler(node=%d, textChange, callback=%d)", nodeId, callbackId);
+        if (g_method_registerTextWatcher) {
+            (*env)->CallVoidMethod(env, g_activity, g_method_registerTextWatcher, view);
+            LOGI("setHandler(node=%d, textChange, callback=%d)", nodeId, callbackId);
+        } else {
+            LOGE("setHandler: registerTextWatcher unavailable, skipping node=%d", nodeId);
+        }
         break;
     default:
         LOGI("setHandler: unknown eventType %d", eventType);

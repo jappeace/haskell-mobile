@@ -86,7 +86,8 @@ void setup_android_permission_bridge(JNIEnv *env, jobject activity, void *haskel
         "checkPermission", "(I)I");
 
     if (!g_method_requestPermission || !g_method_checkPermission) {
-        LOGE("Failed to resolve permission JNI method IDs");
+        LOGE("Failed to resolve permission JNI method IDs — permission bridge disabled");
+        (*env)->ExceptionClear(env);
         return;
     }
 

@@ -16,7 +16,7 @@
 #endif
 
 #ifndef JNI_CLASS
-#define JNI_CLASS MainActivity
+#define JNI_CLASS HaskellMobileActivity
 #endif
 
 /* Two levels of indirection so JNI_PACKAGE / JNI_CLASS are expanded

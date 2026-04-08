@@ -111,8 +111,11 @@ in {
         echo "RTS include: $RTS_INCLUDE"
 
         # Step 1: Compile JNI bridge and Android UI bridge with NDK clang
+        # Core library C files always use me_jappie_haskellmobile because
+        # native methods are declared on HaskellMobileActivity (the library's
+        # own class), not the consumer's subclass.
         ${ndkCc} -c -fPIC \
-          -DJNI_PACKAGE=${jniPackageMacro} \
+          -DJNI_PACKAGE=me_jappie_haskellmobile \
           -I${sysroot}/usr/include \
           -I$RTS_INCLUDE \
           -I${haskellMobileSrc}/include \
@@ -130,7 +133,7 @@ in {
           ${haskellMobileSrc}/cbits/ui_bridge_android.c
 
         ${ndkCc} -c -fPIC \
-          -DJNI_PACKAGE=${jniPackageMacro} \
+          -DJNI_PACKAGE=me_jappie_haskellmobile \
           -I${sysroot}/usr/include \
           -I$RTS_INCLUDE \
           -I${haskellMobileSrc}/include \
@@ -296,6 +299,7 @@ in {
     { sharedLibs ? null       # list of { lib = <drv>; abiDir = "arm64-v8a"; }
     , sharedLib ? null        # backward compat: single lib drv (assumes arm64-v8a)
     , androidSrc
+    , baseJavaSrc ? null      # path to haskell-mobile's android/java/ for consumer APKs
     , apkName ? "app.apk"
     , name ? "app-apk"
     }:
@@ -343,7 +347,8 @@ in {
           -classpath ${platform}/android.jar \
           -d classes \
           $(find gen -name '*.java') \
-          $(find java -name '*.java')
+          $(find java -name '*.java') \
+          ${if baseJavaSrc != null then "$(find ${baseJavaSrc} -name '*.java')" else ""}
 
         echo "=== Step 4: Convert to DEX ==="
         mkdir -p dex_out
