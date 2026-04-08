@@ -310,6 +310,22 @@ static int32_t ios_create_node(int32_t nodeType)
     return nodeId;
 }
 
+/* Show placeholder text inside an ImageView when the image source fails to load. */
+static void ios_set_image_placeholder(UIImageView *imageView, const char *message)
+{
+    UILabel *placeholder = [[UILabel alloc] init];
+    placeholder.text = [NSString stringWithUTF8String:message];
+    placeholder.textColor = [UIColor secondaryLabelColor];
+    placeholder.font = [UIFont systemFontOfSize:12.0];
+    placeholder.textAlignment = NSTextAlignmentCenter;
+    placeholder.translatesAutoresizingMaskIntoConstraints = NO;
+    [imageView addSubview:placeholder];
+    [NSLayoutConstraint activateConstraints:@[
+        [placeholder.centerXAnchor constraintEqualToAnchor:imageView.centerXAnchor],
+        [placeholder.centerYAnchor constraintEqualToAnchor:imageView.centerYAnchor],
+    ]];
+}
+
 static void ios_set_str_prop(int32_t nodeId, int32_t propId, const char *value)
 {
     UIView *view = get_node(nodeId);
@@ -362,6 +378,7 @@ static void ios_set_str_prop(int32_t nodeId, int32_t propId, const char *value)
                 ((UIImageView *)view).image = image;
             } else {
                 LOGE("Image resource not found: %{public}s", value);
+                ios_set_image_placeholder((UIImageView *)view, "Image not found");
             }
         }
         break;
@@ -374,6 +391,7 @@ static void ios_set_str_prop(int32_t nodeId, int32_t propId, const char *value)
                 ((UIImageView *)view).image = image;
             } else {
                 LOGE("Failed to load image file: %{public}s", value);
+                ios_set_image_placeholder((UIImageView *)view, "Image not found");
             }
         }
         break;
@@ -487,6 +505,7 @@ static void ios_set_image_data(int32_t nodeId, const uint8_t *data, int32_t leng
         ((UIImageView *)view).image = image;
     } else {
         LOGE("setImageData: failed to decode %d bytes (node=%d)", length, nodeId);
+        ios_set_image_placeholder((UIImageView *)view, "Image not found");
     }
     LOGI("setImageData(node=%d, %d bytes)", nodeId, length);
 }

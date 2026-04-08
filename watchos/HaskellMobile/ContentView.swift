@@ -88,7 +88,9 @@ struct ImageNodeView: View {
         } else if let filePath = node.imageFile, let uiImage = UIImage(contentsOfFile: filePath) {
             imageWithScaleType(Image(uiImage: uiImage))
         } else {
-            EmptyView()
+            Text("Image not found")
+                .foregroundColor(.secondary)
+                .font(.caption)
         }
     }
 

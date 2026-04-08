@@ -11,6 +11,7 @@ module HaskellMobile.Widget
   , InputType(..)
   , TextInputConfig(..)
   , ScaleType(..)
+  , ResourceName(..)
   , ImageSource(..)
   , ImageConfig(..)
   , Widget(..)
@@ -149,11 +150,19 @@ data ScaleType
   | ScaleNone  -- ^ No scaling; display at native resolution.
   deriving (Show, Eq)
 
+-- | A platform resource name (e.g. @"ic_launcher"@, @"logo"@).
+-- Wraps a 'Text' value that identifies a drawable\/image resource
+-- bundled with the app. No compile-time guarantee that the resource
+-- exists — a missing resource shows \"Image not found\" placeholder text
+-- on iOS\/watchOS and an empty view on Android (with an error log).
+newtype ResourceName = ResourceName { unResourceName :: Text }
+  deriving (Show, Eq)
+
 -- | Source of image data for an 'Image' widget.
 data ImageSource
-  = ImageResource Text      -- ^ Platform resource name (e.g. @"icon_logo"@).
-  | ImageData ByteString    -- ^ Raw image bytes (PNG/JPEG).
-  | ImageFile Text          -- ^ Absolute file path to an image on disk.
+  = ImageResource ResourceName  -- ^ Platform resource by name.
+  | ImageData ByteString        -- ^ Raw image bytes (PNG/JPEG).
+  | ImageFile FilePath          -- ^ Absolute file path to an image on disk.
   deriving (Show, Eq)
 
 -- | Configuration for an image widget.

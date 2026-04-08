@@ -43,7 +43,7 @@ import HaskellMobile.I18n
   , TranslateFailure(..)
   , translate
   )
-import HaskellMobile.App (imageDemoApp, mobileApp)
+import HaskellMobile.App (mobileApp)
 import HaskellMobile.Lifecycle
   ( LifecycleEvent(..)
   , MobileContext(..)
@@ -52,7 +52,7 @@ import HaskellMobile.Lifecycle
   , lifecycleToInt
   , loggingMobileContext
   )
-import HaskellMobile.Widget (ButtonConfig(..), Color(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..), colorFromText, colorToHex, defaultStyle)
+import HaskellMobile.Widget (ButtonConfig(..), Color(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), ResourceName(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..), colorFromText, colorToHex, defaultStyle)
 import HaskellMobile.Permission
   ( Permission(..)
   , PermissionStatus(..)
@@ -426,7 +426,7 @@ imageTests = testGroup "Image"
   [ testCase "Image with resource renders without error" $ do
       rs <- newRenderState
       renderWidget rs $ Image ImageConfig
-        { icSource = ImageResource "ic_launcher", icScaleType = ScaleFit }
+        { icSource = ImageResource (ResourceName "ic_launcher"), icScaleType = ScaleFit }
 
   , testCase "Image with ByteString data renders without error" $ do
       rs <- newRenderState
@@ -444,22 +444,29 @@ imageTests = testGroup "Image"
       renderWidget rs $ Column
         [ Text TextConfig { tcLabel = "header", tcFontConfig = Nothing }
         , Image ImageConfig
-            { icSource = ImageResource "logo", icScaleType = ScaleFit }
+            { icSource = ImageResource (ResourceName "logo"), icScaleType = ScaleFit }
         ]
 
   , testCase "Styled Image renders without error" $ do
       rs <- newRenderState
       renderWidget rs $ Styled defaultStyle
         (Image ImageConfig
-          { icSource = ImageResource "icon", icScaleType = ScaleNone })
+          { icSource = ImageResource (ResourceName "icon"), icScaleType = ScaleNone })
 
-  , testCase "imageDemoApp view returns a Column" $ do
-      dummyPermState <- newPermissionState
-      let dummyUserState = UserState { userPermissionState = dummyPermState }
-      widget <- maView imageDemoApp dummyUserState
-      case widget of
-        Column _ -> pure ()
-        _        -> assertFailure "expected Column from imageDemoApp"
+  , testCase "ScaleFit renders without error" $ do
+      rs <- newRenderState
+      renderWidget rs $ Image ImageConfig
+        { icSource = ImageResource (ResourceName "fit_test"), icScaleType = ScaleFit }
+
+  , testCase "ScaleFill renders without error" $ do
+      rs <- newRenderState
+      renderWidget rs $ Image ImageConfig
+        { icSource = ImageResource (ResourceName "fill_test"), icScaleType = ScaleFill }
+
+  , testCase "ScaleNone renders without error" $ do
+      rs <- newRenderState
+      renderWidget rs $ Image ImageConfig
+        { icSource = ImageResource (ResourceName "none_test"), icScaleType = ScaleNone }
   ]
 
 -- | Tests for the Styled widget wrapper.

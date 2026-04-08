@@ -18,8 +18,8 @@ import Data.IORef (IORef, newIORef, readIORef, writeIORef, modifyIORef')
 import Data.Int (Int32)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
-import Data.Text (Text)
-import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..), colorToHex)
+import Data.Text (Text, pack)
+import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), ResourceName(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..), colorToHex)
 import HaskellMobile.UIBridge qualified as Bridge
 import System.IO (hPutStrLn, stderr)
 
@@ -118,9 +118,9 @@ renderNode rs (ScrollView children) = do
 renderNode _rs (Image config) = do
   nodeId <- Bridge.createNode Bridge.NodeImage
   case icSource config of
-    ImageResource name -> Bridge.setStrProp nodeId Bridge.PropImageResource name
-    ImageData bytes    -> Bridge.setImageData nodeId bytes
-    ImageFile path     -> Bridge.setStrProp nodeId Bridge.PropImageFile path
+    ImageResource (ResourceName name) -> Bridge.setStrProp nodeId Bridge.PropImageResource name
+    ImageData bytes                   -> Bridge.setImageData nodeId bytes
+    ImageFile path                    -> Bridge.setStrProp nodeId Bridge.PropImageFile (pack path)
   Bridge.setNumProp nodeId Bridge.PropScaleType (scaleTypeToDouble (icScaleType config))
   pure nodeId
 renderNode rs (Styled style child) = do
