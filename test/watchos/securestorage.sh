@@ -38,8 +38,9 @@ sleep 1
 FULL_LOG="$WORK_DIR/securestorage_full.txt"
 get_full_log "$SS_START" "$FULL_LOG"
 
-if ! grep -q "SecureStorage" "$FULL_LOG" 2>/dev/null; then
-    echo "  'log show' empty/incomplete, using stream log"
+# Try full log first, fall back to stream log
+if ! grep -q "SecureStorage write result" "$FULL_LOG" 2>/dev/null; then
+    echo "  'log show' missing callback output, using stream log"
     FULL_LOG="$STREAM_LOG"
 fi
 
