@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # iOS secure storage test: install app, auto-tap Store Token + Read Token,
-# assert that the write and read callbacks fire end-to-end.
+# assert that the write and read callbacks fire with correct results.
 #
-# Note: Keychain returns errSecMissingEntitlement (-34018) on the iOS
-# simulator when CODE_SIGNING_ALLOWED=NO, so we verify the bridge dispatches
-# callbacks (StorageSuccess OR StorageError) rather than requiring success.
+# The securestorage app is built with ad-hoc signing (CODE_SIGNING_ALLOWED=YES)
+# so Keychain entitlements are embedded and SecItem* calls succeed on the
+# simulator.
 #
 # --autotest-buttons fires onUIEvent(0) at t+3s (Store Token) and
-# onUIEvent(1) at t+7s (Read Token).
+# onUIEvent(1) at t+7s (Read Token), exercising the Keychain round-trip.
 #
 # Required env vars (set by simulator-all.nix harness):
 #   SIM_UDID, BUNDLE_ID, SECURE_STORAGE_APP, WORK_DIR
@@ -31,7 +31,7 @@ sleep 2
 
 xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID" --autotest-buttons
 
-# Wait for the read result (callback fires regardless of Keychain success)
+# Wait for the read result (last meaningful log from the demo app)
 wait_for_log "$STREAM_LOG" "SecureStorage read result" 60
 WAIT_RC=$?
 if [ $WAIT_RC -eq 2 ]; then
@@ -40,16 +40,13 @@ if [ $WAIT_RC -eq 2 ]; then
     exit 1
 fi
 
-# Give the stream a moment to flush
 sleep 2
 kill "$LOG_STREAM_PID" 2>/dev/null || true
 sleep 1
 
-# Verify the bridge dispatches callbacks (status may be StorageError on simulator)
-assert_log "$STREAM_LOG" "SecureStorage read result:" "read callback fires"
-assert_log "$STREAM_LOG" "setRoot" "app rendered"
-assert_log "$STREAM_LOG" "setHandler.*click.*callback=0" "Store Token button registered"
-assert_log "$STREAM_LOG" "setHandler.*click.*callback=1" "Read Token button registered"
+assert_log "$STREAM_LOG" "SecureStorage write result: StorageSuccess" "write callback fires with StorageSuccess"
+assert_log "$STREAM_LOG" "SecureStorage read result: StorageSuccess" "read callback fires with StorageSuccess"
+assert_log "$STREAM_LOG" "test-token-12345" "read returns written token value"
 
 xcrun simctl uninstall "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
 

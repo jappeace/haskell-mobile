@@ -316,7 +316,7 @@ echo "=== Generating securestorage Xcode project ==="
 cd "$WORK_DIR/securestorage"
 ${xcodegen}/bin/xcodegen generate
 
-echo "=== Building securestorage demo app for simulator ==="
+echo "=== Building securestorage demo app for simulator (ad-hoc signed for Keychain entitlements) ==="
 xcodebuild build \
     -project HaskellMobile.xcodeproj \
     -scheme "$SCHEME" \
@@ -324,7 +324,7 @@ xcodebuild build \
     -configuration Release \
     -derivedDataPath "$WORK_DIR/securestorage-build" \
     CODE_SIGN_IDENTITY=- \
-    CODE_SIGNING_ALLOWED=NO \
+    CODE_SIGNING_ALLOWED=YES \
     ARCHS=arm64 \
     ONLY_ACTIVE_ARCH=NO \
     | tail -20
