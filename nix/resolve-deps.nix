@@ -48,11 +48,28 @@ let
 
   isBootPackage = name: builtins.elem name bootPackageNames;
 
-  # Recursively collect all non-boot Haskell deps from propagatedBuildInputs.
+  # Test/benchmark framework packages — never needed at runtime in mobile apps.
+  # cabal2nix merges internal sub-library deps into libraryHaskellDepends
+  # (e.g. vector's benchmarks-O2 → tasty, random), which leaks these into
+  # propagatedBuildInputs.  Their transitive deps (unix, process via
+  # optparse-applicative) cause link failures because boot packages aren't
+  # linked into the .so.  We exclude them from the transitive walk; consumers
+  # who genuinely need these can add them via the hpkgs overlay.
+  testFrameworkNames = [
+    "tasty" "tasty-bench" "tasty-hunit" "tasty-quickcheck" "tasty-smallcheck"
+    "hspec" "hspec-core" "hspec-discover" "hspec-expectations"
+    "HUnit"
+    "criterion" "gauge"
+  ];
+
+  isExcluded = name: isBootPackage name || builtins.elem name testFrameworkNames;
+
+  # Recursively collect all non-boot, non-test-framework Haskell deps from
+  # propagatedBuildInputs.
   collectDeps = seen: deps:
     builtins.foldl' (acc: dep:
       let name = dep.pname or "";
-      in if name == "" || isBootPackage name || builtins.hasAttr name acc
+      in if name == "" || isExcluded name || builtins.hasAttr name acc
          then acc
          else
            let subDeps = builtins.filter
