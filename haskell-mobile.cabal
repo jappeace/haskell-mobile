@@ -75,7 +75,8 @@ library
       src
   build-depends:
       text,
-      containers
+      containers,
+      bytestring
   c-sources:
       cbits/android_stubs.c
       cbits/platform_log.c
@@ -107,4 +108,5 @@ test-suite unit
       tasty-quickcheck,
       haskell-mobile,
       containers,
-      text
+      text,
+      bytestring

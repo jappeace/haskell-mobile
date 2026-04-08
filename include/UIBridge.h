@@ -10,18 +10,22 @@
 #define UI_NODE_ROW        3
 #define UI_NODE_TEXT_INPUT  4
 #define UI_NODE_SCROLL_VIEW 5
+#define UI_NODE_IMAGE       6
 
 /* Property IDs for string properties */
-#define UI_PROP_TEXT      0
-#define UI_PROP_COLOR     1
-#define UI_PROP_HINT      2
-#define UI_PROP_BG_COLOR  3
+#define UI_PROP_TEXT            0
+#define UI_PROP_COLOR           1
+#define UI_PROP_HINT            2
+#define UI_PROP_BG_COLOR        3
+#define UI_PROP_IMAGE_RESOURCE  4
+#define UI_PROP_IMAGE_FILE      5
 
 /* Property IDs for numeric properties */
 #define UI_PROP_FONT_SIZE   0
 #define UI_PROP_PADDING     1
 #define UI_PROP_INPUT_TYPE  2
 #define UI_PROP_GRAVITY     3
+#define UI_PROP_SCALE_TYPE  4
 
 /* Event types */
 #define UI_EVENT_CLICK       0
@@ -36,6 +40,7 @@ typedef struct UIBridgeCallbacks {
     int32_t (*createNode)(int32_t nodeType);
     void    (*setStrProp)(int32_t nodeId, int32_t propId, const char *value);
     void    (*setNumProp)(int32_t nodeId, int32_t propId, double value);
+    void    (*setImageData)(int32_t nodeId, const uint8_t *data, int32_t length);
     void    (*setHandler)(int32_t nodeId, int32_t eventType, int32_t callbackId);
     void    (*addChild)(int32_t parentId, int32_t childId);
     void    (*removeChild)(int32_t parentId, int32_t childId);
@@ -51,6 +56,7 @@ void ui_register_callbacks(UIBridgeCallbacks *callbacks);
 int32_t ui_create_node(int32_t nodeType);
 void    ui_set_str_prop(int32_t nodeId, int32_t propId, const char *value);
 void    ui_set_num_prop(int32_t nodeId, int32_t propId, double value);
+void    ui_set_image_data(int32_t nodeId, const uint8_t *data, int32_t length);
 void    ui_set_handler(int32_t nodeId, int32_t eventType, int32_t callbackId);
 void    ui_add_child(int32_t parentId, int32_t childId);
 void    ui_remove_child(int32_t parentId, int32_t childId);

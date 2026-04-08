@@ -44,6 +44,17 @@ let
     name = "haskell-mobile-watchos-textinput-simulator-app";
   };
 
+  imageWatchos = import ./watchos.nix {
+    inherit sources;
+    mainModule = ../test/ImageDemoMain.hs;
+    simulator = true;
+  };
+  imageSimApp = lib.mkWatchOSSimulatorApp {
+    watchosLib = imageWatchos;
+    watchosSrc = ../watchos;
+    name = "haskell-mobile-watchos-image-simulator-app";
+  };
+
   # watchOS uses a Swift dictionary (unbounded) — no DYNAMIC_NODE_POOL needed.
   # This test just confirms 300 nodes render successfully.
   nodepoolWatchos = import ./watchos.nix {
@@ -80,6 +91,7 @@ DEVICE_TYPE="Apple Watch Series 9 (45mm)"
 COUNTER_SHARE_DIR="${counterSimApp}/share/watchos"
 SCROLL_SHARE_DIR="${scrollSimApp}/share/watchos"
 TEXTINPUT_SHARE_DIR="${textinputSimApp}/share/watchos"
+IMAGE_SHARE_DIR="${imageSimApp}/share/watchos"
 NODEPOOL_SHARE_DIR="${nodepoolSimApp}/share/watchos"
 TEST_SCRIPTS="${testScripts}"
 
@@ -92,6 +104,7 @@ PHASE1_OK=0
 PHASE2_OK=0
 PHASE3_OK=0
 PHASE4_OK=0
+PHASE5_OK=0
 
 cleanup() {
     echo ""
@@ -224,6 +237,40 @@ fi
 echo "TextInput app: $TEXTINPUT_APP"
 
 # --- Stage and build node-pool test app ---
+echo "=== Staging image test app ==="
+mkdir -p "$WORK_DIR/image/lib" "$WORK_DIR/image/include"
+cp "$IMAGE_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/image/lib/"
+cp "$IMAGE_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/image/include/"
+cp "$IMAGE_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/image/include/"
+cp "$IMAGE_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/image/include/"
+cp -r "$IMAGE_SHARE_DIR/HaskellMobile" "$WORK_DIR/image/"
+cp "$IMAGE_SHARE_DIR/project.yml" "$WORK_DIR/image/"
+chmod -R u+w "$WORK_DIR/image"
+
+echo "=== Generating image Xcode project ==="
+cd "$WORK_DIR/image"
+${xcodegen}/bin/xcodegen generate
+
+echo "=== Building image test app for watchOS simulator ==="
+xcodebuild build \
+    -project HaskellMobile.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk watchsimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/image-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+IMAGE_APP=$(find "$WORK_DIR/image-build" -name "*.app" -type d | head -1)
+if [ -z "$IMAGE_APP" ]; then
+    echo "ERROR: Could not find image .app bundle"
+    exit 1
+fi
+echo "Image app: $IMAGE_APP"
+
 echo "=== Staging node-pool test app ==="
 mkdir -p "$WORK_DIR/nodepool/lib" "$WORK_DIR/nodepool/include"
 cp "$NODEPOOL_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/nodepool/lib/"
@@ -321,12 +368,13 @@ sleep 5
 # ===========================================================================
 # Log subsystem differs from bundle ID for watchOS (bundle ID has .watchkitapp suffix)
 LOG_SUBSYSTEM="me.jappie.haskellmobile"
-export SIM_UDID BUNDLE_ID LOG_SUBSYSTEM COUNTER_APP SCROLL_APP TEXTINPUT_APP NODEPOOL_APP WORK_DIR
+export SIM_UDID BUNDLE_ID LOG_SUBSYSTEM COUNTER_APP SCROLL_APP TEXTINPUT_APP IMAGE_APP NODEPOOL_APP WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
 PHASE3_EXIT=0
 PHASE4_EXIT=0
+PHASE5_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -366,6 +414,8 @@ echo "--- locale ---"
 run_with_retry "locale"    bash "$TEST_SCRIPTS/watchos/locale.sh"    || PHASE1_EXIT=1
 echo "--- textinput ---"
 run_with_retry "textinput" bash "$TEST_SCRIPTS/watchos/textinput.sh" || PHASE3_EXIT=1
+echo "--- image ---"
+run_with_retry "image" bash "$TEST_SCRIPTS/watchos/image.sh" || PHASE5_EXIT=1
 echo "--- node-pool ---"
 run_with_retry "node-pool" bash "$TEST_SCRIPTS/watchos/node-pool.sh" || PHASE4_EXIT=1
 
@@ -408,6 +458,16 @@ else
     echo "PHASE 4 FAILED"
 fi
 
+if [ $PHASE5_EXIT -eq 0 ]; then
+    PHASE5_OK=1
+    echo ""
+    echo "PHASE 5 PASSED"
+else
+    PHASE5_OK=0
+    echo ""
+    echo "PHASE 5 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -443,6 +503,13 @@ if [ $PHASE4_OK -eq 1 ]; then
     echo "PASS  Phase 4 — Node pool stress test (300 nodes)"
 else
     echo "FAIL  Phase 4 — Node pool stress test (300 nodes)"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE5_OK -eq 1 ]; then
+    echo "PASS  Phase 5 — Image demo app"
+else
+    echo "FAIL  Phase 5 — Image demo app"
     FINAL_EXIT=1
 fi
 

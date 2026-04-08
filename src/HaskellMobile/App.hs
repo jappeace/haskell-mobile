@@ -5,7 +5,7 @@
 module HaskellMobile.App (mobileApp, scrollDemoApp, textInputDemoApp) where
 
 import Data.IORef (IORef, newIORef, readIORef, modifyIORef')
-import Data.Text (pack)
+import Data.Text qualified as Text
 import HaskellMobile.Types (MobileApp(..))
 import HaskellMobile.Lifecycle (loggingMobileContext)
 import HaskellMobile.Widget (ButtonConfig(..), Color(..), FontConfig(..), InputType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..))
@@ -30,7 +30,7 @@ counterView = do
   pure $ Column
     [ Styled (WidgetStyle (Just 16.0) (Just AlignCenter) (Just (Color 255 0 0 255)) (Just (Color 0 255 0 255)))
         (Text TextConfig
-          { tcLabel      = "Counter: " <> pack (show n)
+          { tcLabel      = "Counter: " <> Text.pack (show n)
           , tcFontConfig = Just (FontConfig 24.0)
           })
     , Row [ Button ButtonConfig
@@ -54,7 +54,7 @@ scrollDemoView :: IO Widget
 scrollDemoView = pure $ ScrollView
   [ Column
     ( map (\itemNumber -> Text TextConfig
-        { tcLabel = "Item " <> pack (show (itemNumber :: Int)), tcFontConfig = Nothing }) [1..20]
+        { tcLabel = "Item " <> Text.pack (show (itemNumber :: Int)), tcFontConfig = Nothing }) [1..20]
     ++ [Button ButtonConfig
         { bcLabel = "Reached Bottom", bcAction = pure (), bcFontConfig = Nothing }]
     )
@@ -87,4 +87,6 @@ textInputDemoView = pure $ Column
       , tiFontConfig = Nothing
       }
   ]
+
+
 

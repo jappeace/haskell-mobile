@@ -138,6 +138,7 @@ static UIView *get_node(int32_t nodeId)
 static int32_t ios_create_node(int32_t nodeType);
 static void    ios_set_str_prop(int32_t nodeId, int32_t propId, const char *value);
 static void    ios_set_num_prop(int32_t nodeId, int32_t propId, double value);
+static void    ios_set_image_data(int32_t nodeId, const uint8_t *data, int32_t length);
 static void    ios_set_handler(int32_t nodeId, int32_t eventType, int32_t callbackId);
 static void    ios_add_child(int32_t parentId, int32_t childId);
 static void    ios_remove_child(int32_t parentId, int32_t childId);
@@ -146,15 +147,16 @@ static void    ios_set_root(int32_t nodeId);
 static void    ios_clear(void);
 
 static UIBridgeCallbacks g_ios_callbacks = {
-    .createNode  = ios_create_node,
-    .setStrProp  = ios_set_str_prop,
-    .setNumProp  = ios_set_num_prop,
-    .setHandler  = ios_set_handler,
-    .addChild    = ios_add_child,
-    .removeChild = ios_remove_child,
-    .destroyNode = ios_destroy_node,
-    .setRoot     = ios_set_root,
-    .clear       = ios_clear,
+    .createNode   = ios_create_node,
+    .setStrProp   = ios_set_str_prop,
+    .setNumProp   = ios_set_num_prop,
+    .setImageData = ios_set_image_data,
+    .setHandler   = ios_set_handler,
+    .addChild     = ios_add_child,
+    .removeChild  = ios_remove_child,
+    .destroyNode  = ios_destroy_node,
+    .setRoot      = ios_set_root,
+    .clear        = ios_clear,
 };
 
 /* ---- Hex color parser ---- */
@@ -264,6 +266,13 @@ static int32_t ios_create_node(int32_t nodeType)
         view = textField;
         break;
     }
+    case UI_NODE_IMAGE: {
+        UIImageView *imageView = [[UIImageView alloc] init];
+        imageView.contentMode = UIViewContentModeScaleAspectFit;
+        imageView.translatesAutoresizingMaskIntoConstraints = NO;
+        view = imageView;
+        break;
+    }
     case UI_NODE_SCROLL_VIEW: {
         UIScrollView *scrollView = [[UIScrollView alloc] init];
         scrollView.translatesAutoresizingMaskIntoConstraints = NO;
@@ -299,6 +308,22 @@ static int32_t ios_create_node(int32_t nodeType)
 
     LOGI("createNode(type=%d) -> %d", nodeType, nodeId);
     return nodeId;
+}
+
+/* Show placeholder text inside an ImageView when the image source fails to load. */
+static void ios_set_image_placeholder(UIImageView *imageView, const char *message)
+{
+    UILabel *placeholder = [[UILabel alloc] init];
+    placeholder.text = [NSString stringWithUTF8String:message];
+    placeholder.textColor = [UIColor secondaryLabelColor];
+    placeholder.font = [UIFont systemFontOfSize:12.0];
+    placeholder.textAlignment = NSTextAlignmentCenter;
+    placeholder.translatesAutoresizingMaskIntoConstraints = NO;
+    [imageView addSubview:placeholder];
+    [NSLayoutConstraint activateConstraints:@[
+        [placeholder.centerXAnchor constraintEqualToAnchor:imageView.centerXAnchor],
+        [placeholder.centerYAnchor constraintEqualToAnchor:imageView.centerYAnchor],
+    ]];
 }
 
 static void ios_set_str_prop(int32_t nodeId, int32_t propId, const char *value)
@@ -343,6 +368,32 @@ static void ios_set_str_prop(int32_t nodeId, int32_t propId, const char *value)
         UIColor *color = parse_hex_color(value);
         if (!color) break;
         view.backgroundColor = color;
+        break;
+    }
+    case UI_PROP_IMAGE_RESOURCE: {
+        LOGI("setStrProp(node=%d, imageResource=\"%{public}s\")", nodeId, value);
+        if ([view isKindOfClass:[UIImageView class]]) {
+            UIImage *image = [UIImage imageNamed:str];
+            if (image) {
+                ((UIImageView *)view).image = image;
+            } else {
+                LOGE("Image resource not found: %{public}s", value);
+                ios_set_image_placeholder((UIImageView *)view, "Image not found");
+            }
+        }
+        break;
+    }
+    case UI_PROP_IMAGE_FILE: {
+        LOGI("setStrProp(node=%d, imageFile=\"%{public}s\")", nodeId, value);
+        if ([view isKindOfClass:[UIImageView class]]) {
+            UIImage *image = [UIImage imageWithContentsOfFile:str];
+            if (image) {
+                ((UIImageView *)view).image = image;
+            } else {
+                LOGE("Failed to load image file: %{public}s", value);
+                ios_set_image_placeholder((UIImageView *)view, "Image not found");
+            }
+        }
         break;
     }
     default:
@@ -391,6 +442,20 @@ static void ios_set_num_prop(int32_t nodeId, int32_t propId, double value)
         LOGI("setNumProp(node=%d, padding=%.1f)", nodeId, value);
         break;
     }
+    case UI_PROP_SCALE_TYPE: {
+        /* Haskell 0 = ScaleFit, 1 = ScaleFill, 2 = ScaleNone */
+        if ([view isKindOfClass:[UIImageView class]]) {
+            UIViewContentMode mode;
+            switch ((int)value) {
+            case 1:  mode = UIViewContentModeScaleAspectFill; break;
+            case 2:  mode = UIViewContentModeCenter;          break;
+            default: mode = UIViewContentModeScaleAspectFit;  break;
+            }
+            ((UIImageView *)view).contentMode = mode;
+        }
+        LOGI("setNumProp(node=%d, scaleType=%d)", nodeId, (int)value);
+        break;
+    }
     case UI_PROP_GRAVITY: {
         /* Haskell 0 = AlignStart, 1 = AlignCenter, 2 = AlignEnd */
         int gravity = (int)value;
@@ -426,6 +491,23 @@ static void ios_set_num_prop(int32_t nodeId, int32_t propId, double value)
         LOGI("setNumProp: unknown propId %d", propId);
         break;
     }
+}
+
+static void ios_set_image_data(int32_t nodeId, const uint8_t *data, int32_t length)
+{
+    UIView *view = get_node(nodeId);
+    if (!view) return;
+    if (![view isKindOfClass:[UIImageView class]]) return;
+
+    NSData *nsdata = [NSData dataWithBytes:data length:(NSUInteger)length];
+    UIImage *image = [UIImage imageWithData:nsdata];
+    if (image) {
+        ((UIImageView *)view).image = image;
+    } else {
+        LOGE("setImageData: failed to decode %d bytes (node=%d)", length, nodeId);
+        ios_set_image_placeholder((UIImageView *)view, "Image not found");
+    }
+    LOGI("setImageData(node=%d, %d bytes)", nodeId, length);
 }
 
 static void ios_set_handler(int32_t nodeId, int32_t eventType, int32_t callbackId)

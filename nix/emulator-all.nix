@@ -71,6 +71,17 @@ let
     name = "haskell-mobile-permission-apk";
   };
 
+  imageAndroid = import ./android.nix {
+    inherit sources androidArch;
+    mainModule = ../test/ImageDemoMain.hs;
+  };
+  imageApk = lib.mkApk {
+    sharedLibs = [{ lib = imageAndroid; inherit abiDir; }];
+    androidSrc = ../android;
+    apkName = "haskell-mobile-image.apk";
+    name = "haskell-mobile-image-apk";
+  };
+
   nodepoolAndroid = import ./android.nix {
     inherit sources androidArch;
     mainModule = ../test/NodePoolTestMain.hs;
@@ -125,6 +136,7 @@ COUNTER_APK="${counterApk}/haskell-mobile.apk"
 SCROLL_APK="${scrollApk}/haskell-mobile-scroll.apk"
 TEXTINPUT_APK="${textinputApk}/haskell-mobile-textinput.apk"
 PERMISSION_APK="${permissionApk}/haskell-mobile-permission.apk"
+IMAGE_APK="${imageApk}/haskell-mobile-image.apk"
 NODEPOOL_APK="${nodepoolApk}/haskell-mobile-nodepool.apk"
 PACKAGE="me.jappie.haskellmobile"
 ACTIVITY=".MainActivity"
@@ -171,6 +183,7 @@ PHASE2_OK=0
 PHASE3_OK=0
 PHASE4_OK=0
 PHASE5_OK=0
+PHASE6_OK=0
 
 cleanup() {
     echo ""
@@ -287,13 +300,14 @@ sleep 30
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK PERMISSION_APK NODEPOOL_APK PACKAGE ACTIVITY WORK_DIR
+export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK PERMISSION_APK IMAGE_APK NODEPOOL_APK PACKAGE ACTIVITY WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
 PHASE3_EXIT=0
 PHASE4_EXIT=0
 PHASE5_EXIT=0
+PHASE6_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -342,6 +356,8 @@ echo "--- textinput ---"
 run_with_retry "textinput" bash "$TEST_SCRIPTS/android/textinput.sh" || PHASE3_EXIT=1
 echo "--- permission ---"
 run_with_retry "permission" bash "$TEST_SCRIPTS/android/permission.sh" || PHASE4_EXIT=1
+echo "--- image ---"
+run_with_retry "image" bash "$TEST_SCRIPTS/android/image.sh" || PHASE6_EXIT=1
 echo "--- node-pool ---"
 run_with_retry "node-pool" bash "$TEST_SCRIPTS/android/node-pool.sh" || PHASE5_EXIT=1
 
@@ -394,6 +410,16 @@ else
     echo "PHASE 5 FAILED"
 fi
 
+if [ $PHASE6_EXIT -eq 0 ]; then
+    PHASE6_OK=1
+    echo ""
+    echo "PHASE 6 PASSED"
+else
+    PHASE6_OK=0
+    echo ""
+    echo "PHASE 6 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -436,6 +462,13 @@ if [ $PHASE5_OK -eq 1 ]; then
     echo "PASS  Phase 5 — Node pool stress test (300 nodes, dynamic pool)"
 else
     echo "FAIL  Phase 5 — Node pool stress test (300 nodes, dynamic pool)"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE6_OK -eq 1 ]; then
+    echo "PASS  Phase 6 — Image demo app"
+else
+    echo "FAIL  Phase 6 — Image demo app"
     FINAL_EXIT=1
 fi
 

@@ -53,6 +53,8 @@ static jclass   g_class_Button;
 static jclass   g_class_EditText;
 static jclass   g_class_LinearLayout;
 static jclass   g_class_ScrollView;
+static jclass   g_class_ImageView;
+static jclass   g_class_BitmapFactory;
 static jclass   g_class_ViewGroup;
 static jclass   g_class_ViewGroup_LayoutParams;
 static jclass   g_class_Integer;
@@ -62,6 +64,7 @@ static jmethodID g_ctor_Button;
 static jmethodID g_ctor_EditText;
 static jmethodID g_ctor_LinearLayout;
 static jmethodID g_ctor_ScrollView;
+static jmethodID g_ctor_ImageView;
 static jmethodID g_ctor_ViewGroup_LayoutParams;
 static jmethodID g_ctor_Integer;
 
@@ -85,6 +88,10 @@ static jmethodID g_method_setGravity_LinearLayout;
 static jmethodID g_method_setLayoutParams;
 static jmethodID g_method_setTextColor;
 static jmethodID g_method_setBackgroundColor;
+static jmethodID g_method_setImageBitmap;
+static jmethodID g_method_setScaleType;
+static jmethodID g_method_decodeByteArray;
+static jmethodID g_method_decodeFile;
 
 /* LinearLayout orientation constants */
 static jint ORIENTATION_VERTICAL   = 1;
@@ -94,6 +101,7 @@ static jint ORIENTATION_HORIZONTAL = 0;
 static int32_t android_create_node(int32_t nodeType);
 static void    android_set_str_prop(int32_t nodeId, int32_t propId, const char *value);
 static void    android_set_num_prop(int32_t nodeId, int32_t propId, double value);
+static void    android_set_image_data(int32_t nodeId, const uint8_t *data, int32_t length);
 static void    android_set_handler(int32_t nodeId, int32_t eventType, int32_t callbackId);
 static void    android_add_child(int32_t parentId, int32_t childId);
 static void    android_remove_child(int32_t parentId, int32_t childId);
@@ -102,15 +110,16 @@ static void    android_set_root(int32_t nodeId);
 static void    android_clear(void);
 
 static UIBridgeCallbacks g_android_callbacks = {
-    .createNode  = android_create_node,
-    .setStrProp  = android_set_str_prop,
-    .setNumProp  = android_set_num_prop,
-    .setHandler  = android_set_handler,
-    .addChild    = android_add_child,
-    .removeChild = android_remove_child,
-    .destroyNode = android_destroy_node,
-    .setRoot     = android_set_root,
-    .clear       = android_clear,
+    .createNode   = android_create_node,
+    .setStrProp   = android_set_str_prop,
+    .setNumProp   = android_set_num_prop,
+    .setImageData = android_set_image_data,
+    .setHandler   = android_set_handler,
+    .addChild     = android_add_child,
+    .removeChild  = android_remove_child,
+    .destroyNode  = android_destroy_node,
+    .setRoot      = android_set_root,
+    .clear        = android_clear,
 };
 
 /* ---- JNI class/method resolution ---- */
@@ -139,6 +148,14 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     if (!cls) return -1;
     g_class_ScrollView = (*env)->NewGlobalRef(env, cls);
 
+    cls = (*env)->FindClass(env, "android/widget/ImageView");
+    if (!cls) return -1;
+    g_class_ImageView = (*env)->NewGlobalRef(env, cls);
+
+    cls = (*env)->FindClass(env, "android/graphics/BitmapFactory");
+    if (!cls) return -1;
+    g_class_BitmapFactory = (*env)->NewGlobalRef(env, cls);
+
     cls = (*env)->FindClass(env, "android/view/ViewGroup");
     if (!cls) return -1;
     g_class_ViewGroup = (*env)->NewGlobalRef(env, cls);
@@ -161,6 +178,8 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     g_ctor_LinearLayout = (*env)->GetMethodID(env, g_class_LinearLayout,
         "<init>", "(Landroid/content/Context;)V");
     g_ctor_ScrollView = (*env)->GetMethodID(env, g_class_ScrollView,
+        "<init>", "(Landroid/content/Context;)V");
+    g_ctor_ImageView = (*env)->GetMethodID(env, g_class_ImageView,
         "<init>", "(Landroid/content/Context;)V");
     g_ctor_ViewGroup_LayoutParams = (*env)->GetMethodID(env,
         g_class_ViewGroup_LayoutParams, "<init>", "(II)V");
@@ -240,6 +259,22 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     /* View.setBackgroundColor(int) — sets ARGB background color */
     g_method_setBackgroundColor = (*env)->GetMethodID(env, viewClass,
         "setBackgroundColor", "(I)V");
+
+    /* ImageView.setImageBitmap(Bitmap) */
+    g_method_setImageBitmap = (*env)->GetMethodID(env, g_class_ImageView,
+        "setImageBitmap", "(Landroid/graphics/Bitmap;)V");
+
+    /* ImageView.setScaleType(ImageView.ScaleType) */
+    g_method_setScaleType = (*env)->GetMethodID(env, g_class_ImageView,
+        "setScaleType", "(Landroid/widget/ImageView$ScaleType;)V");
+
+    /* BitmapFactory.decodeByteArray(byte[], int, int) -> Bitmap */
+    g_method_decodeByteArray = (*env)->GetStaticMethodID(env, g_class_BitmapFactory,
+        "decodeByteArray", "([BII)Landroid/graphics/Bitmap;");
+
+    /* BitmapFactory.decodeFile(String) -> Bitmap */
+    g_method_decodeFile = (*env)->GetStaticMethodID(env, g_class_BitmapFactory,
+        "decodeFile", "(Ljava/lang/String;)Landroid/graphics/Bitmap;");
 
     /* Clear any pending exception from optional method lookups above */
     if ((*env)->ExceptionCheck(env)) {
@@ -356,6 +391,9 @@ static int32_t android_create_node(int32_t nodeType)
     case UI_NODE_SCROLL_VIEW:
         view = (*env)->NewObject(env, g_class_ScrollView, g_ctor_ScrollView, g_activity);
         break;
+    case UI_NODE_IMAGE:
+        view = (*env)->NewObject(env, g_class_ImageView, g_ctor_ImageView, g_activity);
+        break;
     default:
         LOGE("Unknown node type: %d", nodeType);
         return 0;
@@ -407,6 +445,58 @@ static void android_set_str_prop(int32_t nodeId, int32_t propId, const char *val
         LOGI("setStrProp(node=%d, bgColor=\"%s\")", nodeId, value);
         jint argb = parse_hex_color(value);
         (*env)->CallVoidMethod(env, view, g_method_setBackgroundColor, argb);
+        break;
+    }
+    case UI_PROP_IMAGE_RESOURCE: {
+        LOGI("setStrProp(node=%d, imageResource=\"%s\")", nodeId, value);
+        /* Resource lookup: getResources().getIdentifier(name, "drawable", packageName) */
+        if ((*env)->IsInstanceOf(env, view, g_class_ImageView)) {
+            jclass actClass = (*env)->GetObjectClass(env, g_activity);
+            jmethodID getResources = (*env)->GetMethodID(env, actClass,
+                "getResources", "()Landroid/content/res/Resources;");
+            jmethodID getPackageName = (*env)->GetMethodID(env, actClass,
+                "getPackageName", "()Ljava/lang/String;");
+            jobject resources = (*env)->CallObjectMethod(env, g_activity, getResources);
+            jstring packageName = (*env)->CallObjectMethod(env, g_activity, getPackageName);
+            jclass resClass = (*env)->GetObjectClass(env, resources);
+            jmethodID getIdentifier = (*env)->GetMethodID(env, resClass,
+                "getIdentifier", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I");
+            jmethodID getDrawable = (*env)->GetMethodID(env, resClass,
+                "getDrawable", "(I)Landroid/graphics/drawable/Drawable;");
+            jstring jname = (*env)->NewStringUTF(env, value);
+            jstring jtype = (*env)->NewStringUTF(env, "drawable");
+            jint resId = (*env)->CallIntMethod(env, resources, getIdentifier,
+                jname, jtype, packageName);
+            if (resId != 0) {
+                jobject drawable = (*env)->CallObjectMethod(env, resources, getDrawable, resId);
+                jmethodID setImageDrawable = (*env)->GetMethodID(env, g_class_ImageView,
+                    "setImageDrawable", "(Landroid/graphics/drawable/Drawable;)V");
+                (*env)->CallVoidMethod(env, view, setImageDrawable, drawable);
+                (*env)->DeleteLocalRef(env, drawable);
+            } else {
+                LOGE("Resource not found: %s", value);
+            }
+            (*env)->DeleteLocalRef(env, jname);
+            (*env)->DeleteLocalRef(env, jtype);
+            (*env)->DeleteLocalRef(env, packageName);
+            (*env)->DeleteLocalRef(env, resources);
+        }
+        break;
+    }
+    case UI_PROP_IMAGE_FILE: {
+        LOGI("setStrProp(node=%d, imageFile=\"%s\")", nodeId, value);
+        if ((*env)->IsInstanceOf(env, view, g_class_ImageView)) {
+            jstring jpath = (*env)->NewStringUTF(env, value);
+            jobject bitmap = (*env)->CallStaticObjectMethod(env,
+                g_class_BitmapFactory, g_method_decodeFile, jpath);
+            if (bitmap) {
+                (*env)->CallVoidMethod(env, view, g_method_setImageBitmap, bitmap);
+                (*env)->DeleteLocalRef(env, bitmap);
+            } else {
+                LOGE("Failed to decode file: %s", value);
+            }
+            (*env)->DeleteLocalRef(env, jpath);
+        }
         break;
     }
     default:
@@ -477,10 +567,58 @@ static void android_set_num_prop(int32_t nodeId, int32_t propId, double value)
         LOGI("setNumProp(node=%d, gravity=%d)", nodeId, gravity);
         break;
     }
+    case UI_PROP_SCALE_TYPE: {
+        /* Haskell 0 = ScaleFit  -> FIT_CENTER
+         * Haskell 1 = ScaleFill -> CENTER_CROP
+         * Haskell 2 = ScaleNone -> CENTER
+         */
+        if ((*env)->IsInstanceOf(env, view, g_class_ImageView)) {
+            jclass scaleTypeClass = (*env)->FindClass(env, "android/widget/ImageView$ScaleType");
+            const char *fieldName;
+            switch ((int)value) {
+            case 1:  fieldName = "CENTER_CROP"; break;
+            case 2:  fieldName = "CENTER";      break;
+            default: fieldName = "FIT_CENTER";  break;
+            }
+            jfieldID field = (*env)->GetStaticFieldID(env, scaleTypeClass,
+                fieldName, "Landroid/widget/ImageView$ScaleType;");
+            jobject scaleType = (*env)->GetStaticObjectField(env, scaleTypeClass, field);
+            (*env)->CallVoidMethod(env, view, g_method_setScaleType, scaleType);
+            (*env)->DeleteLocalRef(env, scaleType);
+            (*env)->DeleteLocalRef(env, scaleTypeClass);
+        }
+        LOGI("setNumProp(node=%d, scaleType=%d)", nodeId, (int)value);
+        break;
+    }
     default:
         LOGI("setNumProp: unknown propId %d", propId);
         break;
     }
+}
+
+static void android_set_image_data(int32_t nodeId, const uint8_t *data, int32_t length)
+{
+    JNIEnv *env = g_env;
+    jobject view = get_node(nodeId);
+    if (!view) return;
+    if (!(*env)->IsInstanceOf(env, view, g_class_ImageView)) return;
+
+    /* Create Java byte[] and copy data */
+    jbyteArray jdata = (*env)->NewByteArray(env, length);
+    (*env)->SetByteArrayRegion(env, jdata, 0, length, (const jbyte *)data);
+
+    /* BitmapFactory.decodeByteArray(byte[], offset, length) */
+    jobject bitmap = (*env)->CallStaticObjectMethod(env,
+        g_class_BitmapFactory, g_method_decodeByteArray, jdata, (jint)0, (jint)length);
+    if (bitmap) {
+        (*env)->CallVoidMethod(env, view, g_method_setImageBitmap, bitmap);
+        (*env)->DeleteLocalRef(env, bitmap);
+    } else {
+        LOGE("setImageData: BitmapFactory.decodeByteArray failed (node=%d, %d bytes)", nodeId, length);
+    }
+    (*env)->DeleteLocalRef(env, jdata);
+
+    LOGI("setImageData(node=%d, %d bytes)", nodeId, length);
 }
 
 static void android_set_handler(int32_t nodeId, int32_t eventType, int32_t callbackId)
