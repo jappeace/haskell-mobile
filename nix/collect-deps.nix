@@ -1,48 +1,17 @@
 # Collect pre-built Haskell package outputs into a single directory.
 #
-# Takes a list of nixpkgs haskellPackages derivations (already built by
-# nixpkgs infrastructure), walks their transitive closure via
-# propagatedBuildInputs, and collects .conf / .a files into:
+# Takes a list of nixpkgs haskellPackages derivations (already resolved
+# transitively by resolve-deps.nix) and collects their .conf / .a files:
 #   $out/lib/*.a       — static archives (only those referenced by hs-libraries)
 #   $out/pkgdb/        — GHC package database (.conf + cache)
 #
 # This uses standard nixpkgs outputs rather than manual cabal builds.
 { pkgs
 , ghcPkgCmd         # full path to ghc-pkg (or cross ghc-pkg)
-, deps              # list of haskellPackages derivations
+, deps              # list of haskellPackages derivations (from resolve-deps.nix)
 }:
 let
-  # GHC boot/wired-in packages — already provided by the cross-GHC, so they
-  # must not be collected again.  Also excludes haskell-mobile itself
-  # (compiled separately in mkAndroidLib/mkIOSLib).
-  bootPackageNames = [
-    "base" "ghc-prim" "ghc-bignum" "ghc-internal" "integer-gmp"
-    "bytestring" "text" "array" "deepseq" "containers"
-    "template-haskell" "transformers" "mtl" "stm" "exceptions"
-    "filepath" "directory" "process" "unix" "time" "binary"
-    "parsec" "pretty" "ghc-boot-th" "ghc-boot" "ghc-heap"
-    "hpc" "Cabal" "Cabal-syntax" "os-string"
-    "haskell-mobile"
-  ];
-
-  isBootPackage = name: builtins.elem name bootPackageNames;
-
-  # Walk propagatedBuildInputs transitively to collect all Haskell deps.
-  collectTransitive = seen: drvs:
-    builtins.foldl' (acc: drv:
-      let name = drv.pname or "";
-      in if name == "" || isBootPackage name || builtins.hasAttr name acc
-         then acc
-         else
-           let subDeps = builtins.filter
-                 (d: d ? pname && d ? isHaskellLibrary)
-                 (drv.propagatedBuildInputs or []);
-           in collectTransitive (acc // { "${name}" = drv; }) subDeps
-    ) seen drvs;
-
-  allDeps = builtins.attrValues (collectTransitive {} deps);
-
-  depsList = builtins.concatStringsSep " " (map toString allDeps);
+  depsList = builtins.concatStringsSep " " (map toString deps);
 
 in pkgs.runCommand "haskell-mobile-collected-deps" {
   nativeBuildInputs = [ pkgs.findutils ];
