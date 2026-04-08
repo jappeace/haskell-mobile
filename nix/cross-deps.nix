@@ -63,6 +63,6 @@ let
   };
 
 in import ./collect-deps.nix {
-  inherit pkgs ghcPkgCmd;
+  inherit pkgs ghc ghcPkgCmd;
   deps = resolvedDeps;
 }
