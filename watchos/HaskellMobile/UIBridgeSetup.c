@@ -20,6 +20,7 @@ extern void haskellLogLocale(void);
 extern int32_t watchos_create_node(int32_t nodeType);
 extern void    watchos_set_str_prop(int32_t nodeId, int32_t propId, const char *value);
 extern void    watchos_set_num_prop(int32_t nodeId, int32_t propId, double value);
+extern void    watchos_set_image_data(int32_t nodeId, const uint8_t *data, int32_t length);
 extern void    watchos_set_handler(int32_t nodeId, int32_t eventType, int32_t callbackId);
 extern void    watchos_add_child(int32_t parentId, int32_t childId);
 extern void    watchos_remove_child(int32_t parentId, int32_t childId);
@@ -31,6 +32,7 @@ static UIBridgeCallbacks g_watchos_callbacks = {
     .createNode  = watchos_create_node,
     .setStrProp  = watchos_set_str_prop,
     .setNumProp  = watchos_set_num_prop,
+    .setImageData = watchos_set_image_data,
     .setHandler  = watchos_set_handler,
     .addChild    = watchos_add_child,
     .removeChild = watchos_remove_child,
