@@ -71,6 +71,17 @@ let
     name = "haskell-mobile-permission-apk";
   };
 
+  secureStorageAndroid = import ./android.nix {
+    inherit sources androidArch;
+    mainModule = ../test/SecureStorageDemoMain.hs;
+  };
+  secureStorageApk = lib.mkApk {
+    sharedLibs = [{ lib = secureStorageAndroid; inherit abiDir; }];
+    androidSrc = ../android;
+    apkName = "haskell-mobile-securestorage.apk";
+    name = "haskell-mobile-securestorage-apk";
+  };
+
   imageAndroid = import ./android.nix {
     inherit sources androidArch;
     mainModule = ../test/ImageDemoMain.hs;
@@ -136,6 +147,7 @@ COUNTER_APK="${counterApk}/haskell-mobile.apk"
 SCROLL_APK="${scrollApk}/haskell-mobile-scroll.apk"
 TEXTINPUT_APK="${textinputApk}/haskell-mobile-textinput.apk"
 PERMISSION_APK="${permissionApk}/haskell-mobile-permission.apk"
+SECURE_STORAGE_APK="${secureStorageApk}/haskell-mobile-securestorage.apk"
 IMAGE_APK="${imageApk}/haskell-mobile-image.apk"
 NODEPOOL_APK="${nodepoolApk}/haskell-mobile-nodepool.apk"
 PACKAGE="me.jappie.haskellmobile"
@@ -184,6 +196,7 @@ PHASE3_OK=0
 PHASE4_OK=0
 PHASE5_OK=0
 PHASE6_OK=0
+PHASE7_OK=0
 
 cleanup() {
     echo ""
@@ -300,7 +313,7 @@ sleep 30
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK PERMISSION_APK IMAGE_APK NODEPOOL_APK PACKAGE ACTIVITY WORK_DIR
+export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK PACKAGE ACTIVITY WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -308,6 +321,7 @@ PHASE3_EXIT=0
 PHASE4_EXIT=0
 PHASE5_EXIT=0
 PHASE6_EXIT=0
+PHASE7_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -356,6 +370,8 @@ echo "--- textinput ---"
 run_with_retry "textinput" bash "$TEST_SCRIPTS/android/textinput.sh" || PHASE3_EXIT=1
 echo "--- permission ---"
 run_with_retry "permission" bash "$TEST_SCRIPTS/android/permission.sh" || PHASE4_EXIT=1
+echo "--- securestorage ---"
+run_with_retry "securestorage" bash "$TEST_SCRIPTS/android/securestorage.sh" || PHASE7_EXIT=1
 echo "--- image ---"
 run_with_retry "image" bash "$TEST_SCRIPTS/android/image.sh" || PHASE6_EXIT=1
 echo "--- node-pool ---"
@@ -420,6 +436,16 @@ else
     echo "PHASE 6 FAILED"
 fi
 
+if [ $PHASE7_EXIT -eq 0 ]; then
+    PHASE7_OK=1
+    echo ""
+    echo "PHASE 7 PASSED"
+else
+    PHASE7_OK=0
+    echo ""
+    echo "PHASE 7 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -469,6 +495,13 @@ if [ $PHASE6_OK -eq 1 ]; then
     echo "PASS  Phase 6 — Image demo app"
 else
     echo "FAIL  Phase 6 — Image demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE7_OK -eq 1 ]; then
+    echo "PASS  Phase 7 — SecureStorage demo app"
+else
+    echo "FAIL  Phase 7 — SecureStorage demo app"
     FINAL_EXIT=1
 fi
 

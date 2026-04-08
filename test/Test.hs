@@ -63,6 +63,16 @@ import HaskellMobile.Permission
   , permissionStatusFromInt
   )
 import HaskellMobile.Render (newRenderState, renderWidget, dispatchEvent, dispatchTextEvent)
+import HaskellMobile.SecureStorage
+  ( SecureStorageStatus(..)
+  , SecureStorageState(..)
+  , newSecureStorageState
+  , secureStorageWrite
+  , secureStorageRead
+  , secureStorageDelete
+  , dispatchSecureStorageResult
+  , storageStatusFromInt
+  )
 
 main :: IO ()
 main = do
@@ -71,10 +81,10 @@ main = do
   -- one context can be active for FFI permission dispatch.
   ffiCtxPtr <- startMobileApp mobileApp
   ffiAppCtx <- derefAppContext ffiCtxPtr
-  defaultMain (tests (acPermissionState ffiAppCtx))
+  defaultMain (tests (acPermissionState ffiAppCtx) (acSecureStorageState ffiAppCtx))
 
-tests :: PermissionState -> TestTree
-tests ffiPermState = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, imageTests, styledTests, textAlignTests, colorTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, appContextTests, exceptionHandlerTests]
+tests :: PermissionState -> SecureStorageState -> TestTree
+tests ffiPermState ffiSecureStorageState = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, imageTests, styledTests, textAlignTests, colorTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, secureStorageTests ffiSecureStorageState, appContextTests, exceptionHandlerTests]
 
 qcProps :: TestTree
 qcProps = testGroup "(checked by QuickCheck)"
@@ -251,7 +261,11 @@ uiTests = testGroup "UI"
 
   , testCase "mobileApp view returns a widget" $ do
       dummyPermState <- newPermissionState
-      let dummyUserState = UserState { userPermissionState = dummyPermState }
+      dummySecureStorageState <- newSecureStorageState
+      let dummyUserState = UserState
+            { userPermissionState    = dummyPermState
+            , userSecureStorageState = dummySecureStorageState
+            }
       widget <- maView mobileApp dummyUserState
       -- mobileApp is the counter demo; verify it's a column
       case widget of
@@ -639,7 +653,11 @@ registrationTests = testGroup "Registration"
       ctxPtr <- newAppContext customApp
       appCtx <- derefAppContext ctxPtr
       dummyPermState <- newPermissionState
-      let dummyUserState = UserState { userPermissionState = dummyPermState }
+      dummySecureStorageState <- newSecureStorageState
+      let dummyUserState = UserState
+            { userPermissionState    = dummyPermState
+            , userSecureStorageState = dummySecureStorageState
+            }
       viewFn <- readIORef (acViewFunction appCtx)
       widget <- viewFn dummyUserState
       case widget of
@@ -661,7 +679,11 @@ registrationTests = testGroup "Registration"
       appCtxA <- derefAppContext ctxPtrA
       appCtxB <- derefAppContext ctxPtrB
       dummyPermState <- newPermissionState
-      let dummyUserState = UserState { userPermissionState = dummyPermState }
+      dummySecureStorageState <- newSecureStorageState
+      let dummyUserState = UserState
+            { userPermissionState    = dummyPermState
+            , userSecureStorageState = dummySecureStorageState
+            }
       viewFnA <- readIORef (acViewFunction appCtxA)
       viewFnB <- readIORef (acViewFunction appCtxB)
       widgetA <- viewFnA dummyUserState
@@ -827,6 +849,110 @@ permissionTests ffiPermState = testGroup "Permission"
       permissionStatusFromInt 100 @?= Nothing
   ]
 
+-- | Secure storage tests.  The @ffiSecureStorageState@ parameter is the
+-- 'SecureStorageState' from a context created once in 'main' via
+-- 'haskellCreateContext', ensuring the C desktop stub dispatches through
+-- a valid context pointer.
+secureStorageTests :: SecureStorageState -> TestTree
+secureStorageTests ffiSecureStorageState = testGroup "SecureStorage"
+  [ testCase "write then read returns written value" $ do
+      statusRef <- newIORef (Nothing :: Maybe SecureStorageStatus)
+      valueRef  <- newIORef (Nothing :: Maybe Text.Text)
+      secureStorageWrite ffiSecureStorageState "test_key" "test_value"
+        (\status -> modifyIORef' statusRef (const (Just status)))
+      writeStatus <- readIORef statusRef
+      writeStatus @?= Just StorageSuccess
+      secureStorageRead ffiSecureStorageState "test_key"
+        (\status maybeVal -> do
+          modifyIORef' statusRef (const (Just status))
+          modifyIORef' valueRef  (const maybeVal))
+      readStatus <- readIORef statusRef
+      readValue  <- readIORef valueRef
+      readStatus @?= Just StorageSuccess
+      readValue  @?= Just "test_value"
+
+  , testCase "read nonexistent key returns StorageNotFound" $ do
+      statusRef <- newIORef (Nothing :: Maybe SecureStorageStatus)
+      valueRef  <- newIORef (Nothing :: Maybe Text.Text)
+      secureStorageRead ffiSecureStorageState "nonexistent_key_12345"
+        (\status maybeVal -> do
+          modifyIORef' statusRef (const (Just status))
+          modifyIORef' valueRef  (const maybeVal))
+      readStatus <- readIORef statusRef
+      readValue  <- readIORef valueRef
+      readStatus @?= Just StorageNotFound
+      readValue  @?= Nothing
+
+  , testCase "delete then read returns StorageNotFound" $ do
+      statusRef <- newIORef (Nothing :: Maybe SecureStorageStatus)
+      valueRef  <- newIORef (Nothing :: Maybe Text.Text)
+      -- Write a key first
+      secureStorageWrite ffiSecureStorageState "delete_me" "some_value"
+        (\_ -> pure ())
+      -- Delete it
+      secureStorageDelete ffiSecureStorageState "delete_me"
+        (\status -> modifyIORef' statusRef (const (Just status)))
+      deleteStatus <- readIORef statusRef
+      deleteStatus @?= Just StorageSuccess
+      -- Read it back — should be gone
+      secureStorageRead ffiSecureStorageState "delete_me"
+        (\status maybeVal -> do
+          modifyIORef' statusRef (const (Just status))
+          modifyIORef' valueRef  (const maybeVal))
+      readStatus <- readIORef statusRef
+      readValue  <- readIORef valueRef
+      readStatus @?= Just StorageNotFound
+      readValue  @?= Nothing
+
+  , testCase "write overwrites existing value" $ do
+      valueRef <- newIORef (Nothing :: Maybe Text.Text)
+      secureStorageWrite ffiSecureStorageState "overwrite_key" "first"
+        (\_ -> pure ())
+      secureStorageWrite ffiSecureStorageState "overwrite_key" "second"
+        (\_ -> pure ())
+      secureStorageRead ffiSecureStorageState "overwrite_key"
+        (\_ maybeVal -> modifyIORef' valueRef (const maybeVal))
+      readValue <- readIORef valueRef
+      readValue @?= Just "second"
+
+  , testCase "write callback removed after dispatch" $ do
+      ref <- newIORef (0 :: Int)
+      storageState <- newSecureStorageState
+      modifyIORef' (ssWriteCallbacks storageState) (\_ ->
+        IntMap.singleton 0 (\_ -> modifyIORef' ref (+ 1)))
+      dispatchSecureStorageResult storageState 0 0 Nothing
+      count1 <- readIORef ref
+      count1 @?= 1
+      -- Second dispatch for same ID should be a no-op
+      dispatchSecureStorageResult storageState 0 0 Nothing
+      count2 <- readIORef ref
+      count2 @?= 1
+
+  , testCase "storageStatusFromInt roundtrips valid codes" $ do
+      storageStatusFromInt 0 @?= Just StorageSuccess
+      storageStatusFromInt 1 @?= Just StorageNotFound
+      storageStatusFromInt 2 @?= Just StorageError
+
+  , testCase "storageStatusFromInt rejects unknown codes" $ do
+      storageStatusFromInt 3 @?= Nothing
+      storageStatusFromInt (-1) @?= Nothing
+      storageStatusFromInt 100 @?= Nothing
+
+  , testCase "unknown request ID does not crash" $ do
+      storageState <- newSecureStorageState
+      -- Should not throw (logs to stderr)
+      dispatchSecureStorageResult storageState 999 0 Nothing
+
+  , testCase "unknown status code does not fire callback" $ do
+      ref <- newIORef (0 :: Int)
+      storageState <- newSecureStorageState
+      modifyIORef' (ssWriteCallbacks storageState) (\_ ->
+        IntMap.singleton 0 (\_ -> modifyIORef' ref (+ 1)))
+      dispatchSecureStorageResult storageState 0 42 Nothing
+      count <- readIORef ref
+      count @?= 0
+  ]
+
 -- | Tests for the AppContext FFI path.
 appContextTests :: TestTree
 appContextTests = testGroup "AppContext"
@@ -851,7 +977,10 @@ viewIsErrorWidget :: Ptr AppContext -> IO Bool
 viewIsErrorWidget ctxPtr = do
   appCtx <- derefAppContext ctxPtr
   viewFn <- readIORef (acViewFunction appCtx)
-  let userState = UserState { userPermissionState = acPermissionState appCtx }
+  let userState = UserState
+        { userPermissionState    = acPermissionState appCtx
+        , userSecureStorageState = acSecureStorageState appCtx
+        }
   widget <- viewFn userState
   case widget of
     Column (Text config : _) -> pure (tcLabel config == "An error occurred")

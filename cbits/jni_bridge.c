@@ -14,6 +14,7 @@
 #include "HsFFI.h"
 #include "JniBridge.h"
 #include "PermissionBridge.h"
+#include "SecureStorageBridge.h"
 
 /* Runs the user's Haskell main via RTS API (cbits/run_main.c).
  * Returns the opaque AppContext pointer. */
@@ -32,6 +33,8 @@ extern void haskellRenderUI(void *ctx);
 extern void haskellOnUIEvent(void *ctx, int callbackId);
 extern void haskellOnUITextChange(void *ctx, int callbackId, const char *text);
 extern void haskellOnPermissionResult(void *ctx, int32_t requestId, int32_t statusCode);
+extern void haskellOnSecureStorageResult(void *ctx, int32_t requestId,
+                                          int32_t statusCode, const char *value);
 
 /* Android UI bridge (from ui_bridge_android.c) */
 extern void setup_android_ui_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
@@ -40,6 +43,9 @@ extern void android_handle_text_change(JNIEnv *env, jobject view, jstring text, 
 
 /* Android permission bridge (from permission_bridge_android.c) */
 extern void setup_android_permission_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
+
+/* Android secure storage bridge (from secure_storage_android.c) */
+extern void setup_android_secure_storage_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
 
 /* Lifecycle event codes (must match HaskellMobile.h) */
 #define LIFECYCLE_CREATE     0
@@ -112,6 +118,7 @@ JNI_METHOD(renderUI)(JNIEnv *env, jobject thiz)
 {
     setup_android_ui_bridge(env, thiz, g_haskell_ctx);
     setup_android_permission_bridge(env, thiz, g_haskell_ctx);
+    setup_android_secure_storage_bridge(env, thiz, g_haskell_ctx);
     haskellRenderUI(g_haskell_ctx);
 }
 

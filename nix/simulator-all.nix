@@ -55,6 +55,17 @@ let
     name = "haskell-mobile-permission-simulator-app";
   };
 
+  secureStorageIos = import ./ios.nix {
+    inherit sources;
+    mainModule = ../test/SecureStorageDemoMain.hs;
+    simulator = true;
+  };
+  secureStorageSimApp = lib.mkSimulatorApp {
+    iosLib = secureStorageIos;
+    iosSrc = ../ios;
+    name = "haskell-mobile-securestorage-simulator-app";
+  };
+
   imageIos = import ./ios.nix {
     inherit sources;
     mainModule = ../test/ImageDemoMain.hs;
@@ -102,6 +113,7 @@ COUNTER_SHARE_DIR="${counterSimApp}/share/ios"
 SCROLL_SHARE_DIR="${scrollSimApp}/share/ios"
 TEXTINPUT_SHARE_DIR="${textinputSimApp}/share/ios"
 PERMISSION_SHARE_DIR="${permissionSimApp}/share/ios"
+SECURE_STORAGE_SHARE_DIR="${secureStorageSimApp}/share/ios"
 IMAGE_SHARE_DIR="${imageSimApp}/share/ios"
 NODEPOOL_SHARE_DIR="${nodepoolSimApp}/share/ios"
 TEST_SCRIPTS="${testScripts}"
@@ -117,6 +129,7 @@ PHASE3_OK=0
 PHASE4_OK=0
 PHASE5_OK=0
 PHASE6_OK=0
+PHASE7_OK=0
 
 cleanup() {
     echo ""
@@ -283,6 +296,41 @@ if [ -z "$PERMISSION_APP" ]; then
 fi
 echo "Permission app: $PERMISSION_APP"
 
+# --- Stage and build securestorage demo app ---
+echo "=== Staging securestorage demo app ==="
+mkdir -p "$WORK_DIR/securestorage/lib" "$WORK_DIR/securestorage/include"
+cp "$SECURE_STORAGE_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/securestorage/lib/"
+cp "$SECURE_STORAGE_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/securestorage/include/"
+cp "$SECURE_STORAGE_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/securestorage/include/"
+cp "$SECURE_STORAGE_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/securestorage/include/"
+cp -r "$SECURE_STORAGE_SHARE_DIR/HaskellMobile" "$WORK_DIR/securestorage/"
+cp "$SECURE_STORAGE_SHARE_DIR/project.yml" "$WORK_DIR/securestorage/"
+chmod -R u+w "$WORK_DIR/securestorage"
+
+echo "=== Generating securestorage Xcode project ==="
+cd "$WORK_DIR/securestorage"
+${xcodegen}/bin/xcodegen generate
+
+echo "=== Building securestorage demo app for simulator ==="
+xcodebuild build \
+    -project HaskellMobile.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk iphonesimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/securestorage-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+SECURE_STORAGE_APP=$(find "$WORK_DIR/securestorage-build" -name "*.app" -type d | head -1)
+if [ -z "$SECURE_STORAGE_APP" ]; then
+    echo "ERROR: Could not find securestorage .app bundle"
+    exit 1
+fi
+echo "SecureStorage app: $SECURE_STORAGE_APP"
+
 # --- Stage and build image test app ---
 echo "=== Staging image test app ==="
 mkdir -p "$WORK_DIR/image/lib" "$WORK_DIR/image/include"
@@ -414,7 +462,7 @@ sleep 5
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP IMAGE_APP NODEPOOL_APP WORK_DIR
+export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -422,6 +470,7 @@ PHASE3_EXIT=0
 PHASE4_EXIT=0
 PHASE5_EXIT=0
 PHASE6_EXIT=0
+PHASE7_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -470,6 +519,8 @@ echo "--- textinput ---"
 run_with_retry "textinput" bash "$TEST_SCRIPTS/ios/textinput.sh" || PHASE3_EXIT=1
 echo "--- permission ---"
 run_with_retry "permission" bash "$TEST_SCRIPTS/ios/permission.sh" || PHASE4_EXIT=1
+echo "--- securestorage ---"
+run_with_retry "securestorage" bash "$TEST_SCRIPTS/ios/securestorage.sh" || PHASE7_EXIT=1
 echo "--- image ---"
 run_with_retry "image" bash "$TEST_SCRIPTS/ios/image.sh" || PHASE6_EXIT=1
 echo "--- node-pool ---"
@@ -534,6 +585,16 @@ else
     echo "PHASE 6 FAILED"
 fi
 
+if [ $PHASE7_EXIT -eq 0 ]; then
+    PHASE7_OK=1
+    echo ""
+    echo "PHASE 7 PASSED"
+else
+    PHASE7_OK=0
+    echo ""
+    echo "PHASE 7 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -583,6 +644,13 @@ if [ $PHASE6_OK -eq 1 ]; then
     echo "PASS  Phase 6 — Image demo app"
 else
     echo "FAIL  Phase 6 — Image demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE7_OK -eq 1 ]; then
+    echo "PASS  Phase 7 — SecureStorage demo app"
+else
+    echo "FAIL  Phase 7 — SecureStorage demo app"
     FINAL_EXIT=1
 fi
 

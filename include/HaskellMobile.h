@@ -68,4 +68,13 @@ const char* getSystemLocale(void);
  * ctx must be a pointer returned by haskellRunMain(). */
 void haskellOnPermissionResult(void *ctx, int32_t requestId, int32_t statusCode);
 
+/* Dispatch a secure storage result from native code back to Haskell.
+ * requestId: opaque ID from the original secure_storage_*() call.
+ * statusCode: SECURE_STORAGE_SUCCESS (0), SECURE_STORAGE_NOT_FOUND (1),
+ *             or SECURE_STORAGE_ERROR (2).
+ * value:     null-terminated value string for read results, or NULL.
+ * ctx must be a pointer returned by haskellCreateContext(). */
+void haskellOnSecureStorageResult(void *ctx, int32_t requestId,
+                                   int32_t statusCode, const char *value);
+
 #endif /* HASKELL_MOBILE_H */

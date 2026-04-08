@@ -10,6 +10,7 @@ where
 
 import HaskellMobile.Lifecycle (MobileContext)
 import HaskellMobile.Permission (PermissionState)
+import HaskellMobile.SecureStorage (SecureStorageState)
 import HaskellMobile.Widget (Widget)
 
 -- | State made available to the view function by the framework.
@@ -17,7 +18,8 @@ import HaskellMobile.Widget (Widget)
 -- may need (e.g. requesting permissions).  Extended as the framework
 -- gains new capabilities.
 data UserState = UserState
-  { userPermissionState :: PermissionState
+  { userPermissionState    :: PermissionState
+  , userSecureStorageState :: SecureStorageState
   }
 
 -- | Application definition record. Downstream apps create one of these

@@ -17,17 +17,20 @@ import Foreign.StablePtr (StablePtr, castPtrToStablePtr, castStablePtrToPtr, new
 import HaskellMobile.Lifecycle (MobileContext)
 import HaskellMobile.Permission (PermissionState(..), newPermissionState)
 import HaskellMobile.Render (RenderState, newRenderState)
+import HaskellMobile.SecureStorage (SecureStorageState(..), newSecureStorageState)
 import HaskellMobile.Types (MobileApp(..), UserState(..))
 import HaskellMobile.Widget (Widget)
 
 -- | Combines user-supplied lifecycle callbacks with the rendering engine's
--- mutable state, the permission callback registry, and the current view
--- function.  One of these is created per platform bridge session.
+-- mutable state, the permission callback registry, the secure storage
+-- callback registry, and the current view function.
+-- One of these is created per platform bridge session.
 data AppContext = AppContext
-  { acMobileContext    :: MobileContext
-  , acRenderState      :: RenderState
-  , acPermissionState  :: PermissionState
-  , acViewFunction     :: IORef (UserState -> IO Widget)
+  { acMobileContext       :: MobileContext
+  , acRenderState         :: RenderState
+  , acPermissionState     :: PermissionState
+  , acSecureStorageState  :: SecureStorageState
+  , acViewFunction        :: IORef (UserState -> IO Widget)
   }
 
 -- | Create a fresh 'AppContext' from a 'MobileApp', allocating a new
@@ -35,18 +38,21 @@ data AppContext = AppContext
 -- suitable for passing through the C FFI (C sees @void *@).
 newAppContext :: MobileApp -> IO (Ptr AppContext)
 newAppContext mobileApp = do
-  renderState     <- newRenderState
-  permissionState <- newPermissionState
-  viewRef         <- newIORef (maView mobileApp)
+  renderState        <- newRenderState
+  permissionState    <- newPermissionState
+  secureStorageState <- newSecureStorageState
+  viewRef            <- newIORef (maView mobileApp)
   let appContext = AppContext
-        { acMobileContext   = maContext mobileApp
-        , acRenderState     = renderState
-        , acPermissionState = permissionState
-        , acViewFunction    = viewRef
+        { acMobileContext      = maContext mobileApp
+        , acRenderState        = renderState
+        , acPermissionState    = permissionState
+        , acSecureStorageState = secureStorageState
+        , acViewFunction       = viewRef
         }
   ptr <- castPtr . castStablePtrToPtr <$> newStablePtr appContext
-  -- Write the context pointer back so requestPermission can pass it to C.
+  -- Write the context pointer back so requestPermission / secure storage can pass it to C.
   writeIORef (psContextPtr permissionState) (castPtr ptr)
+  writeIORef (ssContextPtr secureStorageState) (castPtr ptr)
   pure ptr
 
 -- | Release a pointer previously created by 'newAppContext'.

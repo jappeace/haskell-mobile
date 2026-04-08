@@ -1,6 +1,8 @@
 package me.jappie.haskellmobile;
 
 import android.app.Activity;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.Manifest;
 import android.os.Bundle;
@@ -37,6 +39,9 @@ public class HaskellMobileActivity extends Activity implements View.OnClickListe
     private native void onLifecycleDestroy();
     private native void onLifecycleLowMemory();
     private native void onPermissionResult(int requestCode, int statusCode);
+    private native void onSecureStorageResult(int requestId, int statusCode, String value);
+
+    private static final String SECURE_PREFS_NAME = "haskell_mobile_secure_storage";
 
     /**
      * Map a permission code (from PermissionBridge.h) to an Android permission string.
@@ -87,6 +92,51 @@ public class HaskellMobileActivity extends Activity implements View.OnClickListe
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         int statusCode = (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) ? 0 : 1;
         onPermissionResult(requestCode, statusCode);
+    }
+
+    /**
+     * Write a key-value pair to secure storage. Called from native code via JNI.
+     * Uses SharedPreferences with MODE_PRIVATE.
+     */
+    public void secureStorageWrite(int requestId, String key, String value) {
+        try {
+            SharedPreferences prefs = getSharedPreferences(SECURE_PREFS_NAME, Context.MODE_PRIVATE);
+            prefs.edit().putString(key, value).apply();
+            onSecureStorageResult(requestId, 0 /* SUCCESS */, null);
+        } catch (Exception e) {
+            onSecureStorageResult(requestId, 2 /* ERROR */, null);
+        }
+    }
+
+    /**
+     * Read a value from secure storage by key. Called from native code via JNI.
+     * Returns SUCCESS with value if found, NOT_FOUND if absent.
+     */
+    public void secureStorageRead(int requestId, String key) {
+        try {
+            SharedPreferences prefs = getSharedPreferences(SECURE_PREFS_NAME, Context.MODE_PRIVATE);
+            String value = prefs.getString(key, null);
+            if (value != null) {
+                onSecureStorageResult(requestId, 0 /* SUCCESS */, value);
+            } else {
+                onSecureStorageResult(requestId, 1 /* NOT_FOUND */, null);
+            }
+        } catch (Exception e) {
+            onSecureStorageResult(requestId, 2 /* ERROR */, null);
+        }
+    }
+
+    /**
+     * Delete a key from secure storage. Called from native code via JNI.
+     */
+    public void secureStorageDelete(int requestId, String key) {
+        try {
+            SharedPreferences prefs = getSharedPreferences(SECURE_PREFS_NAME, Context.MODE_PRIVATE);
+            prefs.edit().remove(key).apply();
+            onSecureStorageResult(requestId, 0 /* SUCCESS */, null);
+        } catch (Exception e) {
+            onSecureStorageResult(requestId, 2 /* ERROR */, null);
+        }
     }
 
     @Override

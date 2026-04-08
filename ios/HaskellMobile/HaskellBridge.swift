@@ -21,6 +21,7 @@ class HaskellBridge {
         hs_init(nil, nil)
         context = haskellRunMain()
         setup_ios_permission_bridge(context)
+        setup_ios_secure_storage_bridge(context)
     }
 
     /// Call Haskell's haskellGreet and return the result as a Swift String.

@@ -10,6 +10,7 @@ module HaskellMobile
   , haskellOnUIEvent
   , haskellOnLifecycle
   , haskellOnPermissionResult
+  , haskellOnSecureStorageResult
   -- Error handling
   , errorWidget
   -- Re-exports from Lifecycle
@@ -44,15 +45,21 @@ module HaskellMobile
   , PermissionState(..)
   , requestPermission
   , checkPermission
+  -- Re-exports from SecureStorage
+  , SecureStorageStatus(..)
+  , SecureStorageState(..)
+  , secureStorageWrite
+  , secureStorageRead
+  , secureStorageDelete
   )
 where
 
 import Control.Exception (SomeException, catch)
 import Data.IORef (readIORef, writeIORef)
-import Data.Text (pack)
+import Data.Text (Text, pack)
 import Foreign.C.String (CString, newCString, peekCString)
 import Foreign.C.Types (CInt(..))
-import Foreign.Ptr (Ptr)
+import Foreign.Ptr (Ptr, nullPtr)
 import HaskellMobile.AppContext (AppContext(..), newAppContext, freeAppContext, derefAppContext)
 import HaskellMobile.Lifecycle
   ( LifecycleEvent(..)
@@ -75,6 +82,14 @@ import HaskellMobile.Permission
   , dispatchPermissionResult
   )
 import HaskellMobile.Render (renderWidget, dispatchEvent, dispatchTextEvent)
+import HaskellMobile.SecureStorage
+  ( SecureStorageStatus(..)
+  , SecureStorageState(..)
+  , secureStorageWrite
+  , secureStorageRead
+  , secureStorageDelete
+  , dispatchSecureStorageResult
+  )
 import HaskellMobile.Types (MobileApp(..), UserState(..))
 import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), TextConfig(..), Widget(..))
 
@@ -122,7 +137,10 @@ renderView :: Ptr AppContext -> IO ()
 renderView ctxPtr = do
   appCtx <- derefAppContext ctxPtr
   viewFunction <- readIORef (acViewFunction appCtx)
-  let userState = UserState { userPermissionState = acPermissionState appCtx }
+  let userState = UserState
+        { userPermissionState    = acPermissionState appCtx
+        , userSecureStorageState = acSecureStorageState appCtx
+        }
   widget <- viewFunction userState
   renderWidget (acRenderState appCtx) widget
 
@@ -214,3 +232,23 @@ haskellOnLifecycle ctxPtr code =
       Nothing -> pure ()
 
 foreign export ccall haskellOnLifecycle :: Ptr AppContext -> CInt -> IO ()
+
+-- | Handle a secure storage result from native code. Dispatches to the
+-- callback registered by 'secureStorageWrite', 'secureStorageRead', or
+-- 'secureStorageDelete'.  The @cValue@ parameter is non-null only for
+-- successful read operations.
+haskellOnSecureStorageResult :: Ptr AppContext -> CInt -> CInt -> CString -> IO ()
+haskellOnSecureStorageResult ctxPtr requestId statusCode cValue =
+  withExceptionHandler ctxPtr $ do
+    appCtx <- derefAppContext ctxPtr
+    maybeValue <- peekOptionalCString cValue
+    dispatchSecureStorageResult (acSecureStorageState appCtx) requestId statusCode maybeValue
+
+foreign export ccall haskellOnSecureStorageResult :: Ptr AppContext -> CInt -> CInt -> CString -> IO ()
+
+-- | Peek an optional CString: returns 'Nothing' for null pointers,
+-- 'Just' with the decoded 'Text' otherwise.
+peekOptionalCString :: CString -> IO (Maybe Text)
+peekOptionalCString cstr
+  | cstr == nullPtr = pure Nothing
+  | otherwise       = Just . pack <$> peekCString cstr

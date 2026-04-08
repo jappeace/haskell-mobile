@@ -7,6 +7,7 @@
  */
 
 #include "UIBridge.h"
+#include "SecureStorageBridge.h"
 #include <os/log.h>
 #include <string.h>
 
@@ -27,6 +28,14 @@ extern void    watchos_remove_child(int32_t parentId, int32_t childId);
 extern void    watchos_destroy_node(int32_t nodeId);
 extern void    watchos_set_root(int32_t nodeId);
 extern void    watchos_clear(void);
+
+/* Forward declarations of Swift @_cdecl secure storage functions */
+extern void watchos_secure_storage_write(void *ctx, int32_t requestId,
+                                          const char *key, const char *value);
+extern void watchos_secure_storage_read(void *ctx, int32_t requestId,
+                                         const char *key);
+extern void watchos_secure_storage_delete(void *ctx, int32_t requestId,
+                                           const char *key);
 
 static UIBridgeCallbacks g_watchos_callbacks = {
     .createNode  = watchos_create_node,
@@ -59,4 +68,10 @@ void setup_watchos_ui_bridge(void *haskellCtx)
      * in Swift (HaskellBridge) if needed. */
     setSystemLocale("en");
     haskellLogLocale();
+
+    /* Register Swift secure storage callbacks with platform-agnostic dispatcher */
+    secure_storage_register_impl(watchos_secure_storage_write,
+                                  watchos_secure_storage_read,
+                                  watchos_secure_storage_delete);
+    os_log_info(log, "watchOS secure storage bridge initialized");
 }
