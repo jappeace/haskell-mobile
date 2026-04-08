@@ -38,6 +38,8 @@ sleep 5
 assert_log "$LOG_FILE" "setNumProp.*fontSize" "setNumProp dispatched for fontSize"
 assert_log "$LOG_FILE" "setNumProp.*padding"  "setNumProp dispatched for padding"
 assert_log "$LOG_FILE" "setNumProp.*gravity"  "setNumProp dispatched for gravity"
+assert_log "$LOG_FILE" "setStrProp.*color"    "setStrProp dispatched for color (text color)"
+assert_log "$LOG_FILE" "setStrProp.*bgColor"  "setStrProp dispatched for bgColor (background color)"
 
 xcrun simctl terminate "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
 kill "$LOG_STREAM_PID" 2>/dev/null || true

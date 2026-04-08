@@ -15,6 +15,7 @@
 #define UI_PROP_TEXT      0
 #define UI_PROP_COLOR     1
 #define UI_PROP_HINT      2
+#define UI_PROP_BG_COLOR  3
 
 /* Property IDs for numeric properties */
 #define UI_PROP_FONT_SIZE   0

@@ -13,6 +13,8 @@ class WatchUINode: ObservableObject, Identifiable {
     @Published var padding: CGFloat?
     @Published var inputType: Int32 = 0
     @Published var callbackId: Int32 = -1
+    @Published var textColor: String?
+    @Published var backgroundColor: String?
     @Published var children: [WatchUINode] = []
 
     init(id: Int32, nodeType: Int32) {

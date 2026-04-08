@@ -51,6 +51,7 @@ data PropId
   = PropText
   | PropColor
   | PropHint
+  | PropBgColor
   | PropFontSize
   | PropPadding
   | PropInputType
@@ -62,6 +63,7 @@ propIdToInt :: PropId -> Int32
 propIdToInt PropText      = 0
 propIdToInt PropColor     = 1
 propIdToInt PropHint      = 2
+propIdToInt PropBgColor   = 3
 propIdToInt PropFontSize  = 0
 propIdToInt PropPadding   = 1
 propIdToInt PropInputType = 2

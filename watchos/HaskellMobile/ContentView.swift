@@ -12,6 +12,12 @@ struct NodeView: View {
             .ifLet(node.padding) { view, pad in
                 view.padding(pad)
             }
+            .ifLet(node.textColor.flatMap { Color(hex: $0) }) { view, color in
+                view.foregroundColor(color)
+            }
+            .ifLet(node.backgroundColor.flatMap { Color(hex: $0) }) { view, color in
+                view.background(color)
+            }
         return content
     }
 
@@ -121,5 +127,40 @@ extension View {
         } else {
             self
         }
+    }
+}
+
+/// Parse hex color strings (#RGB, #RRGGBB, or #AARRGGBB) into SwiftUI Color.
+extension Color {
+    init?(hex: String) {
+        guard hex.hasPrefix("#") else { return nil }
+        let digits = String(hex.dropFirst())
+        guard let raw = UInt64(digits, radix: 16) else { return nil }
+
+        let red: Double
+        let green: Double
+        let blue: Double
+        let opacity: Double
+
+        switch digits.count {
+        case 3:
+            let r = Double((raw >> 8) & 0xF) * 0x11
+            let g = Double((raw >> 4) & 0xF) * 0x11
+            let b = Double(raw & 0xF) * 0x11
+            red = r / 255.0; green = g / 255.0; blue = b / 255.0; opacity = 1.0
+        case 6:
+            red = Double((raw >> 16) & 0xFF) / 255.0
+            green = Double((raw >> 8) & 0xFF) / 255.0
+            blue = Double(raw & 0xFF) / 255.0
+            opacity = 1.0
+        case 8:
+            opacity = Double((raw >> 24) & 0xFF) / 255.0
+            red = Double((raw >> 16) & 0xFF) / 255.0
+            green = Double((raw >> 8) & 0xFF) / 255.0
+            blue = Double(raw & 0xFF) / 255.0
+        default:
+            return nil
+        }
+        self.init(red: red, green: green, blue: blue, opacity: opacity)
     }
 }

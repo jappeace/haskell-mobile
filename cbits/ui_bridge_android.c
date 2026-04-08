@@ -83,6 +83,8 @@ static jmethodID g_method_setPadding;
 static jmethodID g_method_setGravity_TextView;
 static jmethodID g_method_setGravity_LinearLayout;
 static jmethodID g_method_setLayoutParams;
+static jmethodID g_method_setTextColor;
+static jmethodID g_method_setBackgroundColor;
 
 /* LinearLayout orientation constants */
 static jint ORIENTATION_VERTICAL   = 1;
@@ -227,6 +229,14 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     g_method_setLayoutParams = (*env)->GetMethodID(env, viewClass,
         "setLayoutParams", "(Landroid/view/ViewGroup$LayoutParams;)V");
 
+    /* TextView.setTextColor(int) — sets ARGB text color */
+    g_method_setTextColor = (*env)->GetMethodID(env, g_class_TextView,
+        "setTextColor", "(I)V");
+
+    /* View.setBackgroundColor(int) — sets ARGB background color */
+    g_method_setBackgroundColor = (*env)->GetMethodID(env, viewClass,
+        "setBackgroundColor", "(I)V");
+
     return 0;
 }
 
@@ -260,6 +270,38 @@ static jobject get_node(int32_t nodeId)
     if (nodeId < 1 || nodeId >= MAX_NODES) return NULL;
 #endif
     return g_nodes[nodeId];
+}
+
+/* ---- Hex color parser ---- */
+
+/*
+ * Parse a hex color string (#RGB, #RRGGBB, or #AARRGGBB) into a jint ARGB value.
+ * Returns 0 (transparent black) on invalid input.
+ */
+static jint parse_hex_color(const char *hex)
+{
+    if (!hex || hex[0] != '#') return 0;
+    const char *digits = hex + 1;
+    size_t len = strlen(digits);
+    unsigned long raw = strtoul(digits, NULL, 16);
+
+    switch (len) {
+    case 3: {
+        /* #RGB -> #FFRRGGBB (expand each nibble) */
+        unsigned int r = (raw >> 8) & 0xF;
+        unsigned int g = (raw >> 4) & 0xF;
+        unsigned int b = raw & 0xF;
+        return (jint)(0xFF000000u | (r * 0x11u) << 16 | (g * 0x11u) << 8 | (b * 0x11u));
+    }
+    case 6:
+        /* #RRGGBB -> #FFRRGGBB */
+        return (jint)(0xFF000000u | (raw & 0xFFFFFFu));
+    case 8:
+        /* #AARRGGBB — already complete */
+        return (jint)raw;
+    default:
+        return 0;
+    }
 }
 
 /* ---- Callback implementation ---- */
@@ -341,6 +383,20 @@ static void android_set_str_prop(int32_t nodeId, int32_t propId, const char *val
         jstring jstr = (*env)->NewStringUTF(env, value);
         (*env)->CallVoidMethod(env, view, g_method_setHint, jstr);
         (*env)->DeleteLocalRef(env, jstr);
+        break;
+    }
+    case UI_PROP_COLOR: {
+        LOGI("setStrProp(node=%d, color=\"%s\")", nodeId, value);
+        if ((*env)->IsInstanceOf(env, view, g_class_TextView)) {
+            jint argb = parse_hex_color(value);
+            (*env)->CallVoidMethod(env, view, g_method_setTextColor, argb);
+        }
+        break;
+    }
+    case UI_PROP_BG_COLOR: {
+        LOGI("setStrProp(node=%d, bgColor=\"%s\")", nodeId, value);
+        jint argb = parse_hex_color(value);
+        (*env)->CallVoidMethod(env, view, g_method_setBackgroundColor, argb);
         break;
     }
     default:

@@ -31,6 +31,8 @@ LOGCAT_FILE="$WORK_DIR/styled_logcat.txt"
 assert_logcat "$LOGCAT_FILE" "setNumProp.*fontSize" "setNumProp dispatched for fontSize"
 assert_logcat "$LOGCAT_FILE" "setNumProp.*padding"  "setNumProp dispatched for padding"
 assert_logcat "$LOGCAT_FILE" "setNumProp.*gravity"  "setNumProp dispatched for gravity"
+assert_logcat "$LOGCAT_FILE" "setStrProp.*color"    "setStrProp dispatched for color (text color)"
+assert_logcat "$LOGCAT_FILE" "setStrProp.*bgColor"  "setStrProp dispatched for bgColor (background color)"
 
 "$ADB" -s "$EMULATOR_SERIAL" uninstall "$PACKAGE" 2>/dev/null || true
 

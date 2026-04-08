@@ -157,6 +157,53 @@ static UIBridgeCallbacks g_ios_callbacks = {
     .clear       = ios_clear,
 };
 
+/* ---- Hex color parser ---- */
+
+/*
+ * Parse a hex color string (#RGB, #RRGGBB, or #AARRGGBB) into a UIColor.
+ * Returns nil on invalid input.
+ */
+static UIColor *parse_hex_color(const char *hex)
+{
+    if (!hex || hex[0] != '#') return nil;
+    NSString *digits = [NSString stringWithUTF8String:hex + 1];
+    unsigned int raw = 0;
+    NSScanner *scanner = [NSScanner scannerWithString:digits];
+    if (![scanner scanHexInt:&raw]) return nil;
+
+    CGFloat alpha, red, green, blue;
+    switch (digits.length) {
+    case 3: {
+        /* #RGB -> expand each nibble */
+        unsigned int r = (raw >> 8) & 0xF;
+        unsigned int g = (raw >> 4) & 0xF;
+        unsigned int b = raw & 0xF;
+        alpha = 1.0;
+        red   = (r * 0x11) / 255.0;
+        green = (g * 0x11) / 255.0;
+        blue  = (b * 0x11) / 255.0;
+        break;
+    }
+    case 6:
+        /* #RRGGBB */
+        alpha = 1.0;
+        red   = ((raw >> 16) & 0xFF) / 255.0;
+        green = ((raw >> 8) & 0xFF) / 255.0;
+        blue  = (raw & 0xFF) / 255.0;
+        break;
+    case 8:
+        /* #AARRGGBB */
+        alpha = ((raw >> 24) & 0xFF) / 255.0;
+        red   = ((raw >> 16) & 0xFF) / 255.0;
+        green = ((raw >> 8) & 0xFF) / 255.0;
+        blue  = (raw & 0xFF) / 255.0;
+        break;
+    default:
+        return nil;
+    }
+    return [UIColor colorWithRed:red green:green blue:blue alpha:alpha];
+}
+
 /* ---- Callback implementation ---- */
 
 static int32_t ios_create_node(int32_t nodeType)
@@ -278,6 +325,26 @@ static void ios_set_str_prop(int32_t nodeId, int32_t propId, const char *value)
             ((UITextField *)view).placeholder = str;
         }
         break;
+    case UI_PROP_COLOR: {
+        LOGI("setStrProp(node=%d, color=\"%{public}s\")", nodeId, value);
+        UIColor *color = parse_hex_color(value);
+        if (!color) break;
+        if ([view isKindOfClass:[UILabel class]]) {
+            ((UILabel *)view).textColor = color;
+        } else if ([view isKindOfClass:[UIButton class]]) {
+            [((UIButton *)view) setTitleColor:color forState:UIControlStateNormal];
+        } else if ([view isKindOfClass:[UITextField class]]) {
+            ((UITextField *)view).textColor = color;
+        }
+        break;
+    }
+    case UI_PROP_BG_COLOR: {
+        LOGI("setStrProp(node=%d, bgColor=\"%{public}s\")", nodeId, value);
+        UIColor *color = parse_hex_color(value);
+        if (!color) break;
+        view.backgroundColor = color;
+        break;
+    }
     default:
         LOGI("setStrProp: unknown propId %d", propId);
         break;

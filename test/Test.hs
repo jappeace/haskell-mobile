@@ -51,7 +51,7 @@ import HaskellMobile.Lifecycle
   , lifecycleToInt
   , loggingMobileContext
   )
-import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), InputType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..), defaultStyle)
+import HaskellMobile.Widget (ButtonConfig(..), Color(..), FontConfig(..), InputType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..), colorFromText, colorToHex, defaultStyle)
 import HaskellMobile.Permission
   ( Permission(..)
   , PermissionStatus(..)
@@ -77,7 +77,7 @@ main = do
   defaultMain (tests (acPermissionState ffiAppCtx) ffiCtxPtr)
 
 tests :: PermissionState -> Ptr AppContext -> TestTree
-tests ffiPermState ffiCtxPtr = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, styledTests, textAlignTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, appContextTests, exceptionHandlerTests ffiCtxPtr]
+tests ffiPermState ffiCtxPtr = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, styledTests, textAlignTests, colorTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, appContextTests, exceptionHandlerTests ffiCtxPtr]
 
 qcProps :: TestTree
 qcProps = testGroup "(checked by QuickCheck)"
@@ -423,13 +423,13 @@ styledTests :: TestTree
 styledTests = testGroup "Styled"
   [ testCase "Styled Text renders without error" $ do
       rs <- newRenderState
-      renderWidget rs $ Styled (WidgetStyle (Just 8.0) Nothing)
+      renderWidget rs $ Styled (WidgetStyle (Just 8.0) Nothing Nothing Nothing)
         (Text TextConfig { tcLabel = "styled", tcFontConfig = Just (FontConfig 20.0) })
 
   , testCase "Styled Button fires callback" $ do
       ref <- newIORef (0 :: Int)
       rs <- newRenderState
-      renderWidget rs $ Styled (WidgetStyle Nothing Nothing)
+      renderWidget rs $ Styled (WidgetStyle Nothing Nothing Nothing Nothing)
         (Button ButtonConfig
           { bcLabel = "tap", bcAction = modifyIORef' ref (+ 1)
           , bcFontConfig = Just (FontConfig 16.0) })
@@ -452,8 +452,8 @@ styledTests = testGroup "Styled"
   , testCase "nested Styled applies both styles" $ do
       rs <- newRenderState
       renderWidget rs $
-        Styled (WidgetStyle (Just 12.0) Nothing)
-          (Styled (WidgetStyle Nothing Nothing)
+        Styled (WidgetStyle (Just 12.0) Nothing Nothing Nothing)
+          (Styled (WidgetStyle Nothing Nothing Nothing Nothing)
             (Text TextConfig { tcLabel = "double styled", tcFontConfig = Just (FontConfig 18.0) }))
 
   , testCase "defaultStyle is a no-op" $ do
@@ -483,13 +483,13 @@ textAlignTests :: TestTree
 textAlignTests = testGroup "TextAlignment"
   [ testCase "Styled with AlignCenter renders without error" $ do
       rs <- newRenderState
-      renderWidget rs $ Styled (WidgetStyle Nothing (Just AlignCenter))
+      renderWidget rs $ Styled (WidgetStyle Nothing (Just AlignCenter) Nothing Nothing)
         (Text TextConfig { tcLabel = "centered", tcFontConfig = Nothing })
 
   , testCase "Styled with AlignCenter on Button fires callback" $ do
       ref <- newIORef (0 :: Int)
       rs <- newRenderState
-      renderWidget rs $ Styled (WidgetStyle Nothing (Just AlignCenter))
+      renderWidget rs $ Styled (WidgetStyle Nothing (Just AlignCenter) Nothing Nothing)
         (Button ButtonConfig
           { bcLabel = "tap", bcAction = modifyIORef' ref (+ 1), bcFontConfig = Nothing })
       dispatchEvent rs 0
@@ -501,8 +501,66 @@ textAlignTests = testGroup "TextAlignment"
 
   , testCase "Styled with AlignEnd renders without error" $ do
       rs <- newRenderState
-      renderWidget rs $ Styled (WidgetStyle Nothing (Just AlignEnd))
+      renderWidget rs $ Styled (WidgetStyle Nothing (Just AlignEnd) Nothing Nothing)
         (Text TextConfig { tcLabel = "end aligned", tcFontConfig = Nothing })
+  ]
+
+-- | Tests for color support in Styled widgets.
+colorTests :: TestTree
+colorTests = testGroup "Colors"
+  [ testCase "Styled with textColor renders and callback fires" $ do
+      ref <- newIORef (0 :: Int)
+      rs <- newRenderState
+      renderWidget rs $ Styled (WidgetStyle Nothing Nothing (Just (Color 255 0 0 255)) Nothing)
+        (Button ButtonConfig
+          { bcLabel = "red", bcAction = modifyIORef' ref (+ 1), bcFontConfig = Nothing })
+      dispatchEvent rs 0
+      count <- readIORef ref
+      count @?= 1
+
+  , testCase "Styled with backgroundColor renders without error" $ do
+      rs <- newRenderState
+      renderWidget rs $ Styled (WidgetStyle Nothing Nothing Nothing (Just (Color 0 255 0 255)))
+        (Text TextConfig { tcLabel = "green bg", tcFontConfig = Nothing })
+
+  , testCase "both textColor and backgroundColor together" $ do
+      ref <- newIORef (0 :: Int)
+      rs <- newRenderState
+      renderWidget rs $ Styled (WidgetStyle Nothing Nothing (Just (Color 255 0 0 255)) (Just (Color 0 255 0 255)))
+        (Button ButtonConfig
+          { bcLabel = "colored", bcAction = modifyIORef' ref (+ 1), bcFontConfig = Nothing })
+      dispatchEvent rs 0
+      count <- readIORef ref
+      count @?= 1
+
+  , testCase "defaultStyle has no colors" $ do
+      wsTextColor defaultStyle @?= Nothing
+      wsBackgroundColor defaultStyle @?= Nothing
+
+  , testCase "nested Styled with different colors renders" $ do
+      rs <- newRenderState
+      renderWidget rs $
+        Styled (WidgetStyle Nothing Nothing (Just (Color 255 0 0 255)) Nothing)
+          (Styled (WidgetStyle Nothing Nothing Nothing (Just (Color 0 0 255 255)))
+            (Text TextConfig { tcLabel = "nested colors", tcFontConfig = Nothing }))
+
+  , testCase "colorFromText parses #RRGGBB" $
+      colorFromText "#FF0000" @?= Just (Color 255 0 0 255)
+
+  , testCase "colorFromText parses #RGB" $
+      colorFromText "#F00" @?= Just (Color 255 0 0 255)
+
+  , testCase "colorFromText parses #AARRGGBB" $
+      colorFromText "#80FF0000" @?= Just (Color 255 0 0 128)
+
+  , testCase "colorFromText rejects invalid input" $ do
+      colorFromText "" @?= Nothing
+      colorFromText "FF0000" @?= Nothing
+      colorFromText "#GG0000" @?= Nothing
+
+  , testCase "colorToHex roundtrips through colorFromText" $ do
+      let color = Color 255 128 0 255
+      colorFromText (colorToHex color) @?= Just color
   ]
 
 -- | Tests for the IORef registration pattern.

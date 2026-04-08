@@ -30,9 +30,15 @@ class WatchUIBridgeState: ObservableObject {
         case 0: // UI_PROP_TEXT
             os_log("setStrProp(node=%d, text=\"%{public}s\")", log: bridgeLog, type: .info, nodeId, value)
             node.text = value
+        case 1: // UI_PROP_COLOR
+            os_log("setStrProp(node=%d, color=\"%{public}s\")", log: bridgeLog, type: .info, nodeId, value)
+            node.textColor = value
         case 2: // UI_PROP_HINT
             os_log("setStrProp(node=%d, hint=\"%{public}s\")", log: bridgeLog, type: .info, nodeId, value)
             node.hint = value
+        case 3: // UI_PROP_BG_COLOR
+            os_log("setStrProp(node=%d, bgColor=\"%{public}s\")", log: bridgeLog, type: .info, nodeId, value)
+            node.backgroundColor = value
         default:
             os_log("setStrProp: unknown propId %d", log: bridgeLog, type: .info, propId)
         }
