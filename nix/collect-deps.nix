@@ -2,11 +2,14 @@
 #
 # Takes a list of nixpkgs haskellPackages derivations (already resolved
 # transitively by resolve-deps.nix) and collects their .conf / .a files:
-#   $out/lib/*.a       — static archives (only those referenced by hs-libraries)
+#   $out/lib/*.a       — static archives
 #   $out/pkgdb/        — GHC package database (.conf + cache)
 #
-# This uses standard nixpkgs outputs rather than manual cabal builds.
+# Also collects boot package .a files from the GHC, since consumer deps
+# may reference boot packages (os-string, mtl, etc.) that mkAndroidLib
+# doesn't whole-archive by default.
 { pkgs
+, ghc               # GHC derivation (for boot package .a files)
 , ghcPkgCmd         # full path to ghc-pkg (or cross ghc-pkg)
 , deps              # list of haskellPackages derivations (from resolve-deps.nix)
 }:
@@ -28,16 +31,36 @@ in pkgs.runCommand "haskell-mobile-collected-deps" {
         *benchmark*|*test*) echo "  skip sub-lib: $LIB_NAME"; continue ;;
       esac
       cp "$conf" $out/pkgdb/
-
-      # Copy only .a files referenced by this .conf's hs-libraries field
-      HS_LIBS=$(grep '^hs-libraries:' "$conf" | sed 's/^hs-libraries: *//')
-      for lib in $HS_LIBS; do
-        aFile=$(find "$pkg" -name "lib$lib.a" ! -name "*_p.a" | head -1)
-        if [ -n "$aFile" ]; then
-          cp "$aFile" $out/lib/
-        fi
-      done
     done
+
+    # Copy all non-profiling .a files from this package, skipping
+    # benchmark/test sub-library archives (they reference test frameworks
+    # like tasty that aren't available on mobile).
+    # We collect all .a files rather than just those in hs-libraries because
+    # internal sub-libraries (e.g. attoparsec-internal) have empty
+    # hs-libraries fields in their .conf but still need their .a collected.
+    find "$pkg" -name 'libHS*.a' ! -name '*_p.a' | while read aFile; do
+      aName=$(basename "$aFile")
+      case "$aName" in
+        *-benchmark*|*-benchmarks*|*-test*) echo "  skip .a: $aName"; continue ;;
+      esac
+      if [ ! -f "$out/lib/$aName" ]; then
+        cp "$aFile" $out/lib/
+      fi
+    done
+  done
+
+  # Collect boot package .a files from the GHC.  Consumer deps may
+  # reference boot packages (os-string, mtl, stm, etc.) that mkAndroidLib
+  # doesn't whole-archive.  Including them here ensures the linker can
+  # resolve all symbols.
+  echo "=== Collecting boot package libraries ==="
+  find ${ghc}/lib -name 'libHS*.a' ! -name '*_p.a' ! -name '*_thr*' ! -name '*-ghc*' | while read aFile; do
+    aName=$(basename "$aFile")
+    if [ ! -f "$out/lib/$aName" ]; then
+      echo "  boot: $aName"
+      cp "$aFile" $out/lib/
+    fi
   done
 
   ${ghcPkgCmd} --package-db=$out/pkgdb recache

@@ -9,6 +9,7 @@ in {
   android-armv7a = import ./android.nix { inherit sources; androidArch = "armv7a"; };
   apk = import ./apk.nix { inherit sources; };
   consumer-link-test = import ./test-link-consumer.nix { inherit sources; };
+  consumer-deps-test = import ./test-consumer-deps.nix { inherit sources; };
 
   # Android combined test script (boot + run via CI: nix-build ... -o out && ./out/bin/test-all)
   emulator-all = import ./emulator-all.nix { inherit sources; };
