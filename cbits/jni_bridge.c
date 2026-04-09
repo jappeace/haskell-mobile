@@ -47,7 +47,10 @@ extern void haskellOnAuthSessionResult(void *ctx, int32_t requestId,
                                         int32_t statusCode,
                                         const char *redirectUrl,
                                         const char *errorMessage);
-extern void haskellOnCameraResult(void *ctx, int32_t requestId, int32_t statusCode, const char *filePath);
+extern void haskellOnCameraResult(void *ctx, int32_t requestId,
+                                   int32_t statusCode, const char *filePath,
+                                   const uint8_t *imageData, int32_t imageDataLen,
+                                   int32_t width, int32_t height);
 
 /* Android UI bridge (from ui_bridge_android.c) */
 extern void setup_android_ui_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
