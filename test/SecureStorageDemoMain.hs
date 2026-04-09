@@ -10,7 +10,7 @@ import HaskellMobile
   ( MobileApp(..)
   , UserState(..)
   , SecureStorageStatus(..)
-  , runMobileApp
+  , startMobileApp
   , platformLog
   , secureStorageWrite
   , secureStorageRead
@@ -20,7 +20,7 @@ import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
 
 main :: IO ()
 main = do
-  runMobileApp secureStorageDemoApp
+  _ctxPtr <- startMobileApp secureStorageDemoApp
   platformLog "SecureStorage demo app registered"
 
 -- | SecureStorage demo: writes and reads an OAuth token on button taps.
