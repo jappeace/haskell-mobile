@@ -3,11 +3,9 @@
 module HaskellMobile
   ( MobileApp(..)
   , UserState(..)
-  , runMobileApp
-  , getMobileApp
+  , startMobileApp
   -- FFI exports
   , haskellGreet
-  , haskellCreateContext
   , haskellRenderUI
   , haskellOnUIEvent
   , haskellOnLifecycle
@@ -50,10 +48,11 @@ module HaskellMobile
 where
 
 import Control.Exception (SomeException, catch)
+import Data.IORef (readIORef, writeIORef)
 import Data.Text (pack)
 import Foreign.C.String (CString, newCString, peekCString)
 import Foreign.C.Types (CInt(..))
-import Foreign.Ptr (Ptr, nullPtr, castPtr)
+import Foreign.Ptr (Ptr)
 import HaskellMobile.AppContext (AppContext(..), newAppContext, freeAppContext, derefAppContext)
 import HaskellMobile.Lifecycle
   ( LifecycleEvent(..)
@@ -76,54 +75,61 @@ import HaskellMobile.Permission
   , dispatchPermissionResult
   )
 import HaskellMobile.Render (renderWidget, dispatchEvent, dispatchTextEvent)
-import HaskellMobile.Types (MobileApp(..), UserState(..), runMobileApp, getMobileApp)
+import HaskellMobile.Types (MobileApp(..), UserState(..))
 import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), TextConfig(..), Widget(..))
 
+-- | Create an 'AppContext' from a 'MobileApp' and return it as a typed
+-- pointer suitable for the C FFI. This is the user-facing API: the user's
+-- @main@ calls this to initialise the framework.
+startMobileApp :: MobileApp -> IO (Ptr AppContext)
+startMobileApp = newAppContext
+
 -- | Wrap an IO action in a catch-all exception handler.
--- On failure, logs the exception, overwrites the registered app's view
+-- On failure, logs the exception, overwrites the context's view
 -- with an error widget, and fires the user's 'onError' callback.
 withExceptionHandler :: Ptr AppContext -> IO () -> IO ()
 withExceptionHandler ctxPtr action =
   catch action (handleException ctxPtr)
 
 -- | Handle an uncaught exception from an FFI entry point.
--- Overwrites the registered app's 'maView' with an error widget so
+-- Overwrites the context's view function with an error widget so
 -- that subsequent renders show the error on screen. The error widget
 -- includes a dismiss button that restores the original view.
 -- Also logs via 'platformLog' and best-effort fires 'onError'.
 handleException :: Ptr AppContext -> SomeException -> IO ()
 handleException ctxPtr exc = do
   appCtx <- derefAppContext ctxPtr
-  app <- getMobileApp
-  let originalView = maView app
-  runMobileApp app { maView = \_userState -> pure (errorWidget originalView exc) }
+  originalView <- readIORef (acViewFunction appCtx)
+  writeIORef (acViewFunction appCtx)
+    (\_userState -> pure (errorWidget ctxPtr originalView exc))
   platformLog ("Uncaught exception: " <> pack (show exc))
-  renderWidget (acRenderState appCtx) (errorWidget originalView exc)
-  fireUserErrorCallback exc
+  renderWidget (acRenderState appCtx)
+    (errorWidget ctxPtr originalView exc)
+  fireUserErrorCallback appCtx exc
 
--- | Best-effort: read the registered app's 'onError' callback and fire it.
+-- | Best-effort: read the context's 'onError' callback and fire it.
 -- Catches any secondary exception so we never crash in the error handler.
-fireUserErrorCallback :: SomeException -> IO ()
-fireUserErrorCallback exc =
+fireUserErrorCallback :: AppContext -> SomeException -> IO ()
+fireUserErrorCallback appCtx exc =
   catch
-    (do app <- getMobileApp
-        onError (maContext app) exc)
+    (onError (acMobileContext appCtx) exc)
     (\secondaryExc ->
       platformLog ("onError callback failed: " <> pack (show (secondaryExc :: SomeException))))
 
--- | Render the current view: read the registered app and render its widget.
+-- | Render the current view: read the view function from AppContext and
+-- render its widget.
 renderView :: Ptr AppContext -> IO ()
 renderView ctxPtr = do
   appCtx <- derefAppContext ctxPtr
-  app <- getMobileApp
+  viewFunction <- readIORef (acViewFunction appCtx)
   let userState = UserState { userPermissionState = acPermissionState appCtx }
-  widget <- maView app userState
+  widget <- viewFunction userState
   renderWidget (acRenderState appCtx) widget
 
 -- | A widget that displays an error message with a dismiss button.
 -- The dismiss button restores the original view via a closure.
-errorWidget :: (UserState -> IO Widget) -> SomeException -> Widget
-errorWidget originalView exc = Column
+errorWidget :: Ptr AppContext -> (UserState -> IO Widget) -> SomeException -> Widget
+errorWidget ctxPtr originalView exc = Column
   [ Text TextConfig
       { tcLabel      = "An error occurred"
       , tcFontConfig = Just (FontConfig 20.0)
@@ -135,8 +141,8 @@ errorWidget originalView exc = Column
   , Button ButtonConfig
       { bcLabel      = "Dismiss"
       , bcAction     = do
-          app <- getMobileApp
-          runMobileApp app { maView = originalView }
+          appCtx <- derefAppContext ctxPtr
+          writeIORef (acViewFunction appCtx) originalView
       , bcFontConfig = Nothing
       }
   ]
@@ -150,25 +156,8 @@ haskellGreet cname = do
 
 foreign export ccall haskellGreet :: CString -> IO CString
 
--- | Create an 'AppContext' (bundling 'MobileContext' + 'RenderState' +
--- 'PermissionState') and return it as a typed pointer for C code.
--- Called by platform bridges after 'haskellRunMain'.
--- The context pointer is written into the 'PermissionState' so that
--- 'requestPermission' can thread it through to the C bridge.
--- Returns 'nullPtr' if the app is not registered or an exception occurs.
-haskellCreateContext :: IO (Ptr AppContext)
-haskellCreateContext =
-  catch
-    (do app <- getMobileApp
-        newAppContext (maContext app))
-    (\exc -> do
-      platformLog ("haskellCreateContext failed: " <> pack (show (exc :: SomeException)))
-      pure (castPtr nullPtr))
-
-foreign export ccall haskellCreateContext :: IO (Ptr AppContext)
-
 -- | Render the UI tree. Dereferences the context pointer to obtain the
--- 'RenderState', calls 'maView' from the registered 'MobileApp'
+-- 'RenderState', reads the view function from 'AppContext'
 -- to get the widget description, then issues ui_* calls through the
 -- registered bridge callbacks. Catches exceptions and shows error widget.
 haskellRenderUI :: Ptr AppContext -> IO ()

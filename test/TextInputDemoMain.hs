@@ -5,10 +5,11 @@
 -- Starts directly in text-input-demo mode so no runtime switching is needed.
 module Main where
 
-import HaskellMobile (runMobileApp, platformLog)
+import Foreign.Ptr (Ptr)
+import HaskellMobile (startMobileApp, platformLog, AppContext)
 import HaskellMobile.App (textInputDemoApp)
 
-main :: IO ()
+main :: IO (Ptr AppContext)
 main = do
-  runMobileApp textInputDemoApp
   platformLog "TextInput demo app registered"
+  startMobileApp textInputDemoApp

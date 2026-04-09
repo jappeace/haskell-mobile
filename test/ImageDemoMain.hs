@@ -6,13 +6,14 @@
 module Main where
 
 import Data.ByteString qualified as BS
-import HaskellMobile (runMobileApp, platformLog, loggingMobileContext, MobileApp(..))
+import Foreign.Ptr (Ptr)
+import HaskellMobile (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext)
 import HaskellMobile.Widget (ImageConfig(..), ImageSource(..), ResourceName(..), ScaleType(..), TextConfig(..), Widget(..))
 
-main :: IO ()
+main :: IO (Ptr AppContext)
 main = do
-  runMobileApp imageDemoApp
   platformLog "Image demo app registered"
+  startMobileApp imageDemoApp
 
 -- | Image demo: displays images from all three source types.
 -- Exercises every ImageSource constructor and every ScaleType variant.

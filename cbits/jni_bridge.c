@@ -15,8 +15,9 @@
 #include "JniBridge.h"
 #include "PermissionBridge.h"
 
-/* Runs the user's Haskell main via RTS API (cbits/run_main.c) */
-extern void haskellRunMain(void);
+/* Runs the user's Haskell main via RTS API (cbits/run_main.c).
+ * Returns the opaque AppContext pointer. */
+extern void *haskellRunMain(void);
 
 /* Locale detection (cbits/locale.c) */
 extern void setSystemLocale(const char *locale);
@@ -26,7 +27,6 @@ extern void haskellLogLocale(void);
 
 /* Haskell foreign exports */
 extern char* haskellGreet(const char* name);
-extern void *haskellCreateContext(void);
 extern void haskellOnLifecycle(void *ctx, int eventType);
 extern void haskellRenderUI(void *ctx);
 extern void haskellOnUIEvent(void *ctx, int callbackId);
@@ -57,8 +57,7 @@ JNIEXPORT jint JNICALL
 JNI_OnLoad(JavaVM *vm, void *reserved)
 {
     hs_init(NULL, NULL);
-    haskellRunMain();
-    g_haskell_ctx = haskellCreateContext();
+    g_haskell_ctx = haskellRunMain();
 
     /* Cache the system locale from Android's Locale.getDefault().toLanguageTag() */
     {

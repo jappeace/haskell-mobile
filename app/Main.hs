@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import HaskellMobile (runMobileApp, platformLog, MobileApp(maContext))
+import HaskellMobile (startMobileApp, platformLog, AppContext(..), derefAppContext)
 import HaskellMobile.App (mobileApp)
 import HaskellMobile.Lifecycle (LifecycleEvent(..), MobileContext(onLifecycle))
 
--- | Desktop entry point. Registers the app, then simulates a mobile
+-- | Desktop entry point. Creates the app context, then simulates a mobile
 -- lifecycle to exercise the callbacks.
 --
 -- On Android\/iOS, the platform bridge runs the user's @main@ via
@@ -13,9 +13,10 @@ import HaskellMobile.Lifecycle (LifecycleEvent(..), MobileContext(onLifecycle))
 -- C main stub.
 main :: IO ()
 main = do
-  runMobileApp mobileApp
+  ctxPtr <- startMobileApp mobileApp
+  appCtx <- derefAppContext ctxPtr
   platformLog "Haskell app registered"
-  let listen = onLifecycle (maContext mobileApp)
+  let listen = onLifecycle (acMobileContext appCtx)
 
   -- Simulate the platform sending lifecycle events
   listen Create

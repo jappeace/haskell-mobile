@@ -18,10 +18,8 @@ import Foreign.Ptr (Ptr)
 import HaskellMobile
   ( MobileApp(..)
   , UserState(..)
-  , runMobileApp
-  , getMobileApp
+  , startMobileApp
   , haskellGreet
-  , haskellCreateContext
   , haskellRenderUI
   , haskellOnUIEvent
   , haskellOnLifecycle
@@ -68,17 +66,15 @@ import HaskellMobile.Render (newRenderState, renderWidget, dispatchEvent, dispat
 
 main :: IO ()
 main = do
-  -- Register the default app so FFI functions that read the IORef work
-  runMobileApp mobileApp
   -- Create a single FFI context for permission round-trip tests.
   -- The C desktop stub uses a process-wide g_permission_ctx, so only
   -- one context can be active for FFI permission dispatch.
-  ffiCtxPtr <- haskellCreateContext
+  ffiCtxPtr <- startMobileApp mobileApp
   ffiAppCtx <- derefAppContext ffiCtxPtr
-  defaultMain (tests (acPermissionState ffiAppCtx) ffiCtxPtr)
+  defaultMain (tests (acPermissionState ffiAppCtx))
 
-tests :: PermissionState -> Ptr AppContext -> TestTree
-tests ffiPermState ffiCtxPtr = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, imageTests, styledTests, textAlignTests, colorTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, appContextTests, exceptionHandlerTests ffiCtxPtr]
+tests :: PermissionState -> TestTree
+tests ffiPermState = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, imageTests, styledTests, textAlignTests, colorTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, appContextTests, exceptionHandlerTests]
 
 qcProps :: TestTree
 qcProps = testGroup "(checked by QuickCheck)"
@@ -118,14 +114,24 @@ unitTests = testGroup "Unit tests"
       result @?= "Hello from Haskell, Android!"
   ]
 
--- | Helper: create an 'AppContext' with the given lifecycle callback,
+-- | Helper: create an 'AppContext' from a 'MobileApp',
 -- run an action with the typed 'Ptr AppContext', then free the context.
-withContext :: (LifecycleEvent -> IO ()) -> (Ptr AppContext -> IO a) -> IO a
-withContext callback action = do
-  ptr <- newAppContext MobileContext { onLifecycle = callback, onError = \_ -> pure () }
+withAppContext :: MobileApp -> (Ptr AppContext -> IO a) -> IO a
+withAppContext app action = do
+  ptr <- newAppContext app
   result <- action ptr
   freeAppContext ptr
   pure result
+
+-- | Helper: create an 'AppContext' with the given lifecycle callback,
+-- run an action with the typed 'Ptr AppContext', then free the context.
+withContext :: (LifecycleEvent -> IO ()) -> (Ptr AppContext -> IO a) -> IO a
+withContext callback action = withAppContext dummyApp action
+  where
+    dummyApp = MobileApp
+      { maContext = MobileContext { onLifecycle = callback, onError = \_ -> pure () }
+      , maView    = \_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing })
+      }
 
 allEvents :: [LifecycleEvent]
 allEvents = [Create, Start, Resume, Pause, Stop, Destroy, LowMemory]
@@ -614,29 +620,60 @@ colorTests = testGroup "Colors"
       colorFromText (colorToHex color) @?= Just color
   ]
 
--- | Tests for the IORef registration pattern.
--- Uses 'sequentialTestGroup' because these tests modify the global mobileApp registration.
+-- | Tests for the AppContext-based registration.
+-- Each test creates its own context, so no shared global state.
 registrationTests :: TestTree
-registrationTests = sequentialTestGroup "Registration" AllFinish
-  [ testCase "getMobileApp returns the registered app" $ do
-      app <- getMobileApp
-      -- The app was registered in main before defaultMain.
-      -- Verify it has the same context as mobileApp.
-      mapM_ (onLifecycle (maContext app)) [Create, Destroy]
+registrationTests = testGroup "Registration"
+  [ testCase "startMobileApp returns working context" $ do
+      ctxPtr <- startMobileApp mobileApp
+      appCtx <- derefAppContext ctxPtr
+      -- Verify the context has a working lifecycle callback
+      mapM_ (onLifecycle (acMobileContext appCtx)) [Create, Destroy]
+      freeAppContext ctxPtr
 
-  , testCase "runMobileApp overwrites previous registration" $ do
-      let customCtx = MobileContext { onLifecycle = \_ -> pure (), onError = \_ -> pure () }
-          customApp = MobileApp { maContext = customCtx, maView = \_userState -> pure (Text TextConfig { tcLabel = "custom", tcFontConfig = Nothing }) }
-      runMobileApp customApp
-      app <- getMobileApp
+  , testCase "view function produces a widget through AppContext" $ do
+      let customApp = MobileApp
+            { maContext = MobileContext { onLifecycle = \_ -> pure (), onError = \_ -> pure () }
+            , maView = \_userState -> pure (Text TextConfig { tcLabel = "custom", tcFontConfig = Nothing })
+            }
+      ctxPtr <- newAppContext customApp
+      appCtx <- derefAppContext ctxPtr
       dummyPermState <- newPermissionState
       let dummyUserState = UserState { userPermissionState = dummyPermState }
-      widget <- maView app dummyUserState
+      viewFn <- readIORef (acViewFunction appCtx)
+      widget <- viewFn dummyUserState
       case widget of
         Text config -> tcLabel config @?= "custom"
         _           -> assertFailure "expected Text \"custom\""
-      -- Restore the original
-      runMobileApp mobileApp
+      freeAppContext ctxPtr
+
+  , testCase "two contexts are independent" $ do
+      let appA = MobileApp
+            { maContext = defaultMobileContext
+            , maView = \_userState -> pure (Text TextConfig { tcLabel = "A", tcFontConfig = Nothing })
+            }
+          appB = MobileApp
+            { maContext = defaultMobileContext
+            , maView = \_userState -> pure (Text TextConfig { tcLabel = "B", tcFontConfig = Nothing })
+            }
+      ctxPtrA <- newAppContext appA
+      ctxPtrB <- newAppContext appB
+      appCtxA <- derefAppContext ctxPtrA
+      appCtxB <- derefAppContext ctxPtrB
+      dummyPermState <- newPermissionState
+      let dummyUserState = UserState { userPermissionState = dummyPermState }
+      viewFnA <- readIORef (acViewFunction appCtxA)
+      viewFnB <- readIORef (acViewFunction appCtxB)
+      widgetA <- viewFnA dummyUserState
+      widgetB <- viewFnB dummyUserState
+      case widgetA of
+        Text config -> tcLabel config @?= "A"
+        _           -> assertFailure "expected Text \"A\""
+      case widgetB of
+        Text config -> tcLabel config @?= "B"
+        _           -> assertFailure "expected Text \"B\""
+      freeAppContext ctxPtrA
+      freeAppContext ctxPtrB
   ]
 
 localeTests :: TestTree
@@ -705,7 +742,7 @@ i18nTests = testGroup "I18n"
   ]
 
 -- | Permission tests.  The @ffiPermState@ parameter is the 'PermissionState'
--- from a context created once in 'main' via 'haskellCreateContext'.  This
+-- from a context created once in 'main' via 'startMobileApp'.  This
 -- ensures the C desktop stub's @g_permission_ctx@ points to a valid context
 -- for the FFI round-trip tests, without racing with other tests.
 permissionTests :: PermissionState -> TestTree
@@ -791,14 +828,15 @@ permissionTests ffiPermState = testGroup "Permission"
   ]
 
 -- | Tests for the AppContext FFI path.
--- Uses 'newAppContext' (not 'haskellCreateContext') to avoid mutating the
--- global @g_permission_ctx@ — lifecycle dispatch doesn't need it.
 appContextTests :: TestTree
 appContextTests = testGroup "AppContext"
   [ testCase "newAppContext produces working lifecycle context" $ do
       ref <- newIORef ([] :: [LifecycleEvent])
-      let ctx = MobileContext { onLifecycle = \event -> modifyIORef' ref (++ [event]), onError = \_ -> pure () }
-      ctxPtr <- newAppContext ctx
+      let app = MobileApp
+            { maContext = MobileContext { onLifecycle = \event -> modifyIORef' ref (++ [event]), onError = \_ -> pure () }
+            , maView = \_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing })
+            }
+      ctxPtr <- newAppContext app
       haskellOnLifecycle ctxPtr 0  -- Create
       haskellOnLifecycle ctxPtr 2  -- Resume
       haskellOnLifecycle ctxPtr 5  -- Destroy
@@ -807,14 +845,14 @@ appContextTests = testGroup "AppContext"
       received @?= [Create, Resume, Destroy]
   ]
 
--- | Helper: check whether the registered app's view is an error widget
+-- | Helper: check whether the context's view function produces an error widget
 -- (a Column whose first child is a Text with "An error occurred").
 viewIsErrorWidget :: Ptr AppContext -> IO Bool
 viewIsErrorWidget ctxPtr = do
   appCtx <- derefAppContext ctxPtr
-  app <- getMobileApp
+  viewFn <- readIORef (acViewFunction appCtx)
   let userState = UserState { userPermissionState = acPermissionState appCtx }
-  widget <- maView app userState
+  widget <- viewFn userState
   case widget of
     Column (Text config : _) -> pure (tcLabel config == "An error occurred")
     Column _                 -> pure False
@@ -827,24 +865,21 @@ viewIsErrorWidget ctxPtr = do
     Styled _ _               -> pure False
 
 -- | Tests for the default exception handler that wraps FFI entry points.
--- Uses 'sequentialTestGroup' because these tests share global mutable state
--- (mobileApp registration) that would conflict with other tests.
-exceptionHandlerTests :: Ptr AppContext -> TestTree
-exceptionHandlerTests ffiCtxPtr = sequentialTestGroup "ExceptionHandler" AllFinish
-  [ testCase "exception in maView is caught and view replaced with error widget" $ do
-      runMobileApp mobileApp
+-- Each test creates its own context, so no shared global mutation.
+exceptionHandlerTests :: TestTree
+exceptionHandlerTests = testGroup "ExceptionHandler"
+  [ testCase "exception in view is caught and view replaced with error widget" $ do
       let crashingApp = MobileApp
             { maContext = defaultMobileContext
             , maView    = \_userState -> throwIO (userError "test-boom")
             }
-      runMobileApp crashingApp
-      haskellRenderUI ffiCtxPtr
-      isError <- viewIsErrorWidget ffiCtxPtr
-      assertBool "maView should be replaced with error widget" isError
-      runMobileApp mobileApp
+      ctxPtr <- newAppContext crashingApp
+      haskellRenderUI ctxPtr
+      isError <- viewIsErrorWidget ctxPtr
+      assertBool "view should be replaced with error widget" isError
+      freeAppContext ctxPtr
 
   , testCase "exception in button callback is caught" $ do
-      runMobileApp mobileApp
       let crashingApp = MobileApp
             { maContext = defaultMobileContext
             , maView    = \_userState -> pure $ Button ButtonConfig
@@ -853,17 +888,16 @@ exceptionHandlerTests ffiCtxPtr = sequentialTestGroup "ExceptionHandler" AllFini
                 , bcFontConfig = Nothing
                 }
             }
-      runMobileApp crashingApp
+      ctxPtr <- newAppContext crashingApp
       -- First render to register the button callback
-      haskellRenderUI ffiCtxPtr
-      -- Dispatch the button, which throws — handler overwrites maView
-      haskellOnUIEvent ffiCtxPtr 0
-      isError <- viewIsErrorWidget ffiCtxPtr
-      assertBool "maView should be error widget after button callback exception" isError
-      runMobileApp mobileApp
+      haskellRenderUI ctxPtr
+      -- Dispatch the button, which throws — handler overwrites view
+      haskellOnUIEvent ctxPtr 0
+      isError <- viewIsErrorWidget ctxPtr
+      assertBool "view should be error widget after button callback exception" isError
+      freeAppContext ctxPtr
 
   , testCase "dismiss restores original view after transient error" $ do
-      runMobileApp mobileApp
       -- Transient error: throws once, then succeeds
       shouldThrow <- newIORef True
       let transientView _userState = do
@@ -877,20 +911,19 @@ exceptionHandlerTests ffiCtxPtr = sequentialTestGroup "ExceptionHandler" AllFini
             { maContext = defaultMobileContext
             , maView    = transientView
             }
-      runMobileApp transientApp
+      ctxPtr <- newAppContext transientApp
       -- First render throws, error widget shown, flag cleared
-      haskellRenderUI ffiCtxPtr
-      isError <- viewIsErrorWidget ffiCtxPtr
+      haskellRenderUI ctxPtr
+      isError <- viewIsErrorWidget ctxPtr
       assertBool "should show error widget" isError
       -- Dispatch callback 0 (the dismiss button in the error widget).
       -- This restores the original transientView, which now succeeds.
-      haskellOnUIEvent ffiCtxPtr 0
-      isStillError <- viewIsErrorWidget ffiCtxPtr
+      haskellOnUIEvent ctxPtr 0
+      isStillError <- viewIsErrorWidget ctxPtr
       assertBool "should no longer show error widget after dismiss" (not isStillError)
-      runMobileApp mobileApp
+      freeAppContext ctxPtr
 
   , testCase "onError callback fires on exception" $ do
-      runMobileApp mobileApp
       ref <- newIORef (Nothing :: Maybe String)
       let ctx = MobileContext
             { onLifecycle = \_ -> pure ()
@@ -900,16 +933,15 @@ exceptionHandlerTests ffiCtxPtr = sequentialTestGroup "ExceptionHandler" AllFini
             { maContext = ctx
             , maView    = \_userState -> throwIO (userError "onError-test")
             }
-      runMobileApp crashingApp
-      haskellRenderUI ffiCtxPtr
+      ctxPtr <- newAppContext crashingApp
+      haskellRenderUI ctxPtr
       firedValue <- readIORef ref
       case firedValue of
         Nothing  -> assertFailure "onError callback should have been fired"
         Just msg -> assertBool "onError should receive the exception" ("onError-test" `isInfixOf` msg)
-      runMobileApp mobileApp
+      freeAppContext ctxPtr
 
   , testCase "exception in onError does not crash" $ do
-      runMobileApp mobileApp
       let ctx = MobileContext
             { onLifecycle = \_ -> pure ()
             , onError     = \_ -> throwIO (userError "secondary-boom")
@@ -918,20 +950,23 @@ exceptionHandlerTests ffiCtxPtr = sequentialTestGroup "ExceptionHandler" AllFini
             { maContext = ctx
             , maView    = \_userState -> throwIO (userError "primary-boom")
             }
-      runMobileApp crashingApp
-      -- Should not crash despite both maView and onError throwing
-      result <- try @IOException (haskellRenderUI ffiCtxPtr)
+      ctxPtr <- newAppContext crashingApp
+      -- Should not crash despite both view and onError throwing
+      result <- try @IOException (haskellRenderUI ctxPtr)
       case result of
         Left exc -> assertFailure ("haskellRenderUI should not throw, but got: " ++ show exc)
         Right () -> pure ()
-      runMobileApp mobileApp
+      freeAppContext ctxPtr
 
   , testCase "exception in lifecycle handler is caught" $ do
-      let crashingCtx = MobileContext
-            { onLifecycle = \_ -> throwIO (userError "lifecycle-boom")
-            , onError     = \_ -> pure ()
+      let crashingApp = MobileApp
+            { maContext = MobileContext
+                { onLifecycle = \_ -> throwIO (userError "lifecycle-boom")
+                , onError     = \_ -> pure ()
+                }
+            , maView = \_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing })
             }
-      ctxPtr <- newAppContext crashingCtx
+      ctxPtr <- newAppContext crashingApp
       -- Should not crash
       result <- try @IOException (haskellOnLifecycle ctxPtr 0)
       case result of

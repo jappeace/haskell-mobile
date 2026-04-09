@@ -8,10 +8,11 @@
 -- packages not linked into the .so).
 module Main where
 
-import HaskellMobile (runMobileApp, platformLog)
+import Foreign.Ptr (Ptr)
+import HaskellMobile (startMobileApp, platformLog, AppContext)
 import HaskellMobile.App (mobileApp)
 
-main :: IO ()
+main :: IO (Ptr AppContext)
 main = do
-  runMobileApp mobileApp
   platformLog "Consumer deps test app registered"
+  startMobileApp mobileApp

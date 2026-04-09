@@ -258,7 +258,6 @@ in {
           -optl-Wl,-u,haskellRunMain \
           -optl-Wl,-u,haskellGreet \
           -optl-Wl,-u,haskellOnLifecycle \
-          -optl-Wl,-u,haskellCreateContext \
           -optl-Wl,-u,haskellRenderUI \
           -optl-Wl,-u,haskellOnUIEvent \
           -optl-Wl,-u,haskellOnUITextChange \
@@ -465,7 +464,6 @@ in {
           -optl-Wl,-u,_haskellRunMain \
           -optl-Wl,-u,_haskellGreet \
           -optl-Wl,-u,_haskellOnLifecycle \
-          -optl-Wl,-u,_haskellCreateContext \
           -optl-Wl,-u,_haskellRenderUI \
           -optl-Wl,-u,_haskellOnUIEvent \
           -optl-Wl,-u,_haskellOnPermissionResult \
@@ -619,7 +617,6 @@ open(sys.argv[1], "w").write(yml)
           -optl-Wl,-u,_haskellRunMain \
           -optl-Wl,-u,_haskellGreet \
           -optl-Wl,-u,_haskellOnLifecycle \
-          -optl-Wl,-u,_haskellCreateContext \
           -optl-Wl,-u,_haskellRenderUI \
           -optl-Wl,-u,_haskellOnUIEvent \
           -optl-Wl,-u,_haskellOnPermissionResult \

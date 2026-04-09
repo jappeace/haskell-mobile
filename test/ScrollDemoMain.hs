@@ -5,10 +5,11 @@
 -- Starts directly in scroll-demo mode so no runtime switching is needed.
 module Main where
 
-import HaskellMobile (runMobileApp, platformLog)
+import Foreign.Ptr (Ptr)
+import HaskellMobile (startMobileApp, platformLog, AppContext)
 import HaskellMobile.App (scrollDemoApp)
 
-main :: IO ()
+main :: IO (Ptr AppContext)
 main = do
-  runMobileApp scrollDemoApp
   platformLog "Scroll demo app registered"
+  startMobileApp scrollDemoApp

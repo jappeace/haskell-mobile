@@ -6,22 +6,24 @@
 module Main where
 
 import Data.Text (pack)
+import Foreign.Ptr (Ptr)
 import HaskellMobile
   ( MobileApp(..)
   , UserState(..)
   , Permission(..)
   , PermissionStatus(..)
-  , runMobileApp
+  , startMobileApp
   , platformLog
   , requestPermission
   , loggingMobileContext
+  , AppContext
   )
 import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
 
-main :: IO ()
+main :: IO (Ptr AppContext)
 main = do
-  runMobileApp permissionDemoApp
   platformLog "Permission demo app registered"
+  startMobileApp permissionDemoApp
 
 -- | Permission demo: requests camera permission on button tap.
 -- Used by integration tests to verify the permission FFI bridge end-to-end.

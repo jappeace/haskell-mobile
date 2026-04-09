@@ -19,8 +19,7 @@ class HaskellBridge {
     /// Initialize the Haskell RTS. Must be called before any other Haskell function.
     static func initialize() {
         hs_init(nil, nil)
-        haskellRunMain()
-        context = haskellCreateContext()
+        context = haskellRunMain()
     }
 
     /// Call Haskell's haskellGreet and return the result as a Swift String.
