@@ -1,6 +1,11 @@
 package me.jappie.haskellmobile;
 
 import android.app.Activity;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothManager;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanResult;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -40,8 +45,12 @@ public class HaskellMobileActivity extends Activity implements View.OnClickListe
     private native void onLifecycleLowMemory();
     private native void onPermissionResult(int requestCode, int statusCode);
     private native void onSecureStorageResult(int requestId, int statusCode, String value);
+    private native void onBleScanResult(String deviceName, String deviceAddress, int rssi);
 
     private static final String SECURE_PREFS_NAME = "haskell_mobile_secure_storage";
+
+    private BluetoothLeScanner bleScanner;
+    private ScanCallback bleScanCallback;
 
     /**
      * Map a permission code (from PermissionBridge.h) to an Android permission string.
@@ -136,6 +145,78 @@ public class HaskellMobileActivity extends Activity implements View.OnClickListe
             onSecureStorageResult(requestId, 0 /* SUCCESS */, null);
         } catch (Exception e) {
             onSecureStorageResult(requestId, 2 /* ERROR */, null);
+        }
+    }
+
+    /**
+     * Check the BLE adapter status. Called from native code via JNI.
+     * Returns BLE_ADAPTER_ON (1), BLE_ADAPTER_OFF (0),
+     * BLE_ADAPTER_UNAUTHORIZED (2), or BLE_ADAPTER_UNSUPPORTED (3).
+     */
+    public int checkBleAdapter() {
+        try {
+            if (!getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_BLUETOOTH_LE)) {
+                return 3; // BLE_ADAPTER_UNSUPPORTED
+            }
+            BluetoothManager manager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+            if (manager == null) {
+                return 3; // BLE_ADAPTER_UNSUPPORTED
+            }
+            BluetoothAdapter adapter = manager.getAdapter();
+            if (adapter == null) {
+                return 3; // BLE_ADAPTER_UNSUPPORTED
+            }
+            if (!adapter.isEnabled()) {
+                return 0; // BLE_ADAPTER_OFF
+            }
+            return 1; // BLE_ADAPTER_ON
+        } catch (Exception e) {
+            android.util.Log.e("BleBridge", "checkBleAdapter failed: " + e.getMessage());
+            return 3; // BLE_ADAPTER_UNSUPPORTED
+        }
+    }
+
+    /**
+     * Start a BLE scan. Called from native code via JNI.
+     * Scan results are delivered via onBleScanResult JNI callback.
+     */
+    public void startBleScan() {
+        try {
+            BluetoothManager manager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+            if (manager == null) return;
+            BluetoothAdapter adapter = manager.getAdapter();
+            if (adapter == null || !adapter.isEnabled()) return;
+
+            bleScanner = adapter.getBluetoothLeScanner();
+            if (bleScanner == null) return;
+
+            bleScanCallback = new ScanCallback() {
+                @Override
+                public void onScanResult(int callbackType, ScanResult result) {
+                    String name = result.getDevice().getName();
+                    String address = result.getDevice().getAddress();
+                    int rssi = result.getRssi();
+                    onBleScanResult(name, address, rssi);
+                }
+            };
+
+            bleScanner.startScan(bleScanCallback);
+        } catch (Exception e) {
+            android.util.Log.e("BleBridge", "startBleScan failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Stop a running BLE scan. Called from native code via JNI.
+     */
+    public void stopBleScan() {
+        try {
+            if (bleScanner != null && bleScanCallback != null) {
+                bleScanner.stopScan(bleScanCallback);
+                bleScanCallback = null;
+            }
+        } catch (Exception e) {
+            android.util.Log.e("BleBridge", "stopBleScan failed: " + e.getMessage());
         }
     }
 

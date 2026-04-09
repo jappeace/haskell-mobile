@@ -77,4 +77,11 @@ void haskellOnPermissionResult(void *ctx, int32_t requestId, int32_t statusCode)
 void haskellOnSecureStorageResult(void *ctx, int32_t requestId,
                                    int32_t statusCode, const char *value);
 
+/* Dispatch a BLE scan result from native code back to Haskell.
+ * name: device name (may be NULL for unnamed devices).
+ * address: device address string.
+ * rssi: received signal strength indicator.
+ * ctx must be a pointer returned by haskellRunMain(). */
+void haskellOnBleScanResult(void *ctx, const char *name, const char *address, int32_t rssi);
+
 #endif /* HASKELL_MOBILE_H */

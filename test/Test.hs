@@ -14,7 +14,7 @@ import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Foreign.C.String (newCString, peekCString)
 import Foreign.Marshal.Alloc (free)
-import Foreign.Ptr (Ptr)
+import Foreign.Ptr (Ptr, nullPtr)
 import HaskellMobile
   ( MobileApp(..)
   , UserState(..)
@@ -62,6 +62,18 @@ import HaskellMobile.Permission
   , permissionToInt
   , permissionStatusFromInt
   )
+import HaskellMobile.Ble
+  ( BleAdapterStatus(..)
+  , BleScanResult(..)
+  , BleState(..)
+  , newBleState
+  , bleAdapterStatusFromInt
+  , bleAdapterStatusToInt
+  , checkBleAdapter
+  , startBleScan
+  , stopBleScan
+  , dispatchBleScanResult
+  )
 import HaskellMobile.Render (newRenderState, renderWidget, dispatchEvent, dispatchTextEvent)
 import HaskellMobile.SecureStorage
   ( SecureStorageStatus(..)
@@ -84,7 +96,7 @@ main = do
   defaultMain (tests (acPermissionState ffiAppCtx) (acSecureStorageState ffiAppCtx))
 
 tests :: PermissionState -> SecureStorageState -> TestTree
-tests ffiPermState ffiSecureStorageState = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, imageTests, styledTests, textAlignTests, colorTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, secureStorageTests ffiSecureStorageState, appContextTests, exceptionHandlerTests]
+tests ffiPermState ffiSecureStorageState = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, imageTests, styledTests, textAlignTests, colorTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, secureStorageTests ffiSecureStorageState, bleTests, appContextTests, exceptionHandlerTests]
 
 qcProps :: TestTree
 qcProps = testGroup "(checked by QuickCheck)"
@@ -262,9 +274,11 @@ uiTests = testGroup "UI"
   , testCase "mobileApp view returns a widget" $ do
       dummyPermState <- newPermissionState
       dummySecureStorageState <- newSecureStorageState
+      dummyBleState  <- newBleState
       let dummyUserState = UserState
             { userPermissionState    = dummyPermState
             , userSecureStorageState = dummySecureStorageState
+            , userBleState           = dummyBleState
             }
       widget <- maView mobileApp dummyUserState
       -- mobileApp is the counter demo; verify it's a column
@@ -654,9 +668,11 @@ registrationTests = testGroup "Registration"
       appCtx <- derefAppContext ctxPtr
       dummyPermState <- newPermissionState
       dummySecureStorageState <- newSecureStorageState
+      dummyBleState  <- newBleState
       let dummyUserState = UserState
             { userPermissionState    = dummyPermState
             , userSecureStorageState = dummySecureStorageState
+            , userBleState           = dummyBleState
             }
       viewFn <- readIORef (acViewFunction appCtx)
       widget <- viewFn dummyUserState
@@ -680,9 +696,11 @@ registrationTests = testGroup "Registration"
       appCtxB <- derefAppContext ctxPtrB
       dummyPermState <- newPermissionState
       dummySecureStorageState <- newSecureStorageState
+      dummyBleState  <- newBleState
       let dummyUserState = UserState
             { userPermissionState    = dummyPermState
             , userSecureStorageState = dummySecureStorageState
+            , userBleState           = dummyBleState
             }
       viewFnA <- readIORef (acViewFunction appCtxA)
       viewFnB <- readIORef (acViewFunction appCtxB)
@@ -957,6 +975,129 @@ secureStorageTests ffiSecureStorageState = sequentialTestGroup "SecureStorage" A
       count @?= 0
   ]
 
+-- | BLE scanning tests.
+-- The desktop stub reports adapter as ON and start/stop scan are no-ops,
+-- so we can exercise the Haskell logic without native code.
+bleTests :: TestTree
+bleTests = testGroup "BLE"
+  [ testCase "bleAdapterStatusFromInt roundtrips all constructors" $ do
+      let allStatuses = [BleAdapterOff, BleAdapterOn, BleAdapterUnauthorized, BleAdapterUnsupported]
+      mapM_ (\status ->
+        bleAdapterStatusFromInt (bleAdapterStatusToInt status) @?= Just status
+        ) allStatuses
+
+  , testCase "bleAdapterStatusFromInt returns Nothing for unknown codes" $ do
+      bleAdapterStatusFromInt 4 @?= Nothing
+      bleAdapterStatusFromInt (-1) @?= Nothing
+      bleAdapterStatusFromInt 100 @?= Nothing
+
+  , testCase "bleAdapterStatusToInt produces expected codes" $ do
+      bleAdapterStatusToInt BleAdapterOff          @?= 0
+      bleAdapterStatusToInt BleAdapterOn           @?= 1
+      bleAdapterStatusToInt BleAdapterUnauthorized @?= 2
+      bleAdapterStatusToInt BleAdapterUnsupported  @?= 3
+
+  , testCase "checkBleAdapter returns BleAdapterOn on desktop" $ do
+      status <- checkBleAdapter
+      status @?= BleAdapterOn
+
+  , testCase "startBleScan registers callback" $ do
+      bleState <- newBleState
+      startBleScan bleState (\_ -> pure ())
+      maybeCb <- readIORef (blesScanCallback bleState)
+      case maybeCb of
+        Nothing -> assertFailure "callback should be Just after startBleScan"
+        Just _  -> pure ()
+
+  , testCase "stopBleScan clears callback" $ do
+      bleState <- newBleState
+      startBleScan bleState (\_ -> pure ())
+      stopBleScan bleState
+      maybeCb <- readIORef (blesScanCallback bleState)
+      case maybeCb of
+        Nothing -> pure ()
+        Just _  -> assertFailure "callback should be Nothing after stopBleScan"
+
+  , testCase "dispatchBleScanResult fires registered callback" $ do
+      bleState <- newBleState
+      ref <- newIORef (Nothing :: Maybe BleScanResult)
+      startBleScan bleState (\result -> writeIORef ref (Just result))
+      cName <- newCString "TestDevice"
+      cAddr <- newCString "AA:BB:CC:DD:EE:FF"
+      dispatchBleScanResult bleState cName cAddr (-42)
+      free cName
+      free cAddr
+      result <- readIORef ref
+      case result of
+        Nothing -> assertFailure "callback should have been fired"
+        Just scanResult -> do
+          bsrDeviceName scanResult @?= "TestDevice"
+          bsrDeviceAddress scanResult @?= "AA:BB:CC:DD:EE:FF"
+          bsrRssi scanResult @?= (-42)
+
+  , testCase "dispatchBleScanResult with no active scan is no-op" $ do
+      bleState <- newBleState
+      cName <- newCString "Ignored"
+      cAddr <- newCString "00:00:00:00:00:00"
+      -- Should not throw or crash
+      dispatchBleScanResult bleState cName cAddr 0
+      free cName
+      free cAddr
+
+  , testCase "multiple scan results accumulate" $ do
+      bleState <- newBleState
+      ref <- newIORef ([] :: [BleScanResult])
+      startBleScan bleState (\result -> modifyIORef' ref (++ [result]))
+      cName1 <- newCString "Device1"
+      cAddr1 <- newCString "11:22:33:44:55:66"
+      dispatchBleScanResult bleState cName1 cAddr1 (-50)
+      free cName1
+      free cAddr1
+      cName2 <- newCString "Device2"
+      cAddr2 <- newCString "AA:BB:CC:DD:EE:FF"
+      dispatchBleScanResult bleState cName2 cAddr2 (-70)
+      free cName2
+      free cAddr2
+      results <- readIORef ref
+      length results @?= 2
+      case results of
+        [first, second] -> do
+          bsrDeviceName first @?= "Device1"
+          bsrDeviceName second @?= "Device2"
+        _ -> assertFailure "expected exactly 2 results"
+
+  , testCase "startBleScan replaces existing callback" $ do
+      bleState <- newBleState
+      refOld <- newIORef (0 :: Int)
+      refNew <- newIORef (0 :: Int)
+      startBleScan bleState (\_ -> modifyIORef' refOld (+ 1))
+      -- Replace with new callback
+      startBleScan bleState (\_ -> modifyIORef' refNew (+ 1))
+      cName <- newCString "Test"
+      cAddr <- newCString "00:11:22:33:44:55"
+      dispatchBleScanResult bleState cName cAddr (-60)
+      free cName
+      free cAddr
+      oldCount <- readIORef refOld
+      newCount <- readIORef refNew
+      oldCount @?= 0
+      newCount @?= 1
+
+  , testCase "null device name handled as empty Text" $ do
+      bleState <- newBleState
+      ref <- newIORef (Nothing :: Maybe BleScanResult)
+      startBleScan bleState (\result -> writeIORef ref (Just result))
+      cAddr <- newCString "FF:EE:DD:CC:BB:AA"
+      dispatchBleScanResult bleState nullPtr cAddr (-80)
+      free cAddr
+      result <- readIORef ref
+      case result of
+        Nothing -> assertFailure "callback should have been fired"
+        Just scanResult -> do
+          bsrDeviceName scanResult @?= ""
+          bsrDeviceAddress scanResult @?= "FF:EE:DD:CC:BB:AA"
+  ]
+
 -- | Tests for the AppContext FFI path.
 appContextTests :: TestTree
 appContextTests = testGroup "AppContext"
@@ -984,6 +1125,7 @@ viewIsErrorWidget ctxPtr = do
   let userState = UserState
         { userPermissionState    = acPermissionState appCtx
         , userSecureStorageState = acSecureStorageState appCtx
+        , userBleState           = acBleState appCtx
         }
   widget <- viewFn userState
   case widget of

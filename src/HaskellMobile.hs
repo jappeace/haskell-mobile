@@ -11,6 +11,7 @@ module HaskellMobile
   , haskellOnLifecycle
   , haskellOnPermissionResult
   , haskellOnSecureStorageResult
+  , haskellOnBleScanResult
   -- Error handling
   , errorWidget
   -- Re-exports from Lifecycle
@@ -51,6 +52,13 @@ module HaskellMobile
   , secureStorageWrite
   , secureStorageRead
   , secureStorageDelete
+  -- Re-exports from Ble
+  , BleAdapterStatus(..)
+  , BleScanResult(..)
+  , BleState(..)
+  , checkBleAdapter
+  , startBleScan
+  , stopBleScan
   )
 where
 
@@ -61,6 +69,15 @@ import Foreign.C.String (CString, newCString, peekCString)
 import Foreign.C.Types (CInt(..))
 import Foreign.Ptr (Ptr, nullPtr)
 import HaskellMobile.AppContext (AppContext(..), newAppContext, freeAppContext, derefAppContext)
+import HaskellMobile.Ble
+  ( BleAdapterStatus(..)
+  , BleScanResult(..)
+  , BleState(..)
+  , checkBleAdapter
+  , startBleScan
+  , stopBleScan
+  , dispatchBleScanResult
+  )
 import HaskellMobile.Lifecycle
   ( LifecycleEvent(..)
   , MobileContext(..)
@@ -140,6 +157,7 @@ renderView ctxPtr = do
   let userState = UserState
         { userPermissionState    = acPermissionState appCtx
         , userSecureStorageState = acSecureStorageState appCtx
+        , userBleState           = acBleState appCtx
         }
   widget <- viewFunction userState
   renderWidget (acRenderState appCtx) widget
@@ -216,6 +234,16 @@ haskellOnPermissionResult ctxPtr requestId statusCode =
     dispatchPermissionResult (acPermissionState appCtx) requestId statusCode
 
 foreign export ccall haskellOnPermissionResult :: Ptr AppContext -> CInt -> CInt -> IO ()
+
+-- | Handle a BLE scan result from native code. Dispatches to the
+-- callback registered by 'startBleScan'.
+haskellOnBleScanResult :: Ptr AppContext -> CString -> CString -> CInt -> IO ()
+haskellOnBleScanResult ctxPtr cName cAddr cRssi =
+  withExceptionHandler ctxPtr $ do
+    appCtx <- derefAppContext ctxPtr
+    dispatchBleScanResult (acBleState appCtx) cName cAddr cRssi
+
+foreign export ccall haskellOnBleScanResult :: Ptr AppContext -> CString -> CString -> CInt -> IO ()
 
 -- | FFI entry point called from platform code.
 -- Takes a context pointer and an event code.

@@ -8,6 +8,7 @@ module HaskellMobile.Types
   )
 where
 
+import HaskellMobile.Ble (BleState)
 import HaskellMobile.Lifecycle (MobileContext)
 import HaskellMobile.Permission (PermissionState)
 import HaskellMobile.SecureStorage (SecureStorageState)
@@ -20,6 +21,7 @@ import HaskellMobile.Widget (Widget)
 data UserState = UserState
   { userPermissionState    :: PermissionState
   , userSecureStorageState :: SecureStorageState
+  , userBleState           :: BleState
   }
 
 -- | Application definition record. Downstream apps create one of these

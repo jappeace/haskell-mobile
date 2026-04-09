@@ -14,6 +14,7 @@ where
 import Data.IORef (IORef, newIORef, writeIORef)
 import Foreign.Ptr (Ptr, castPtr)
 import Foreign.StablePtr (StablePtr, castPtrToStablePtr, castStablePtrToPtr, newStablePtr, deRefStablePtr, freeStablePtr)
+import HaskellMobile.Ble (BleState(..), newBleState)
 import HaskellMobile.Lifecycle (MobileContext)
 import HaskellMobile.Permission (PermissionState(..), newPermissionState)
 import HaskellMobile.Render (RenderState, newRenderState)
@@ -30,6 +31,7 @@ data AppContext = AppContext
   , acRenderState         :: RenderState
   , acPermissionState     :: PermissionState
   , acSecureStorageState  :: SecureStorageState
+  , acBleState            :: BleState
   , acViewFunction        :: IORef (UserState -> IO Widget)
   }
 
@@ -41,18 +43,21 @@ newAppContext mobileApp = do
   renderState        <- newRenderState
   permissionState    <- newPermissionState
   secureStorageState <- newSecureStorageState
+  bleState           <- newBleState
   viewRef            <- newIORef (maView mobileApp)
   let appContext = AppContext
         { acMobileContext      = maContext mobileApp
         , acRenderState        = renderState
         , acPermissionState    = permissionState
         , acSecureStorageState = secureStorageState
+        , acBleState           = bleState
         , acViewFunction       = viewRef
         }
   ptr <- castPtr . castStablePtrToPtr <$> newStablePtr appContext
-  -- Write the context pointer back so requestPermission / secure storage can pass it to C.
+  -- Write context pointers back so bridges can pass them to C.
   writeIORef (psContextPtr permissionState) (castPtr ptr)
   writeIORef (ssContextPtr secureStorageState) (castPtr ptr)
+  writeIORef (blesContextPtr bleState) (castPtr ptr)
   pure ptr
 
 -- | Release a pointer previously created by 'newAppContext'.

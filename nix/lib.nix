@@ -148,6 +148,14 @@ in {
           -o secure_storage_android.o \
           ${haskellMobileSrc}/cbits/secure_storage_android.c
 
+        ${ndkCc} -c -fPIC \
+          -DJNI_PACKAGE=me_jappie_haskellmobile \
+          -I${sysroot}/usr/include \
+          -I$RTS_INCLUDE \
+          -I${haskellMobileSrc}/include \
+          -o ble_bridge_android.o \
+          ${haskellMobileSrc}/cbits/ble_bridge_android.c
+
         # Compile extra JNI bridge sources (consumer-specific JNI methods)
         ${builtins.concatStringsSep "\n" (builtins.genList (i:
           let src = builtins.elemAt extraJniBridge i;
@@ -179,6 +187,7 @@ in {
         cp ${haskellMobileSrc}/src/HaskellMobile/I18n.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/Permission.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/SecureStorage.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/Ble.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile.hs .
 
         # Default App.hs — only copy if not already present (consumer may override)
@@ -203,6 +212,7 @@ in {
         cp ${haskellMobileSrc}/cbits/locale.c cbits/
         cp ${haskellMobileSrc}/cbits/permission_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/secure_storage_bridge.c cbits/
+        cp ${haskellMobileSrc}/cbits/ble_bridge.c cbits/
 
         # Step 4: Compile Haskell to shared library with cross-GHC.
         # Discover library paths dynamically — hash suffixes vary across nixpkgs.
@@ -256,6 +266,7 @@ in {
           cbits/locale.c \
           cbits/permission_bridge.c \
           cbits/secure_storage_bridge.c \
+          cbits/ble_bridge.c \
           -optl-L${androidPkgs.gmp}/lib \
           -optl-L${androidPkgs.libffi}/lib \
           -optl-lffi \
@@ -265,6 +276,7 @@ in {
           -optl$(pwd)/ui_bridge_android.o \
           -optl$(pwd)/permission_bridge_android.o \
           -optl$(pwd)/secure_storage_android.o \
+          -optl$(pwd)/ble_bridge_android.o \
           ${builtins.concatStringsSep " " (builtins.genList (i: "-optl$(pwd)/extra_jni_${toString i}.o") (builtins.length extraJniBridge))} \
           ${builtins.concatStringsSep " " (map (o: "-optl${o}") extraLinkObjects)} \
           -optl-Wl,-u,haskellRunMain \
@@ -275,6 +287,7 @@ in {
           -optl-Wl,-u,haskellOnUITextChange \
           -optl-Wl,-u,haskellOnPermissionResult \
           -optl-Wl,-u,haskellOnSecureStorageResult \
+          -optl-Wl,-u,haskellOnBleScanResult \
           -optl-Wl,-u,haskellLogLocale \
           -optl-Wl,--no-undefined \
           -optl-Wl,--whole-archive \
@@ -449,6 +462,7 @@ in {
         cp ${haskellMobileSrc}/src/HaskellMobile/I18n.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/Permission.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/SecureStorage.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/Ble.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile.hs .
 
         # Default App.hs — only copy if not already present
@@ -469,6 +483,7 @@ in {
         cp ${haskellMobileSrc}/cbits/locale.c cbits/
         cp ${haskellMobileSrc}/cbits/permission_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/secure_storage_bridge.c cbits/
+        cp ${haskellMobileSrc}/cbits/ble_bridge.c cbits/
 
         ghc -staticlib \
           -O2 \
@@ -483,6 +498,7 @@ in {
           -optl-Wl,-u,_haskellOnUIEvent \
           -optl-Wl,-u,_haskellOnPermissionResult \
           -optl-Wl,-u,_haskellOnSecureStorageResult \
+          -optl-Wl,-u,_haskellOnBleScanResult \
           -optl-Wl,-u,_haskellLogLocale \
           cbits/platform_log.c \
           cbits/ui_bridge.c \
@@ -490,6 +506,7 @@ in {
           cbits/locale.c \
           cbits/permission_bridge.c \
           cbits/secure_storage_bridge.c \
+          cbits/ble_bridge.c \
           Main.hs \
           HaskellMobile.hs
       '';
@@ -509,6 +526,7 @@ in {
         cp ${haskellMobileSrc}/include/UIBridge.h $out/include/UIBridge.h
         cp ${haskellMobileSrc}/include/PermissionBridge.h $out/include/PermissionBridge.h
         cp ${haskellMobileSrc}/include/SecureStorageBridge.h $out/include/SecureStorageBridge.h
+        cp ${haskellMobileSrc}/include/BleBridge.h $out/include/BleBridge.h
       '';
     };
 
@@ -561,6 +579,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${iosLib}/include/UIBridge.h $out/share/ios/include/
         cp ${iosLib}/include/PermissionBridge.h $out/share/ios/include/
         cp ${iosLib}/include/SecureStorageBridge.h $out/share/ios/include/
+        cp ${iosLib}/include/BleBridge.h $out/share/ios/include/
         ${patchProjectYml}
       '';
 
@@ -608,6 +627,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${haskellMobileSrc}/src/HaskellMobile/I18n.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/Permission.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/SecureStorage.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/Ble.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile.hs .
 
         # Default App.hs — only copy if not already present
@@ -628,6 +648,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${haskellMobileSrc}/cbits/locale.c cbits/
         cp ${haskellMobileSrc}/cbits/permission_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/secure_storage_bridge.c cbits/
+        cp ${haskellMobileSrc}/cbits/ble_bridge.c cbits/
 
         ghc -staticlib \
           -O2 \
@@ -642,6 +663,7 @@ open(sys.argv[1], "w").write(yml)
           -optl-Wl,-u,_haskellOnUIEvent \
           -optl-Wl,-u,_haskellOnPermissionResult \
           -optl-Wl,-u,_haskellOnSecureStorageResult \
+          -optl-Wl,-u,_haskellOnBleScanResult \
           -optl-Wl,-u,_haskellLogLocale \
           cbits/platform_log.c \
           cbits/ui_bridge.c \
@@ -649,6 +671,7 @@ open(sys.argv[1], "w").write(yml)
           cbits/locale.c \
           cbits/permission_bridge.c \
           cbits/secure_storage_bridge.c \
+          cbits/ble_bridge.c \
           Main.hs \
           HaskellMobile.hs
       '';
@@ -668,6 +691,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${haskellMobileSrc}/include/UIBridge.h $out/include/UIBridge.h
         cp ${haskellMobileSrc}/include/PermissionBridge.h $out/include/PermissionBridge.h
         cp ${haskellMobileSrc}/include/SecureStorageBridge.h $out/include/SecureStorageBridge.h
+        cp ${haskellMobileSrc}/include/BleBridge.h $out/include/BleBridge.h
       '';
     };
 
@@ -695,6 +719,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${watchosLib}/include/UIBridge.h $out/share/watchos/include/
         cp ${watchosLib}/include/PermissionBridge.h $out/share/watchos/include/
         cp ${watchosLib}/include/SecureStorageBridge.h $out/share/watchos/include/
+        cp ${watchosLib}/include/BleBridge.h $out/share/watchos/include/
       '';
 
       installPhase = "true";

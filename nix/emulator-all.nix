@@ -105,6 +105,17 @@ let
     name = "haskell-mobile-nodepool-apk";
   };
 
+  bleAndroid = import ./android.nix {
+    inherit sources androidArch;
+    mainModule = ../test/BleDemoMain.hs;
+  };
+  bleApk = lib.mkApk {
+    sharedLibs = [{ lib = bleAndroid; inherit abiDir; }];
+    androidSrc = ../android;
+    apkName = "haskell-mobile-ble.apk";
+    name = "haskell-mobile-ble-apk";
+  };
+
   androidComposition = pkgs.androidenv.composeAndroidPackages {
     platformVersions = [ emulatorApiLevel ];
     includeEmulator = true;
@@ -150,6 +161,7 @@ PERMISSION_APK="${permissionApk}/haskell-mobile-permission.apk"
 SECURE_STORAGE_APK="${secureStorageApk}/haskell-mobile-securestorage.apk"
 IMAGE_APK="${imageApk}/haskell-mobile-image.apk"
 NODEPOOL_APK="${nodepoolApk}/haskell-mobile-nodepool.apk"
+BLE_APK="${bleApk}/haskell-mobile-ble.apk"
 PACKAGE="me.jappie.haskellmobile"
 ACTIVITY=".MainActivity"
 DEVICE_NAME="test_all"
@@ -313,7 +325,7 @@ sleep 30
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK PACKAGE ACTIVITY WORK_DIR
+export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK PACKAGE ACTIVITY WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -376,6 +388,8 @@ echo "--- image ---"
 run_with_retry "image" bash "$TEST_SCRIPTS/android/image.sh" || PHASE6_EXIT=1
 echo "--- node-pool ---"
 run_with_retry "node-pool" bash "$TEST_SCRIPTS/android/node-pool.sh" || PHASE5_EXIT=1
+echo "--- ble ---"
+run_with_retry "ble" bash "$TEST_SCRIPTS/android/ble.sh" || PHASE7_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -499,9 +513,9 @@ else
 fi
 
 if [ $PHASE7_OK -eq 1 ]; then
-    echo "PASS  Phase 7 — SecureStorage demo app"
+    echo "PASS  Phase 7 — SecureStorage + BLE demo app"
 else
-    echo "FAIL  Phase 7 — SecureStorage demo app"
+    echo "FAIL  Phase 7 — SecureStorage + BLE demo app"
     FINAL_EXIT=1
 fi
 

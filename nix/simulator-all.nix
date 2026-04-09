@@ -89,6 +89,17 @@ let
     dynamicNodePool = true;
   };
 
+  bleIos = import ./ios.nix {
+    inherit sources;
+    mainModule = ../test/BleDemoMain.hs;
+    simulator = true;
+  };
+  bleSimApp = lib.mkSimulatorApp {
+    iosLib = bleIos;
+    iosSrc = ../ios;
+    name = "haskell-mobile-ble-simulator-app";
+  };
+
   xcodegen = pkgs.xcodegen;
 
   testScripts = builtins.path { path = ../test; name = "test-scripts"; };
@@ -116,6 +127,7 @@ PERMISSION_SHARE_DIR="${permissionSimApp}/share/ios"
 SECURE_STORAGE_SHARE_DIR="${secureStorageSimApp}/share/ios"
 IMAGE_SHARE_DIR="${imageSimApp}/share/ios"
 NODEPOOL_SHARE_DIR="${nodepoolSimApp}/share/ios"
+BLE_SHARE_DIR="${bleSimApp}/share/ios"
 TEST_SCRIPTS="${testScripts}"
 
 # --- Temp working directory ---
@@ -164,6 +176,7 @@ cp "$COUNTER_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/counter/include/"
 cp "$COUNTER_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/counter/include/"
 cp "$COUNTER_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/counter/include/"
 cp "$COUNTER_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/counter/include/"
+cp "$COUNTER_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/counter/include/"
 cp -r "$COUNTER_SHARE_DIR/HaskellMobile" "$WORK_DIR/counter/"
 cp "$COUNTER_SHARE_DIR/project.yml" "$WORK_DIR/counter/"
 chmod -R u+w "$WORK_DIR/counter"
@@ -200,6 +213,7 @@ cp "$SCROLL_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/scroll/include/"
 cp "$SCROLL_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/scroll/include/"
 cp "$SCROLL_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/scroll/include/"
 cp "$SCROLL_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/scroll/include/"
+cp "$SCROLL_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/scroll/include/"
 cp -r "$SCROLL_SHARE_DIR/HaskellMobile" "$WORK_DIR/scroll/"
 cp "$SCROLL_SHARE_DIR/project.yml" "$WORK_DIR/scroll/"
 chmod -R u+w "$WORK_DIR/scroll"
@@ -236,6 +250,7 @@ cp "$TEXTINPUT_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/textinput/include/"
 cp "$TEXTINPUT_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/textinput/include/"
 cp "$TEXTINPUT_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/textinput/include/"
 cp "$TEXTINPUT_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/textinput/include/"
+cp "$TEXTINPUT_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/textinput/include/"
 cp -r "$TEXTINPUT_SHARE_DIR/HaskellMobile" "$WORK_DIR/textinput/"
 cp "$TEXTINPUT_SHARE_DIR/project.yml" "$WORK_DIR/textinput/"
 chmod -R u+w "$WORK_DIR/textinput"
@@ -272,6 +287,7 @@ cp "$PERMISSION_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/permission/include
 cp "$PERMISSION_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/permission/include/"
 cp "$PERMISSION_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/permission/include/"
 cp "$PERMISSION_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/permission/include/"
+cp "$PERMISSION_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/permission/include/"
 cp -r "$PERMISSION_SHARE_DIR/HaskellMobile" "$WORK_DIR/permission/"
 cp "$PERMISSION_SHARE_DIR/project.yml" "$WORK_DIR/permission/"
 chmod -R u+w "$WORK_DIR/permission"
@@ -308,6 +324,7 @@ cp "$SECURE_STORAGE_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/securestorage/
 cp "$SECURE_STORAGE_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/securestorage/include/"
 cp "$SECURE_STORAGE_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/securestorage/include/"
 cp "$SECURE_STORAGE_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/securestorage/include/"
+cp "$SECURE_STORAGE_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/securestorage/include/"
 cp -r "$SECURE_STORAGE_SHARE_DIR/HaskellMobile" "$WORK_DIR/securestorage/"
 cp "$SECURE_STORAGE_SHARE_DIR/project.yml" "$WORK_DIR/securestorage/"
 chmod -R u+w "$WORK_DIR/securestorage"
@@ -344,6 +361,7 @@ cp "$IMAGE_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/image/include/"
 cp "$IMAGE_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/image/include/"
 cp "$IMAGE_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/image/include/"
 cp "$IMAGE_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/image/include/"
+cp "$IMAGE_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/image/include/"
 cp -r "$IMAGE_SHARE_DIR/HaskellMobile" "$WORK_DIR/image/"
 cp "$IMAGE_SHARE_DIR/project.yml" "$WORK_DIR/image/"
 chmod -R u+w "$WORK_DIR/image"
@@ -380,6 +398,7 @@ cp "$NODEPOOL_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/nodepool/include/"
 cp "$NODEPOOL_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/nodepool/include/"
 cp "$NODEPOOL_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/nodepool/include/"
 cp "$NODEPOOL_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/nodepool/include/"
+cp "$NODEPOOL_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/nodepool/include/"
 cp -r "$NODEPOOL_SHARE_DIR/HaskellMobile" "$WORK_DIR/nodepool/"
 cp "$NODEPOOL_SHARE_DIR/project.yml" "$WORK_DIR/nodepool/"
 chmod -R u+w "$WORK_DIR/nodepool"
@@ -407,6 +426,43 @@ if [ -z "$NODEPOOL_APP" ]; then
     exit 1
 fi
 echo "NodePool app: $NODEPOOL_APP"
+
+# --- Stage and build BLE demo app ---
+echo "=== Staging BLE demo app ==="
+mkdir -p "$WORK_DIR/ble/lib" "$WORK_DIR/ble/include"
+cp "$BLE_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/ble/lib/"
+cp "$BLE_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/ble/include/"
+cp "$BLE_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/ble/include/"
+cp "$BLE_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/ble/include/"
+cp "$BLE_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/ble/include/"
+cp "$BLE_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/ble/include/"
+cp -r "$BLE_SHARE_DIR/HaskellMobile" "$WORK_DIR/ble/"
+cp "$BLE_SHARE_DIR/project.yml" "$WORK_DIR/ble/"
+chmod -R u+w "$WORK_DIR/ble"
+
+echo "=== Generating BLE Xcode project ==="
+cd "$WORK_DIR/ble"
+${xcodegen}/bin/xcodegen generate
+
+echo "=== Building BLE demo app for simulator ==="
+xcodebuild build \
+    -project HaskellMobile.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk iphonesimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/ble-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+BLE_APP=$(find "$WORK_DIR/ble-build" -name "*.app" -type d | head -1)
+if [ -z "$BLE_APP" ]; then
+    echo "ERROR: Could not find BLE .app bundle"
+    exit 1
+fi
+echo "BLE app: $BLE_APP"
 
 # --- Discover latest iOS runtime ---
 echo "=== Discovering iOS runtime ==="
@@ -469,7 +525,7 @@ sleep 5
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP WORK_DIR
+export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -532,6 +588,8 @@ echo "--- image ---"
 run_with_retry "image" bash "$TEST_SCRIPTS/ios/image.sh" || PHASE6_EXIT=1
 echo "--- node-pool ---"
 run_with_retry "node-pool" bash "$TEST_SCRIPTS/ios/node-pool.sh" || PHASE5_EXIT=1
+echo "--- ble ---"
+run_with_retry "ble" bash "$TEST_SCRIPTS/ios/ble.sh" || PHASE7_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -655,9 +713,9 @@ else
 fi
 
 if [ $PHASE7_OK -eq 1 ]; then
-    echo "PASS  Phase 7 — SecureStorage demo app"
+    echo "PASS  Phase 7 — SecureStorage + BLE demo app"
 else
-    echo "FAIL  Phase 7 — SecureStorage demo app"
+    echo "FAIL  Phase 7 — SecureStorage + BLE demo app"
     FINAL_EXIT=1
 fi
 

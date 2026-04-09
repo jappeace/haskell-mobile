@@ -72,6 +72,7 @@ library
       HaskellMobile.I18n
       HaskellMobile.Permission
       HaskellMobile.SecureStorage
+      HaskellMobile.Ble
   hs-source-dirs:
       src
   build-depends:
@@ -85,6 +86,7 @@ library
       cbits/locale.c
       cbits/permission_bridge.c
       cbits/secure_storage_bridge.c
+      cbits/ble_bridge.c
   include-dirs:
       include
 
