@@ -20,6 +20,10 @@ static os_log_t g_log;
 /* Haskell FFI export (dispatches scan result back to Haskell callback) */
 extern void haskellOnBleScanResult(void *ctx, const char *name, const char *address, int32_t rssi);
 
+/* ---- Module-level state (declared before use in delegate methods) ---- */
+
+static BOOL g_scanning_requested = NO;
+
 /* ---- Scan delegate ---- */
 
 @interface BleScanDelegate : NSObject <CBCentralManagerDelegate>
@@ -54,10 +58,7 @@ extern void haskellOnBleScanResult(void *ctx, const char *name, const char *addr
 
 @end
 
-/* ---- Module-level state ---- */
-
 static BleScanDelegate *g_delegate = nil;
-static BOOL g_scanning_requested = NO;
 
 /* ---- BLE bridge implementations ---- */
 
