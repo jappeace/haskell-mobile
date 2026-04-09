@@ -45,6 +45,9 @@ class WatchUIBridgeState: ObservableObject {
         case 5: // UI_PROP_IMAGE_FILE
             os_log("setStrProp(node=%d, imageFile=\"%{public}s\")", log: bridgeLog, type: .info, nodeId, value)
             node.imageFile = value
+        case 6: // UI_PROP_WEBVIEW_URL
+            os_log("setStrProp(node=%d, webviewUrl=\"%{public}s\")", log: bridgeLog, type: .info, nodeId, value)
+            node.text = value
         default:
             os_log("setStrProp: unknown propId %d", log: bridgeLog, type: .info, propId)
         }

@@ -14,6 +14,7 @@ module HaskellMobile.Widget
   , ResourceName(..)
   , ImageSource(..)
   , ImageConfig(..)
+  , WebViewConfig(..)
   , Widget(..)
   , WidgetStyle(..)
   , TextAlignment(..)
@@ -173,6 +174,14 @@ data ImageConfig = ImageConfig
     -- ^ How the image is scaled.
   } deriving (Show, Eq)
 
+-- | Configuration for an embedded web view.
+data WebViewConfig = WebViewConfig
+  { wvUrl        :: Text
+    -- ^ URL to load in the web view.
+  , wvOnPageLoad :: Maybe (IO ())
+    -- ^ Optional callback fired when a page finishes loading.
+  }
+
 -- | A declarative description of a UI element.
 data Widget
   = Text TextConfig
@@ -189,5 +198,7 @@ data Widget
     -- ^ A vertically scrollable container.
   | Image ImageConfig
     -- ^ An image widget displaying resource, file, or raw data.
+  | WebView WebViewConfig
+    -- ^ An embedded web view loading a URL.
   | Styled WidgetStyle Widget
     -- ^ Apply visual style overrides to a child widget.

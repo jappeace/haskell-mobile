@@ -19,6 +19,8 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.EditText;
 
 /**
@@ -358,6 +360,20 @@ public class HaskellMobileActivity extends Activity implements View.OnClickListe
     @Override
     public void onClick(View v) {
         onButtonClick(v);
+    }
+
+    /**
+     * Register a WebViewClient on a WebView. Called from native code
+     * when a WebView widget has an EventClick (page-load) handler.
+     * The client fires onButtonClick when a page finishes loading.
+     */
+    public void registerWebViewClient(final WebView webView) {
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                onButtonClick(view);
+            }
+        });
     }
 
     /**

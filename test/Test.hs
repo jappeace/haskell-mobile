@@ -50,7 +50,7 @@ import HaskellMobile.Lifecycle
   , lifecycleToInt
   , loggingMobileContext
   )
-import HaskellMobile.Widget (ButtonConfig(..), Color(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), ResourceName(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..), colorFromText, colorToHex, defaultStyle)
+import HaskellMobile.Widget (ButtonConfig(..), Color(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), ResourceName(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), WebViewConfig(..), Widget(..), WidgetStyle(..), colorFromText, colorToHex, defaultStyle)
 import HaskellMobile.Permission
   ( Permission(..)
   , PermissionStatus(..)
@@ -113,7 +113,7 @@ main = do
   defaultMain (tests (acPermissionState ffiAppCtx) (acSecureStorageState ffiAppCtx) (acDialogState ffiAppCtx))
 
 tests :: PermissionState -> SecureStorageState -> DialogState -> TestTree
-tests ffiPermState ffiSecureStorageState ffiDialogState = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, imageTests, styledTests, textAlignTests, colorTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, secureStorageTests ffiSecureStorageState, bleTests, dialogTests ffiDialogState, locationTests, appContextTests, exceptionHandlerTests]
+tests ffiPermState ffiSecureStorageState ffiDialogState = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, imageTests, webViewTests, styledTests, textAlignTests, colorTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, secureStorageTests ffiSecureStorageState, bleTests, dialogTests ffiDialogState, locationTests, appContextTests, exceptionHandlerTests]
 
 qcProps :: TestTree
 qcProps = testGroup "(checked by QuickCheck)"
@@ -309,6 +309,7 @@ uiTests = testGroup "UI"
         Button _        -> assertFailure "expected Column, got Button"
         TextInput _     -> assertFailure "expected Column, got TextInput"
         Image _         -> assertFailure "expected Column, got Image"
+        WebView _       -> assertFailure "expected Column, got WebView"
         Row _           -> assertFailure "expected Column, got Row"
         ScrollView _    -> assertFailure "expected Column, got ScrollView"
         Styled _ _      -> assertFailure "expected Column, got Styled"
@@ -522,6 +523,48 @@ imageTests = testGroup "Image"
       rs <- newRenderState
       renderWidget rs $ Image ImageConfig
         { icSource = ImageResource (ResourceName "none_test"), icScaleType = ScaleNone }
+  ]
+
+-- | Tests for the WebView widget.
+webViewTests :: TestTree
+webViewTests = testGroup "WebView"
+  [ testCase "WebView renders without error" $ do
+      rs <- newRenderState
+      renderWidget rs $ WebView WebViewConfig
+        { wvUrl = "https://example.com", wvOnPageLoad = Nothing }
+
+  , testCase "WebView with callback registers handler and fires" $ do
+      ref <- newIORef (0 :: Int)
+      rs <- newRenderState
+      renderWidget rs $ WebView WebViewConfig
+        { wvUrl = "https://example.com"
+        , wvOnPageLoad = Just (modifyIORef' ref (+ 1))
+        }
+      -- Callback 0 is registered for the page-load event
+      dispatchEvent rs 0
+      count <- readIORef ref
+      count @?= 1
+
+  , testCase "WebView without callback does not register handler" $ do
+      rs <- newRenderState
+      renderWidget rs $ WebView WebViewConfig
+        { wvUrl = "https://example.com", wvOnPageLoad = Nothing }
+      -- No callbacks registered, dispatching should log error but not crash
+      dispatchEvent rs 0
+
+  , testCase "WebView inside Column renders" $ do
+      rs <- newRenderState
+      renderWidget rs $ Column
+        [ Text TextConfig { tcLabel = "header", tcFontConfig = Nothing }
+        , WebView WebViewConfig
+            { wvUrl = "https://example.com", wvOnPageLoad = Nothing }
+        ]
+
+  , testCase "Styled WebView renders without error" $ do
+      rs <- newRenderState
+      renderWidget rs $ Styled defaultStyle
+        (WebView WebViewConfig
+          { wvUrl = "https://example.com", wvOnPageLoad = Nothing })
   ]
 
 -- | Tests for the Styled widget wrapper.
@@ -1323,6 +1366,7 @@ viewIsErrorWidget ctxPtr = do
     Button _                 -> pure False
     TextInput _              -> pure False
     Image _                  -> pure False
+    WebView _                -> pure False
     Row _                    -> pure False
     ScrollView _             -> pure False
     Styled _ _               -> pure False

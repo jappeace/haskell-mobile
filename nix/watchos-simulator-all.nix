@@ -112,6 +112,17 @@ let
     name = "haskell-mobile-watchos-location-simulator-app";
   };
 
+  webviewWatchos = import ./watchos.nix {
+    inherit sources;
+    mainModule = ../test/WebViewDemoMain.hs;
+    simulator = true;
+  };
+  webviewSimApp = lib.mkWatchOSSimulatorApp {
+    watchosLib = webviewWatchos;
+    watchosSrc = ../watchos;
+    name = "haskell-mobile-watchos-webview-simulator-app";
+  };
+
   xcodegen = pkgs.xcodegen;
 
   testScripts = builtins.path { path = ../test; name = "test-scripts"; };
@@ -141,6 +152,7 @@ NODEPOOL_SHARE_DIR="${nodepoolSimApp}/share/watchos"
 BLE_SHARE_DIR="${bleSimApp}/share/watchos"
 DIALOG_SHARE_DIR="${dialogSimApp}/share/watchos"
 LOCATION_SHARE_DIR="${locationSimApp}/share/watchos"
+WEBVIEW_SHARE_DIR="${webviewSimApp}/share/watchos"
 TEST_SCRIPTS="${testScripts}"
 
 # --- Temp working directory ---
@@ -155,6 +167,7 @@ PHASE4_OK=0
 PHASE5_OK=0
 PHASE6_OK=0
 PHASE7_OK=0
+PHASE8_OK=0
 
 cleanup() {
     echo ""
@@ -562,6 +575,45 @@ if [ -z "$LOCATION_APP" ]; then
 fi
 echo "Location app: $LOCATION_APP"
 
+# --- Stage and build webview demo app ---
+echo "=== Staging webview demo app ==="
+mkdir -p "$WORK_DIR/webview/lib" "$WORK_DIR/webview/include"
+cp "$WEBVIEW_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/webview/lib/"
+cp "$WEBVIEW_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/webview/include/"
+cp "$WEBVIEW_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/webview/include/"
+cp "$WEBVIEW_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/webview/include/"
+cp "$WEBVIEW_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/webview/include/"
+cp "$WEBVIEW_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/webview/include/"
+cp "$WEBVIEW_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/webview/include/"
+cp "$WEBVIEW_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/webview/include/"
+cp -r "$WEBVIEW_SHARE_DIR/HaskellMobile" "$WORK_DIR/webview/"
+cp "$WEBVIEW_SHARE_DIR/project.yml" "$WORK_DIR/webview/"
+chmod -R u+w "$WORK_DIR/webview"
+
+echo "=== Generating webview Xcode project ==="
+cd "$WORK_DIR/webview"
+${xcodegen}/bin/xcodegen generate
+
+echo "=== Building webview demo app for simulator ==="
+xcodebuild build \
+    -project HaskellMobile.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk watchsimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/webview-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+WEBVIEW_APP=$(find "$WORK_DIR/webview-build" -name "*.app" -type d | head -1)
+if [ -z "$WEBVIEW_APP" ]; then
+    echo "ERROR: Could not find webview .app bundle"
+    exit 1
+fi
+echo "WebView app: $WEBVIEW_APP"
+
 # --- Discover latest watchOS runtime ---
 echo "=== Discovering watchOS runtime ==="
 RUNTIME=$(xcrun simctl list runtimes -j \
@@ -625,7 +677,7 @@ sleep 5
 # ===========================================================================
 # Log subsystem differs from bundle ID for watchOS (bundle ID has .watchkitapp suffix)
 LOG_SUBSYSTEM="me.jappie.haskellmobile"
-export SIM_UDID BUNDLE_ID LOG_SUBSYSTEM COUNTER_APP SCROLL_APP TEXTINPUT_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WORK_DIR
+export SIM_UDID BUNDLE_ID LOG_SUBSYSTEM COUNTER_APP SCROLL_APP TEXTINPUT_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -634,6 +686,7 @@ PHASE4_EXIT=0
 PHASE5_EXIT=0
 PHASE6_EXIT=0
 PHASE7_EXIT=0
+PHASE8_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -685,6 +738,8 @@ echo "--- dialog ---"
 run_with_retry "dialog" bash "$TEST_SCRIPTS/watchos/dialog.sh" || PHASE7_EXIT=1
 echo "--- location ---"
 run_with_retry "location" bash "$TEST_SCRIPTS/watchos/location.sh" || PHASE6_EXIT=1
+echo "--- webview ---"
+run_with_retry "webview" bash "$TEST_SCRIPTS/watchos/webview.sh" || PHASE8_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -755,6 +810,16 @@ else
     echo "PHASE 7 FAILED"
 fi
 
+if [ $PHASE8_EXIT -eq 0 ]; then
+    PHASE8_OK=1
+    echo ""
+    echo "PHASE 8 PASSED"
+else
+    PHASE8_OK=0
+    echo ""
+    echo "PHASE 8 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -811,6 +876,13 @@ if [ $PHASE7_OK -eq 1 ]; then
     echo "PASS  Phase 7 — Dialog demo app"
 else
     echo "FAIL  Phase 7 — Dialog demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE8_OK -eq 1 ]; then
+    echo "PASS  Phase 8 — WebView demo app"
+else
+    echo "FAIL  Phase 8 — WebView demo app"
     FINAL_EXIT=1
 fi
 

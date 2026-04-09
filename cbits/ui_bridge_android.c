@@ -54,6 +54,7 @@ static jclass   g_class_EditText;
 static jclass   g_class_LinearLayout;
 static jclass   g_class_ScrollView;
 static jclass   g_class_ImageView;
+static jclass   g_class_WebView;
 static jclass   g_class_BitmapFactory;
 static jclass   g_class_ViewGroup;
 static jclass   g_class_ViewGroup_LayoutParams;
@@ -65,6 +66,7 @@ static jmethodID g_ctor_EditText;
 static jmethodID g_ctor_LinearLayout;
 static jmethodID g_ctor_ScrollView;
 static jmethodID g_ctor_ImageView;
+static jmethodID g_ctor_WebView;
 static jmethodID g_ctor_ViewGroup_LayoutParams;
 static jmethodID g_ctor_Integer;
 
@@ -92,6 +94,10 @@ static jmethodID g_method_setImageBitmap;
 static jmethodID g_method_setScaleType;
 static jmethodID g_method_decodeByteArray;
 static jmethodID g_method_decodeFile;
+static jmethodID g_method_loadUrl;
+static jmethodID g_method_getSettings;
+static jmethodID g_method_setJavaScriptEnabled;
+static jmethodID g_method_registerWebViewClient;
 
 /* LinearLayout orientation constants */
 static jint ORIENTATION_VERTICAL   = 1;
@@ -152,6 +158,10 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     if (!cls) return -1;
     g_class_ImageView = (*env)->NewGlobalRef(env, cls);
 
+    cls = (*env)->FindClass(env, "android/webkit/WebView");
+    if (!cls) return -1;
+    g_class_WebView = (*env)->NewGlobalRef(env, cls);
+
     cls = (*env)->FindClass(env, "android/graphics/BitmapFactory");
     if (!cls) return -1;
     g_class_BitmapFactory = (*env)->NewGlobalRef(env, cls);
@@ -180,6 +190,8 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     g_ctor_ScrollView = (*env)->GetMethodID(env, g_class_ScrollView,
         "<init>", "(Landroid/content/Context;)V");
     g_ctor_ImageView = (*env)->GetMethodID(env, g_class_ImageView,
+        "<init>", "(Landroid/content/Context;)V");
+    g_ctor_WebView = (*env)->GetMethodID(env, g_class_WebView,
         "<init>", "(Landroid/content/Context;)V");
     g_ctor_ViewGroup_LayoutParams = (*env)->GetMethodID(env,
         g_class_ViewGroup_LayoutParams, "<init>", "(II)V");
@@ -275,6 +287,32 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     /* BitmapFactory.decodeFile(String) -> Bitmap */
     g_method_decodeFile = (*env)->GetStaticMethodID(env, g_class_BitmapFactory,
         "decodeFile", "(Ljava/lang/String;)Landroid/graphics/Bitmap;");
+
+    /* WebView.loadUrl(String) */
+    g_method_loadUrl = (*env)->GetMethodID(env, g_class_WebView,
+        "loadUrl", "(Ljava/lang/String;)V");
+
+    /* WebView.getSettings() -> WebSettings */
+    g_method_getSettings = (*env)->GetMethodID(env, g_class_WebView,
+        "getSettings", "()Landroid/webkit/WebSettings;");
+
+    /* WebSettings.setJavaScriptEnabled(boolean) */
+    {
+        jclass webSettingsClass = (*env)->FindClass(env, "android/webkit/WebSettings");
+        if (webSettingsClass) {
+            g_method_setJavaScriptEnabled = (*env)->GetMethodID(env, webSettingsClass,
+                "setJavaScriptEnabled", "(Z)V");
+            (*env)->DeleteLocalRef(env, webSettingsClass);
+        }
+    }
+
+    /* Activity.registerWebViewClient(WebView) — our custom Java method */
+    g_method_registerWebViewClient = (*env)->GetMethodID(env, actClass,
+        "registerWebViewClient", "(Landroid/webkit/WebView;)V");
+    if (!g_method_registerWebViewClient) {
+        LOGE("registerWebViewClient not found — webview page-load events disabled");
+        (*env)->ExceptionClear(env);
+    }
 
     /* Clear any pending exception from optional method lookups above */
     if ((*env)->ExceptionCheck(env)) {
@@ -394,6 +432,17 @@ static int32_t android_create_node(int32_t nodeType)
     case UI_NODE_IMAGE:
         view = (*env)->NewObject(env, g_class_ImageView, g_ctor_ImageView, g_activity);
         break;
+    case UI_NODE_WEBVIEW: {
+        view = (*env)->NewObject(env, g_class_WebView, g_ctor_WebView, g_activity);
+        if (view && g_method_getSettings && g_method_setJavaScriptEnabled) {
+            jobject settings = (*env)->CallObjectMethod(env, view, g_method_getSettings);
+            if (settings) {
+                (*env)->CallVoidMethod(env, settings, g_method_setJavaScriptEnabled, JNI_TRUE);
+                (*env)->DeleteLocalRef(env, settings);
+            }
+        }
+        break;
+    }
     default:
         LOGE("Unknown node type: %d", nodeType);
         return 0;
@@ -496,6 +545,15 @@ static void android_set_str_prop(int32_t nodeId, int32_t propId, const char *val
                 LOGE("Failed to decode file: %s", value);
             }
             (*env)->DeleteLocalRef(env, jpath);
+        }
+        break;
+    }
+    case UI_PROP_WEBVIEW_URL: {
+        LOGI("setStrProp(node=%d, webviewUrl=\"%s\")", nodeId, value);
+        if ((*env)->IsInstanceOf(env, view, g_class_WebView)) {
+            jstring jurl = (*env)->NewStringUTF(env, value);
+            (*env)->CallVoidMethod(env, view, g_method_loadUrl, jurl);
+            (*env)->DeleteLocalRef(env, jurl);
         }
         break;
     }
@@ -634,8 +692,18 @@ static void android_set_handler(int32_t nodeId, int32_t eventType, int32_t callb
 
     switch (eventType) {
     case UI_EVENT_CLICK:
-        /* Register the Activity (which implements OnClickListener) as handler */
-        (*env)->CallVoidMethod(env, view, g_method_setOnClickListener, g_activity);
+        if ((*env)->IsInstanceOf(env, view, g_class_WebView)) {
+            /* Register a WebViewClient via our Java helper for page-load callbacks */
+            if (g_method_registerWebViewClient) {
+                (*env)->CallVoidMethod(env, g_activity, g_method_registerWebViewClient, view);
+                LOGI("setHandler(node=%d, webview-pageload, callback=%d)", nodeId, callbackId);
+            } else {
+                LOGE("setHandler: registerWebViewClient unavailable, skipping node=%d", nodeId);
+            }
+        } else {
+            /* Register the Activity (which implements OnClickListener) as handler */
+            (*env)->CallVoidMethod(env, view, g_method_setOnClickListener, g_activity);
+        }
         LOGI("setHandler(node=%d, click, callback=%d)", nodeId, callbackId);
         break;
     case UI_EVENT_TEXT_CHANGE:

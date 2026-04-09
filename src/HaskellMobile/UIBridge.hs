@@ -41,6 +41,7 @@ data NodeType
   | NodeTextInput
   | NodeScrollView
   | NodeImage
+  | NodeWebView
   deriving (Show, Eq, Enum, Bounded)
 
 -- | Map a 'NodeType' to its C integer code.
@@ -52,6 +53,7 @@ nodeTypeToInt NodeRow        = 3
 nodeTypeToInt NodeTextInput  = 4
 nodeTypeToInt NodeScrollView = 5
 nodeTypeToInt NodeImage      = 6
+nodeTypeToInt NodeWebView    = 8
 
 -- | Property identifiers for 'setStrProp' and 'setNumProp'.
 data PropId
@@ -66,6 +68,7 @@ data PropId
   | PropImageResource
   | PropImageFile
   | PropScaleType
+  | PropWebViewUrl
   deriving (Show, Eq, Enum, Bounded)
 
 -- | Map a 'PropId' to its C integer code.
@@ -81,6 +84,7 @@ propIdToInt PropPadding       = 1
 propIdToInt PropInputType     = 2
 propIdToInt PropGravity       = 3
 propIdToInt PropScaleType     = 4
+propIdToInt PropWebViewUrl   = 6
 
 -- | Event types corresponding to @UI_EVENT_*@ in @UIBridge.h@.
 data EventType

@@ -54,6 +54,9 @@ struct NodeView: View {
             }
         case 6: // UI_NODE_IMAGE
             ImageNodeView(node: node)
+        case 8: // UI_NODE_WEBVIEW
+            Text("WebView not available")
+                .foregroundColor(.secondary)
         default:
             EmptyView()
         }

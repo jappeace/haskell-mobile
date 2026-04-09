@@ -9,7 +9,9 @@
  */
 
 #import <UIKit/UIKit.h>
+#import <WebKit/WebKit.h>
 #import <os/log.h>
+#import <objc/runtime.h>
 #include <stdlib.h>
 #include <string.h>
 #include "UIBridge.h"
@@ -84,6 +86,20 @@ static UIViewController *g_viewController = nil;
     NSString *text = sender.text ?: @"";
     LOGI("TextChange dispatched: callbackId=%d text=\"%{public}s\"", callbackId, [text UTF8String]);
     haskellOnUITextChange(self.haskellCtx, callbackId, [text UTF8String]);
+}
+
+@end
+
+/* ---- WKWebView navigation delegate for page-load callbacks ---- */
+@interface HMWebViewDelegate : NSObject <WKNavigationDelegate>
+@property (nonatomic, assign) int32_t callbackId;
+@end
+
+@implementation HMWebViewDelegate
+
+- (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
+    LOGI("WebView page loaded: callbackId=%d", self.callbackId);
+    haskellOnUIEvent([IOSBridgeHandler shared].haskellCtx, self.callbackId);
 }
 
 @end
@@ -273,6 +289,13 @@ static int32_t ios_create_node(int32_t nodeType)
         view = imageView;
         break;
     }
+    case UI_NODE_WEBVIEW: {
+        WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
+        WKWebView *webView = [[WKWebView alloc] initWithFrame:CGRectZero configuration:config];
+        webView.translatesAutoresizingMaskIntoConstraints = NO;
+        view = webView;
+        break;
+    }
     case UI_NODE_SCROLL_VIEW: {
         UIScrollView *scrollView = [[UIScrollView alloc] init];
         scrollView.translatesAutoresizingMaskIntoConstraints = NO;
@@ -392,6 +415,19 @@ static void ios_set_str_prop(int32_t nodeId, int32_t propId, const char *value)
             } else {
                 LOGE("Failed to load image file: %{public}s", value);
                 ios_set_image_placeholder((UIImageView *)view, "Image not found");
+            }
+        }
+        break;
+    }
+    case UI_PROP_WEBVIEW_URL: {
+        LOGI("setStrProp(node=%d, webviewUrl=\"%{public}s\")", nodeId, value);
+        if ([view isKindOfClass:[WKWebView class]]) {
+            NSURL *url = [NSURL URLWithString:str];
+            if (url) {
+                NSURLRequest *request = [NSURLRequest requestWithURL:url];
+                [(WKWebView *)view loadRequest:request];
+            } else {
+                LOGE("Invalid URL: %{public}s", value);
             }
         }
         break;
@@ -518,7 +554,17 @@ static void ios_set_handler(int32_t nodeId, int32_t eventType, int32_t callbackI
     switch (eventType) {
     case UI_EVENT_CLICK:
         view.tag = callbackId;
-        LOGI("setHandler(node=%d, click, callback=%d)", nodeId, callbackId);
+        if ([view isKindOfClass:[WKWebView class]]) {
+            HMWebViewDelegate *delegate = [[HMWebViewDelegate alloc] init];
+            delegate.callbackId = callbackId;
+            ((WKWebView *)view).navigationDelegate = delegate;
+            /* Prevent ARC from deallocating the delegate by associating it with the view */
+            objc_setAssociatedObject(view, "HMWebViewDelegate", delegate,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            LOGI("setHandler(node=%d, webview-pageload, callback=%d)", nodeId, callbackId);
+        } else {
+            LOGI("setHandler(node=%d, click, callback=%d)", nodeId, callbackId);
+        }
         break;
     case UI_EVENT_TEXT_CHANGE:
         view.tag = callbackId;

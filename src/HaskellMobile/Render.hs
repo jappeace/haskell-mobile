@@ -19,7 +19,7 @@ import Data.Int (Int32)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Text (Text, pack)
-import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), ResourceName(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), Widget(..), WidgetStyle(..), colorToHex)
+import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), ResourceName(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), WebViewConfig(..), Widget(..), WidgetStyle(..), colorToHex)
 import HaskellMobile.UIBridge qualified as Bridge
 import System.IO (hPutStrLn, stderr)
 
@@ -122,6 +122,15 @@ renderNode _rs (Image config) = do
     ImageData bytes                   -> Bridge.setImageData nodeId bytes
     ImageFile path                    -> Bridge.setStrProp nodeId Bridge.PropImageFile (pack path)
   Bridge.setNumProp nodeId Bridge.PropScaleType (scaleTypeToDouble (icScaleType config))
+  pure nodeId
+renderNode rs (WebView config) = do
+  nodeId <- Bridge.createNode Bridge.NodeWebView
+  Bridge.setStrProp nodeId Bridge.PropWebViewUrl (wvUrl config)
+  case wvOnPageLoad config of
+    Just action -> do
+      callbackId <- registerCallback rs action
+      Bridge.setHandler nodeId Bridge.EventClick callbackId
+    Nothing -> pure ()
   pure nodeId
 renderNode rs (Styled style child) = do
   nodeId <- renderNode rs child
