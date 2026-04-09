@@ -70,9 +70,9 @@ extern void haskellOnAudioChunk(void *ctx, int32_t requestId,
         return;
     }
 
-    CGSize dimensions = photo.resolvedSettings.photoDimensions;
-    int32_t imgWidth = (int32_t)dimensions.width;
-    int32_t imgHeight = (int32_t)dimensions.height;
+    CMVideoDimensions dimensions = photo.resolvedSettings.photoDimensions;
+    int32_t imgWidth = dimensions.width;
+    int32_t imgHeight = dimensions.height;
 
     NSString *tempDir = NSTemporaryDirectory();
     NSString *fileName = [NSString stringWithFormat:@"capture_%d.jpg", self.photoRequestId];

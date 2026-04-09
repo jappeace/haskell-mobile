@@ -342,6 +342,8 @@ in {
           -optl-Wl,-u,haskellOnLocationUpdate \
           -optl-Wl,-u,haskellOnAuthSessionResult \
           -optl-Wl,-u,haskellOnCameraResult \
+          -optl-Wl,-u,haskellOnVideoFrame \
+          -optl-Wl,-u,haskellOnAudioChunk \
           -optl-Wl,-u,haskellLogLocale \
           -optl-Wl,--no-undefined \
           -optl-Wl,--whole-archive \
@@ -576,6 +578,8 @@ in {
           -optl-Wl,-u,_haskellOnLocationUpdate \
           -optl-Wl,-u,_haskellOnAuthSessionResult \
           -optl-Wl,-u,_haskellOnCameraResult \
+          -optl-Wl,-u,_haskellOnVideoFrame \
+          -optl-Wl,-u,_haskellOnAudioChunk \
           -optl-Wl,-u,_haskellLogLocale \
           cbits/platform_log.c \
           cbits/ui_bridge.c \
@@ -766,6 +770,8 @@ open(sys.argv[1], "w").write(yml)
           -optl-Wl,-u,_haskellOnLocationUpdate \
           -optl-Wl,-u,_haskellOnAuthSessionResult \
           -optl-Wl,-u,_haskellOnCameraResult \
+          -optl-Wl,-u,_haskellOnVideoFrame \
+          -optl-Wl,-u,_haskellOnAudioChunk \
           -optl-Wl,-u,_haskellLogLocale \
           cbits/platform_log.c \
           cbits/ui_bridge.c \
