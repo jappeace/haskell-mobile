@@ -6,10 +6,12 @@
 module Main where
 
 import Data.Text (pack)
+import Foreign.Ptr (Ptr)
 import HaskellMobile
   ( MobileApp(..)
   , UserState(..)
   , SecureStorageStatus(..)
+  , AppContext
   , startMobileApp
   , platformLog
   , secureStorageWrite
@@ -18,10 +20,11 @@ import HaskellMobile
   )
 import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
 
-main :: IO ()
+main :: IO (Ptr AppContext)
 main = do
-  _ctxPtr <- startMobileApp secureStorageDemoApp
+  ctxPtr <- startMobileApp secureStorageDemoApp
   platformLog "SecureStorage demo app registered"
+  pure ctxPtr
 
 -- | SecureStorage demo: writes and reads an OAuth token on button taps.
 -- Used by integration tests to verify the secure storage FFI bridge end-to-end.
