@@ -64,6 +64,16 @@ func watchosDialogShow(_ ctx: UnsafeMutableRawPointer?,
 
     os_log("dialog_show(title=%{public}s, id=%d)", log: bridgeLog, type: .info, titleStr, requestId)
 
+    // In autotest mode, auto-press button 1 without presenting the dialog.
+    // The autotest mechanism only fires widget button callbacks (onUIEvent),
+    // it cannot tap native SwiftUI .alert() buttons.
+    let args = CommandLine.arguments
+    if args.contains("--autotest-buttons") || args.contains("--autotest") {
+        os_log("dialog_show: autotest mode — auto-pressing button 1", log: bridgeLog, type: .info)
+        haskellOnDialogResult(ctx, requestId, DIALOG_BUTTON_1)
+        return
+    }
+
     DispatchQueue.main.async {
         DialogManager.shared.show(ctx: ctx, requestId: requestId,
                                   title: titleStr, message: messageStr,

@@ -29,6 +29,16 @@ static void ios_dialog_show(void *ctx, int32_t requestId,
 {
     LOGI("dialog_show(title=\"%{public}s\", id=%d)", title, requestId);
 
+    /* In autotest mode, auto-press button 1 without presenting the dialog.
+     * The autotest mechanism only fires widget button callbacks (onUIEvent),
+     * it cannot tap native UIAlertController buttons. */
+    NSArray<NSString *> *args = [[NSProcessInfo processInfo] arguments];
+    if ([args containsObject:@"--autotest-buttons"] || [args containsObject:@"--autotest"]) {
+        LOGI("dialog_show: autotest mode — auto-pressing button 1");
+        haskellOnDialogResult(ctx, requestId, DIALOG_BUTTON_1);
+        return;
+    }
+
     NSString *nsTitle = [NSString stringWithUTF8String:title];
     NSString *nsMessage = [NSString stringWithUTF8String:message];
 
