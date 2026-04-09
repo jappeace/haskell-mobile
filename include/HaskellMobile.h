@@ -130,13 +130,38 @@ void haskellOnAuthSessionResult(void *ctx, int32_t requestId,
 #define CAMERA_ERROR             4
 
 /* Dispatch a camera result from native code back to Haskell.
- * requestId:  opaque ID from the original camera capture call.
- * statusCode: CAMERA_SUCCESS (0), CAMERA_CANCELLED (1),
- *             CAMERA_PERMISSION_DENIED (2), CAMERA_UNAVAILABLE (3),
- *             or CAMERA_ERROR (4).
- * filePath:   null-terminated path to captured file, or NULL.
+ * requestId:    opaque ID from the original camera capture call.
+ * statusCode:   CAMERA_SUCCESS (0), CAMERA_CANCELLED (1),
+ *               CAMERA_PERMISSION_DENIED (2), CAMERA_UNAVAILABLE (3),
+ *               or CAMERA_ERROR (4).
+ * filePath:     null-terminated path to captured file, or NULL.
+ * imageData:    JPEG-encoded image bytes, or NULL.
+ * imageDataLen: length of imageData in bytes, or 0.
+ * width:        image width in pixels, or 0.
+ * height:       image height in pixels, or 0.
  * ctx must be a pointer returned by haskellRunMain(). */
 void haskellOnCameraResult(void *ctx, int32_t requestId,
-                            int32_t statusCode, const char *filePath);
+                            int32_t statusCode, const char *filePath,
+                            const uint8_t *imageData, int32_t imageDataLen,
+                            int32_t width, int32_t height);
+
+/* Dispatch a video frame from native code back to Haskell.
+ * requestId:    opaque ID from the startVideoCapture call.
+ * frameData:    JPEG-encoded frame bytes.
+ * frameDataLen: length of frameData in bytes.
+ * width:        frame width in pixels.
+ * height:       frame height in pixels.
+ * ctx must be a pointer returned by haskellRunMain(). */
+void haskellOnVideoFrame(void *ctx, int32_t requestId,
+                          const uint8_t *frameData, int32_t frameDataLen,
+                          int32_t width, int32_t height);
+
+/* Dispatch an audio chunk from native code back to Haskell.
+ * requestId:    opaque ID from the startVideoCapture call.
+ * audioData:    raw PCM audio bytes.
+ * audioDataLen: length of audioData in bytes.
+ * ctx must be a pointer returned by haskellRunMain(). */
+void haskellOnAudioChunk(void *ctx, int32_t requestId,
+                          const uint8_t *audioData, int32_t audioDataLen);
 
 #endif /* HASKELL_MOBILE_H */
