@@ -10,6 +10,7 @@ where
 
 import HaskellMobile.AuthSession (AuthSessionState)
 import HaskellMobile.Ble (BleState)
+import HaskellMobile.Camera (CameraState)
 import HaskellMobile.Dialog (DialogState)
 import HaskellMobile.Lifecycle (MobileContext)
 import HaskellMobile.Location (LocationState)
@@ -28,6 +29,7 @@ data UserState = UserState
   , userDialogState        :: DialogState
   , userLocationState      :: LocationState
   , userAuthSessionState   :: AuthSessionState
+  , userCameraState        :: CameraState
   }
 
 -- | Application definition record. Downstream apps create one of these

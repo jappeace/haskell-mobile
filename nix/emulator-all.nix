@@ -138,15 +138,15 @@ let
     name = "haskell-mobile-location-apk";
   };
 
-  webviewAndroid = import ./android.nix {
+  cameraAndroid = import ./android.nix {
     inherit sources androidArch;
-    mainModule = ../test/WebViewDemoMain.hs;
+    mainModule = ../test/CameraDemoMain.hs;
   };
-  webviewApk = lib.mkApk {
-    sharedLibs = [{ lib = webviewAndroid; inherit abiDir; }];
+  cameraApk = lib.mkApk {
+    sharedLibs = [{ lib = cameraAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-webview.apk";
-    name = "haskell-mobile-webview-apk";
+    apkName = "haskell-mobile-camera.apk";
+    name = "haskell-mobile-camera-apk";
   };
 
   authSessionAndroid = import ./android.nix {
@@ -210,6 +210,7 @@ DIALOG_APK="${dialogApk}/haskell-mobile-dialog.apk"
 LOCATION_APK="${locationApk}/haskell-mobile-location.apk"
 WEBVIEW_APK="${webviewApk}/haskell-mobile-webview.apk"
 AUTH_SESSION_APK="${authSessionApk}/haskell-mobile-authsession.apk"
+CAMERA_APK="${cameraApk}/haskell-mobile-camera.apk"
 PACKAGE="me.jappie.haskellmobile"
 ACTIVITY=".MainActivity"
 DEVICE_NAME="test_all"
@@ -231,7 +232,8 @@ for so_path in \
     "${bleAndroid}/lib/${abiDir}/libhaskellmobile.so" \
     "${dialogAndroid}/lib/${abiDir}/libhaskellmobile.so" \
     "${webviewAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${authSessionAndroid}/lib/${abiDir}/libhaskellmobile.so"; do
+    "${authSessionAndroid}/lib/${abiDir}/libhaskellmobile.so" \
+    "${cameraAndroid}/lib/${abiDir}/libhaskellmobile.so"; do
     SO_BYTES=$(stat -c %s "$so_path")
     SO_MB=$((SO_BYTES / 1048576))
     SO_LABEL=$(echo "$so_path" | grep -oP '[^/]+(?=/lib/)')
@@ -411,7 +413,7 @@ sleep 30
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PACKAGE ACTIVITY WORK_DIR
+export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK CAMERA_APK PACKAGE ACTIVITY WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -487,6 +489,8 @@ echo "--- webview ---"
 run_with_retry "webview" bash "$TEST_SCRIPTS/android/webview.sh" || PHASE9_EXIT=1
 echo "--- authsession ---"
 run_with_retry "authsession" bash "$TEST_SCRIPTS/android/authsession.sh" || PHASE10_EXIT=1
+echo "--- camera ---"
+run_with_retry "camera" bash "$TEST_SCRIPTS/android/camera.sh" || PHASE10_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -654,9 +658,9 @@ else
 fi
 
 if [ $PHASE9_OK -eq 1 ]; then
-    echo "PASS  Phase 9 — WebView demo app"
+    echo "PASS  Phase 9 — Camera demo app"
 else
-    echo "FAIL  Phase 9 — WebView demo app"
+    echo "FAIL  Phase 9 — Camera demo app"
     FINAL_EXIT=1
 fi
 

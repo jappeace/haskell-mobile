@@ -15,6 +15,7 @@ module HaskellMobile
   , haskellOnDialogResult
   , haskellOnLocationUpdate
   , haskellOnAuthSessionResult
+  , haskellOnCameraResult
   -- Error handling
   , errorWidget
   -- Re-exports from Lifecycle
@@ -76,6 +77,16 @@ module HaskellMobile
   , AuthSessionResult(..)
   , AuthSessionState(..)
   , startAuthSession
+  -- Re-exports from Camera
+  , CameraSource(..)
+  , CameraStatus(..)
+  , CameraResult(..)
+  , CameraState(..)
+  , startCameraSession
+  , stopCameraSession
+  , capturePhoto
+  , startVideoCapture
+  , stopVideoCapture
   )
 where
 
@@ -100,6 +111,18 @@ import HaskellMobile.Ble
   , startBleScan
   , stopBleScan
   , dispatchBleScanResult
+  )
+import HaskellMobile.Camera
+  ( CameraSource(..)
+  , CameraStatus(..)
+  , CameraResult(..)
+  , CameraState(..)
+  , startCameraSession
+  , stopCameraSession
+  , capturePhoto
+  , startVideoCapture
+  , stopVideoCapture
+  , dispatchCameraResult
   )
 import HaskellMobile.Dialog
   ( DialogAction(..)
@@ -198,6 +221,7 @@ renderView ctxPtr = do
         , userDialogState        = acDialogState appCtx
         , userLocationState      = acLocationState appCtx
         , userAuthSessionState   = acAuthSessionState appCtx
+        , userCameraState        = acCameraState appCtx
         }
   widget <- viewFunction userState
   renderWidget (acRenderState appCtx) widget
@@ -347,6 +371,18 @@ haskellOnAuthSessionResult ctxPtr requestId statusCode cRedirectUrl cErrorMsg =
     dispatchAuthSessionResult (acAuthSessionState appCtx) requestId statusCode maybeRedirectUrl maybeErrorMsg
 
 foreign export ccall haskellOnAuthSessionResult :: Ptr AppContext -> CInt -> CInt -> CString -> CString -> IO ()
+
+-- | Handle a camera result from native code. Dispatches to the
+-- callback registered by 'capturePhoto' or 'startVideoCapture'.
+-- The @cFilePath@ parameter is non-null only for successful captures.
+haskellOnCameraResult :: Ptr AppContext -> CInt -> CInt -> CString -> IO ()
+haskellOnCameraResult ctxPtr requestId statusCode cFilePath =
+  withExceptionHandler ctxPtr $ do
+    appCtx <- derefAppContext ctxPtr
+    maybeFilePath <- peekOptionalCString cFilePath
+    dispatchCameraResult (acCameraState appCtx) requestId statusCode maybeFilePath
+
+foreign export ccall haskellOnCameraResult :: Ptr AppContext -> CInt -> CInt -> CString -> IO ()
 
 -- | Peek an optional CString: returns 'Nothing' for null pointers,
 -- 'Just' with the decoded 'Text' otherwise.

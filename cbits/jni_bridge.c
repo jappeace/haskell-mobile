@@ -19,6 +19,7 @@
 #include "DialogBridge.h"
 #include "LocationBridge.h"
 #include "AuthSessionBridge.h"
+#include "CameraBridge.h"
 
 /* Runs the user's Haskell main via RTS API (cbits/run_main.c).
  * Returns the opaque AppContext pointer. */
@@ -46,6 +47,7 @@ extern void haskellOnAuthSessionResult(void *ctx, int32_t requestId,
                                         int32_t statusCode,
                                         const char *redirectUrl,
                                         const char *errorMessage);
+extern void haskellOnCameraResult(void *ctx, int32_t requestId, int32_t statusCode, const char *filePath);
 
 /* Android UI bridge (from ui_bridge_android.c) */
 extern void setup_android_ui_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
@@ -69,6 +71,9 @@ extern void setup_android_location_bridge(JNIEnv *env, jobject activity, void *h
 
 /* Android auth session bridge (from auth_session_android.c) */
 extern void setup_android_auth_session_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
+
+/* Android camera bridge (from camera_bridge_android.c) */
+extern void setup_android_camera_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
 
 /* Lifecycle event codes (must match HaskellMobile.h) */
 #define LIFECYCLE_CREATE     0
@@ -146,6 +151,7 @@ JNI_METHOD(renderUI)(JNIEnv *env, jobject thiz)
     setup_android_dialog_bridge(env, thiz, g_haskell_ctx);
     setup_android_location_bridge(env, thiz, g_haskell_ctx);
     setup_android_auth_session_bridge(env, thiz, g_haskell_ctx);
+    setup_android_camera_bridge(env, thiz, g_haskell_ctx);
     haskellRenderUI(g_haskell_ctx);
 }
 

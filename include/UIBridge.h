@@ -11,7 +11,7 @@
 #define UI_NODE_TEXT_INPUT  4
 #define UI_NODE_SCROLL_VIEW 5
 #define UI_NODE_IMAGE       6
-#define UI_NODE_WEBVIEW     8
+#define UI_NODE_CAMERA      7
 
 /* Property IDs for string properties */
 #define UI_PROP_TEXT            0
@@ -20,14 +20,14 @@
 #define UI_PROP_BG_COLOR        3
 #define UI_PROP_IMAGE_RESOURCE  4
 #define UI_PROP_IMAGE_FILE      5
-#define UI_PROP_WEBVIEW_URL     6
 
 /* Property IDs for numeric properties */
 #define UI_PROP_FONT_SIZE   0
 #define UI_PROP_PADDING     1
 #define UI_PROP_INPUT_TYPE  2
 #define UI_PROP_GRAVITY     3
-#define UI_PROP_SCALE_TYPE  4
+#define UI_PROP_SCALE_TYPE    4
+#define UI_PROP_CAMERA_SOURCE 5
 
 /* Event types */
 #define UI_EVENT_CLICK       0

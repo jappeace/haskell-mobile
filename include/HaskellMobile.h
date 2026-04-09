@@ -122,4 +122,21 @@ void haskellOnAuthSessionResult(void *ctx, int32_t requestId,
                                  const char *redirectUrl,
                                  const char *errorMessage);
 
+/* Camera status codes */
+#define CAMERA_SUCCESS           0
+#define CAMERA_CANCELLED         1
+#define CAMERA_PERMISSION_DENIED 2
+#define CAMERA_UNAVAILABLE       3
+#define CAMERA_ERROR             4
+
+/* Dispatch a camera result from native code back to Haskell.
+ * requestId:  opaque ID from the original camera capture call.
+ * statusCode: CAMERA_SUCCESS (0), CAMERA_CANCELLED (1),
+ *             CAMERA_PERMISSION_DENIED (2), CAMERA_UNAVAILABLE (3),
+ *             or CAMERA_ERROR (4).
+ * filePath:   null-terminated path to captured file, or NULL.
+ * ctx must be a pointer returned by haskellRunMain(). */
+void haskellOnCameraResult(void *ctx, int32_t requestId,
+                            int32_t statusCode, const char *filePath);
+
 #endif /* HASKELL_MOBILE_H */
