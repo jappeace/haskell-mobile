@@ -161,6 +161,37 @@ trap cleanup EXIT
 echo "=== watchOS Simulator All-Tests ==="
 echo "Working directory: $WORK_DIR"
 
+# --- .a size guard (see docs/ci-ram-regression-110.md) ---
+# Fail fast if any test .a exceeds the limit.
+A_MAX_MB=120
+SIZE_FAIL=0
+for share_dir in \
+    "$COUNTER_SHARE_DIR" \
+    "$SCROLL_SHARE_DIR" \
+    "$TEXTINPUT_SHARE_DIR" \
+    "$SECURE_STORAGE_SHARE_DIR" \
+    "$IMAGE_SHARE_DIR" \
+    "$NODEPOOL_SHARE_DIR" \
+    "$BLE_SHARE_DIR" \
+    "$DIALOG_SHARE_DIR"; do
+    a_path="$share_dir/lib/libHaskellMobile.a"
+    A_BYTES=$(stat -f %z "$a_path" 2>/dev/null || stat -c %s "$a_path" 2>/dev/null || echo 0)
+    A_MB=$((A_BYTES / 1048576))
+    A_LABEL=$(echo "$share_dir" | grep -oE '[^/]+/share' | sed 's|/share||')
+    if [ "$A_MB" -gt "$A_MAX_MB" ]; then
+        echo "FAIL  $A_LABEL .a is ''${A_MB} MB (limit: ''${A_MAX_MB} MB)"
+        SIZE_FAIL=1
+    else
+        echo "OK    $A_LABEL .a is ''${A_MB} MB"
+    fi
+done
+if [ "$SIZE_FAIL" -eq 1 ]; then
+    echo ""
+    echo "FATAL: .a size limit exceeded. See docs/ci-ram-regression-110.md"
+    exit 1
+fi
+echo ""
+
 # ===========================================================================
 # PHASE 0 — Build both apps + boot simulator
 # ===========================================================================
