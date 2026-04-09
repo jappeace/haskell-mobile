@@ -9,6 +9,7 @@
  */
 
 #import <AVFoundation/AVFoundation.h>
+#import <CoreImage/CoreImage.h>
 #import <os/log.h>
 #include "CameraBridge.h"
 
@@ -165,13 +166,11 @@ static void ios_camera_start_session(void *ctx, int32_t source)
         : AVCaptureDevicePositionBack;
 
     AVCaptureDevice *device = nil;
-    NSArray *devices = [AVCaptureDevice devicesWithMediaType:AVMediaTypeVideo];
-    for (AVCaptureDevice *d in devices) {
-        if (d.position == position) {
-            device = d;
-            break;
-        }
-    }
+    AVCaptureDeviceDiscoverySession *discoverySession =
+        [AVCaptureDeviceDiscoverySession discoverySessionWithDeviceTypes:@[AVCaptureDeviceTypeBuiltInWideAngleCamera]
+                                                              mediaType:AVMediaTypeVideo
+                                                               position:position];
+    device = discoverySession.devices.firstObject;
     if (!device) {
         device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
     }
