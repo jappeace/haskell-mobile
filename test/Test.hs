@@ -340,7 +340,6 @@ uiTests = testGroup "UI"
         WebView _       -> assertFailure "expected Column, got WebView"
         Row _           -> assertFailure "expected Column, got Row"
         ScrollView _    -> assertFailure "expected Column, got ScrollView"
-        CameraView _    -> assertFailure "expected Column, got CameraView"
         Styled _ _      -> assertFailure "expected Column, got Styled"
   ]
 
@@ -1684,7 +1683,6 @@ viewIsErrorWidget ctxPtr = do
     WebView _                -> pure False
     Row _                    -> pure False
     ScrollView _             -> pure False
-    CameraView _             -> pure False
     Styled _ _               -> pure False
 
 -- | Tests for the default exception handler that wraps FFI entry points.

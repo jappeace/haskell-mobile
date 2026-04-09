@@ -68,9 +68,6 @@ class WatchUIBridgeState: ObservableObject {
         case 4: // UI_PROP_SCALE_TYPE
             os_log("setNumProp(node=%d, scaleType=%.0f)", log: bridgeLog, type: .info, nodeId, value)
             node.scaleType = Int32(value)
-        case 5: // UI_PROP_CAMERA_SOURCE
-            os_log("setNumProp(node=%d, cameraSource=%.0f)", log: bridgeLog, type: .info, nodeId, value)
-            /* No-op on watchOS — camera not available on third-party apps */
         default:
             os_log("setNumProp: unknown propId %d", log: bridgeLog, type: .info, propId)
         }

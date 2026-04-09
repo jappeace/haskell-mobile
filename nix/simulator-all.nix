@@ -122,15 +122,15 @@ let
     name = "haskell-mobile-location-simulator-app";
   };
 
-  cameraIos = import ./ios.nix {
+  webviewIos = import ./ios.nix {
     inherit sources;
-    mainModule = ../test/CameraDemoMain.hs;
+    mainModule = ../test/WebViewDemoMain.hs;
     simulator = true;
   };
-  cameraSimApp = lib.mkSimulatorApp {
-    iosLib = cameraIos;
+  webviewSimApp = lib.mkSimulatorApp {
+    iosLib = webviewIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-camera-simulator-app";
+    name = "haskell-mobile-webview-simulator-app";
   };
 
   authSessionIos = import ./ios.nix {
@@ -696,29 +696,29 @@ cp -r "$CAMERA_SHARE_DIR/HaskellMobile" "$WORK_DIR/camera/"
 cp "$CAMERA_SHARE_DIR/project.yml" "$WORK_DIR/camera/"
 chmod -R u+w "$WORK_DIR/camera"
 
-echo "=== Generating camera Xcode project ==="
-cd "$WORK_DIR/camera"
+echo "=== Generating webview Xcode project ==="
+cd "$WORK_DIR/webview"
 ${xcodegen}/bin/xcodegen generate
 
-echo "=== Building camera demo app for simulator ==="
+echo "=== Building webview demo app for simulator ==="
 xcodebuild build \
     -project HaskellMobile.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
-    -derivedDataPath "$WORK_DIR/camera-build" \
+    -derivedDataPath "$WORK_DIR/webview-build" \
     CODE_SIGN_IDENTITY=- \
     CODE_SIGNING_ALLOWED=NO \
     ARCHS=arm64 \
     ONLY_ACTIVE_ARCH=NO \
     | tail -20
 
-CAMERA_APP=$(find "$WORK_DIR/camera-build" -name "*.app" -type d | head -1)
-if [ -z "$CAMERA_APP" ]; then
-    echo "ERROR: Could not find camera .app bundle"
+WEBVIEW_APP=$(find "$WORK_DIR/webview-build" -name "*.app" -type d | head -1)
+if [ -z "$WEBVIEW_APP" ]; then
+    echo "ERROR: Could not find webview .app bundle"
     exit 1
 fi
-echo "Camera app: $CAMERA_APP"
+echo "WebView app: $WEBVIEW_APP"
 
 # --- Stage and build authsession demo app ---
 echo "=== Staging authsession demo app ==="
@@ -1066,9 +1066,9 @@ else
 fi
 
 if [ $PHASE9_OK -eq 1 ]; then
-    echo "PASS  Phase 9 — Camera demo app"
+    echo "PASS  Phase 9 — WebView demo app"
 else
-    echo "FAIL  Phase 9 — Camera demo app"
+    echo "FAIL  Phase 9 — WebView demo app"
     FINAL_EXIT=1
 fi
 

@@ -14,7 +14,7 @@ module HaskellMobile.Widget
   , ResourceName(..)
   , ImageSource(..)
   , ImageConfig(..)
-  , CameraViewConfig(..)
+  , WebViewConfig(..)
   , Widget(..)
   , WidgetStyle(..)
   , TextAlignment(..)
@@ -27,7 +27,6 @@ where
 
 import Data.ByteString (ByteString)
 import Data.Char (digitToInt, isHexDigit, intToDigit)
-import Data.Int (Int32)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Word (Word8)
@@ -175,15 +174,13 @@ data ImageConfig = ImageConfig
     -- ^ How the image is scaled.
   } deriving (Show, Eq)
 
--- | Configuration for a camera preview widget.
--- The camera session is controlled via the bridge API ('CameraState'),
--- not by the widget.  This config carries the source hint so the native
--- renderer can attach the correct preview surface.
-data CameraViewConfig = CameraViewConfig
-  { cvSource :: Int32
-    -- ^ Camera source hint: 0 = back, 1 = front.
-    -- Informational; actual session is controlled via 'startCameraSession'.
-  } deriving (Show, Eq)
+-- | Configuration for an embedded web view.
+data WebViewConfig = WebViewConfig
+  { wvUrl        :: Text
+    -- ^ URL to load in the web view.
+  , wvOnPageLoad :: Maybe (IO ())
+    -- ^ Optional callback fired when a page finishes loading.
+  }
 
 -- | A declarative description of a UI element.
 data Widget
@@ -201,7 +198,7 @@ data Widget
     -- ^ A vertically scrollable container.
   | Image ImageConfig
     -- ^ An image widget displaying resource, file, or raw data.
-  | CameraView CameraViewConfig
-    -- ^ A live camera preview. The session is managed via the camera bridge.
+  | WebView WebViewConfig
+    -- ^ An embedded web view loading a URL.
   | Styled WidgetStyle Widget
     -- ^ Apply visual style overrides to a child widget.

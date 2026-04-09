@@ -138,15 +138,15 @@ let
     name = "haskell-mobile-location-apk";
   };
 
-  cameraAndroid = import ./android.nix {
+  webviewAndroid = import ./android.nix {
     inherit sources androidArch;
-    mainModule = ../test/CameraDemoMain.hs;
+    mainModule = ../test/WebViewDemoMain.hs;
   };
-  cameraApk = lib.mkApk {
-    sharedLibs = [{ lib = cameraAndroid; inherit abiDir; }];
+  webviewApk = lib.mkApk {
+    sharedLibs = [{ lib = webviewAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-camera.apk";
-    name = "haskell-mobile-camera-apk";
+    apkName = "haskell-mobile-webview.apk";
+    name = "haskell-mobile-webview-apk";
   };
 
   authSessionAndroid = import ./android.nix {
@@ -658,9 +658,9 @@ else
 fi
 
 if [ $PHASE9_OK -eq 1 ]; then
-    echo "PASS  Phase 9 — Camera demo app"
+    echo "PASS  Phase 9 — WebView demo app"
 else
-    echo "FAIL  Phase 9 — Camera demo app"
+    echo "FAIL  Phase 9 — WebView demo app"
     FINAL_EXIT=1
 fi
 
