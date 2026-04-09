@@ -4,7 +4,7 @@
  * Uses JNI to call Activity.checkBleAdapter(), Activity.startBleScan(),
  * and Activity.stopBleScan(). Compiled by NDK clang, not cabal.
  *
- * All functions run on the main/UI thread — the same thread that
+ * All functions run on the main/UI thread, the same thread that
  * calls haskellRenderUI from Java.
  */
 

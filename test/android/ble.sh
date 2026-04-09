@@ -22,11 +22,20 @@ install_apk "$BLE_APK" || { echo "FAIL: install_apk"; exit 1; }
 wait_for_logcat "setRoot" 120 || true
 sleep 5
 
+# Verify app rendered (setRoot logged)
 LOGCAT_FILE="$WORK_DIR/ble_logcat.txt"
 "$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1 || true
 
-assert_logcat "$LOGCAT_FILE" "BLE adapter:" "BLE adapter check logged"
 assert_logcat "$LOGCAT_FILE" "BLE bridge\|BleBridge" "BLE bridge log present"
+
+# Tap Check Adapter button — triggers the BLE adapter FFI check
+tap_button "Check Adapter" || { echo "WARNING: could not tap Check Adapter"; }
+sleep 3
+
+# Re-dump logcat to capture adapter check result
+LOGCAT_FILE1B="$WORK_DIR/ble_logcat1b.txt"
+"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE1B" 2>&1 || true
+assert_logcat "$LOGCAT_FILE1B" "BLE adapter:" "BLE adapter check logged"
 
 # Tap Start Scan button — should not crash
 tap_button "Start Scan" || { echo "WARNING: could not tap Start Scan"; }
@@ -41,6 +50,8 @@ LOGCAT_FILE2="$WORK_DIR/ble_logcat2.txt"
 "$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:E' > "$LOGCAT_FILE2" 2>&1 || true
 if grep -qE "$FATAL_PATTERNS" "$LOGCAT_FILE2" 2>/dev/null; then
     echo "FAIL: Fatal crash detected during BLE test"
+    # Dump crash context for CI debugging
+    grep -E "$FATAL_PATTERNS" "$LOGCAT_FILE2" | tail -10
     EXIT_CODE=1
 else
     echo "PASS: No crash during BLE test"
