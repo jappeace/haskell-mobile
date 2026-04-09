@@ -12,10 +12,44 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  nix-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+    - name: Free disk space
+      run: |
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+        df -h
+    - uses: actions/checkout@v4
+    - uses: cachix/install-nix-action@v31
+      with:
+        extra_nix_config: |
+          access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+          extra-substituters = https://nix-cache.jappie.me
+          extra-trusted-public-keys = nix-cache.jappie.me:WjkKcvFtHih2i+n7bdsrJ3HuGboJiU2hA2CZbf9I9oc=
+    - name: Nix store cache
+      uses: nix-community/cache-nix-action@v7
+      with:
+        primary-key: nix-build-${{ hashFiles('npins/sources.json', 'nix/*.nix', '*.cabal') }}
+        restore-prefixes-first-match: nix-build-
+        gc-max-store-size-linux: 8G
+    - name: Build all nix targets (excludes emulator/simulator runners)
+      run: nix-build nix/ci.nix -A all-builds
+    - name: Cancel workflow on failure
+      if: failure()
+      continue-on-error: true
+      run: gh run cancel ${{ github.run_id }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+
   android:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+    - name: Free disk space
+      run: |
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+        df -h
     - uses: actions/checkout@v4
     - uses: cachix/install-nix-action@v31
       with:
@@ -29,7 +63,6 @@ jobs:
         primary-key: nix-android-aarch64-${{ hashFiles('npins/sources.json', 'nix/*.nix', '*.cabal') }}
         restore-prefixes-first-match: nix-android-aarch64-
         gc-max-store-size-linux: 8G
-    - run: nix-build nix/ci.nix
     - name: Run combined emulator test (lifecycle + UI + buttons + scroll)
       run: nix-build nix/ci.nix -A emulator-all -o result-emulator-all && ./result-emulator-all/bin/test-all
     - name: Cancel workflow on failure
@@ -44,6 +77,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+    - name: Free disk space
+      run: |
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+        df -h
     - uses: actions/checkout@v4
     - uses: cachix/install-nix-action@v31
       with:
