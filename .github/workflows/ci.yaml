@@ -17,19 +17,17 @@ jobs:
     timeout-minutes: 45
     steps:
     - uses: actions/checkout@v4
-    - name: Local cache
-      uses: actions/cache@v4
-      with:
-        path: /nix/store
-        key: "${{ runner.os }}-nix-android-cache"
-        restore-keys: |
-          ${{ runner.os }}-nix-android-
     - uses: cachix/install-nix-action@v31
       with:
         extra_nix_config: |
           access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
           extra-substituters = https://nix-cache.jappie.me
           extra-trusted-public-keys = nix-cache.jappie.me:WjkKcvFtHih2i+n7bdsrJ3HuGboJiU2hA2CZbf9I9oc=
+    - name: Nix store cache
+      uses: nix-community/cache-nix-action@v6
+      with:
+        primary-key: nix-android-${{ hashFiles('npins/sources.json', 'nix/*.nix', '*.cabal') }}
+        restore-prefixes-first-match: nix-android-
     - run: nix-build nix/ci.nix
     - name: Run combined emulator test (lifecycle + UI + buttons + scroll)
       run: nix-build nix/ci.nix -A emulator-all -o result-emulator-all && ./result-emulator-all/bin/test-all
@@ -46,20 +44,19 @@ jobs:
     timeout-minutes: 45
     steps:
     - uses: actions/checkout@v4
-    - name: Local cache
-      uses: actions/cache@v4
-      with:
-        path: /nix/store
-        key: "${{ runner.os }}-nix-android-armv7a-emu"
-        restore-keys: |
-          ${{ runner.os }}-nix-android-armv7a-
-          ${{ runner.os }}-nix-android-
     - uses: cachix/install-nix-action@v31
       with:
         extra_nix_config: |
           access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
           extra-substituters = https://nix-cache.jappie.me
           extra-trusted-public-keys = nix-cache.jappie.me:WjkKcvFtHih2i+n7bdsrJ3HuGboJiU2hA2CZbf9I9oc=
+    - name: Nix store cache
+      uses: nix-community/cache-nix-action@v6
+      with:
+        primary-key: nix-android-armv7a-${{ hashFiles('npins/sources.json', 'nix/*.nix', '*.cabal') }}
+        restore-prefixes-first-match: |
+          nix-android-armv7a-
+          nix-android-
     - name: Run armv7a emulator test
       run: nix-build nix/ci.nix -A emulator-armv7a -o result-emulator-armv7a && ./result-emulator-armv7a/bin/test-all
     - name: Cancel workflow on failure
@@ -74,19 +71,17 @@ jobs:
     timeout-minutes: 45
     steps:
     - uses: actions/checkout@v4
-    - name: Local cache
-      uses: actions/cache@v4
-      with:
-        path: /nix/store
-        key: "${{ runner.os }}-nix-ios-cache"
-        restore-keys: |
-          ${{ runner.os }}-nix-ios-
     - uses: cachix/install-nix-action@v31
       with:
         extra_nix_config: |
           access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
           extra-substituters = https://nix-cache.jappie.me
           extra-trusted-public-keys = nix-cache.jappie.me:WjkKcvFtHih2i+n7bdsrJ3HuGboJiU2hA2CZbf9I9oc=
+    - name: Nix store cache
+      uses: nix-community/cache-nix-action@v6
+      with:
+        primary-key: nix-ios-${{ hashFiles('npins/sources.json', 'nix/*.nix', '*.cabal') }}
+        restore-prefixes-first-match: nix-ios-
     - run: nix-build nix/ci.nix -A simulator-all -A ios-lib
     - name: Run combined simulator test (lifecycle + UI + buttons + scroll)
       run: nix-build nix/ci.nix -A simulator-all -o result-simulator-all && ./result-simulator-all/bin/test-all-ios
@@ -101,20 +96,19 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v4
-    - name: Local cache
-      uses: actions/cache@v4
-      with:
-        path: /nix/store
-        key: "${{ runner.os }}-nix-watchos-cache"
-        restore-keys: |
-          ${{ runner.os }}-nix-watchos-
-          ${{ runner.os }}-nix-ios-
     - uses: cachix/install-nix-action@v31
       with:
         extra_nix_config: |
           access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
           extra-substituters = https://nix-cache.jappie.me
           extra-trusted-public-keys = nix-cache.jappie.me:WjkKcvFtHih2i+n7bdsrJ3HuGboJiU2hA2CZbf9I9oc=
+    - name: Nix store cache
+      uses: nix-community/cache-nix-action@v6
+      with:
+        primary-key: nix-watchos-${{ hashFiles('npins/sources.json', 'nix/*.nix', '*.cabal') }}
+        restore-prefixes-first-match: |
+          nix-watchos-
+          nix-ios-
     - run: nix-build nix/ci.nix -A watchos-simulator-all -A watchos-lib
     - name: Run combined watchOS simulator test
       run: nix-build nix/ci.nix -A watchos-simulator-all -o result-watchos && ./result-watchos/bin/test-all-watchos
