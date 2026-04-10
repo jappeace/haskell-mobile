@@ -363,6 +363,16 @@ in {
         mkdir -p $out/lib/${archConfig.abiDir}
         cp ${soName} $out/lib/${archConfig.abiDir}/
 
+        # Strip debug symbols to reduce .so size and runtime memory usage.
+        # GHC embeds large debug/unwind sections; stripping typically cuts
+        # the .so by 60-80%, which also prevents OOM kills on emulators.
+        echo "Stripping debug symbols from ${soName}..."
+        SO_BEFORE=$(stat -c %s $out/lib/${archConfig.abiDir}/${soName})
+        ${ndk}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip \
+          --strip-debug $out/lib/${archConfig.abiDir}/${soName}
+        SO_AFTER=$(stat -c %s $out/lib/${archConfig.abiDir}/${soName})
+        echo "Stripped: $((SO_BEFORE / 1048576)) MB -> $((SO_AFTER / 1048576)) MB"
+
         # Bundle runtime dependencies (not provided by Android)
         cp ${androidPkgs.gmp}/lib/libgmp.so $out/lib/${archConfig.abiDir}/
         cp ${androidPkgs.libffi}/lib/libffi.so $out/lib/${archConfig.abiDir}/
