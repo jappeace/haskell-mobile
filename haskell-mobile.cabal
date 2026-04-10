@@ -107,6 +107,13 @@ test-suite unit
   import: common-options
   type: exitcode-stdio-1.0
   main-is: Test.hs
+  other-modules:
+      Test.Helpers
+      Test.CoreTests
+      Test.WidgetTests
+      Test.PlatformTests
+      Test.AppContextTests
+      Test.ActionTests
   ghc-options: -Wno-unused-packages -threaded -rtsopts "-with-rtsopts=-N -M7G -T -Iw10"
   hs-source-dirs:
       test
