@@ -344,8 +344,8 @@ in {
           -optl$CONTAINERS_LIB \
           -optl$TRANSFORMERS_LIB \
           -optl$TIME_LIB \
-          ${if crossDeps != null then "$(for a in ${crossDeps}/lib/*.a; do echo -n \"-optl$a \"; done)" else ""} \
           -optl-Wl,--no-whole-archive \
+          ${if crossDeps != null then "$(for a in ${crossDeps}/lib/*.a; do echo -n \"-optl$a \"; done)" else ""} \
           ${if crossDeps != null && builtins.pathExists "${crossDeps}/lib-boot" then "$(for a in ${crossDeps}/lib-boot/*.a; do echo -n \"-optl$a \"; done)" else ""}
       '';
 
