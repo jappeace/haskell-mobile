@@ -167,3 +167,39 @@ else:
         f.write(llvm_content)
 
     print("Patched " + llvm_pkg_set)
+
+# --- Patch 3: Haskell generic-builder iserv-wrapper profiling ---
+# generic-builder.nix always builds both profiled and non-profiled
+# iserv-wrapper variants.  For armv7a the cross-GHC is built without
+# profiled boot libraries (enableProfiledLibs = false), so the profiled
+# iserv-proxy-interpreter can't compile (base .p_hi files missing).
+#
+# Fix: make iserv-wrapper-both only include the non-profiled wrapper.
+generic_builder = os.path.join(
+    out,
+    "pkgs", "development", "haskell-modules", "generic-builder.nix",
+)
+
+gb_dir = os.path.dirname(generic_builder)
+for dirpath, dirnames, filenames in os.walk(gb_dir):
+    os.chmod(dirpath, os.stat(dirpath).st_mode | stat.S_IWUSR)
+    for fn in filenames:
+        fp = os.path.join(dirpath, fn)
+        os.chmod(fp, os.stat(fp).st_mode | stat.S_IWUSR)
+
+with open(generic_builder, "r") as f:
+    gb_content = f.read()
+
+# Replace the paths list that builds both profiled and non-profiled wrappers
+# with one that only builds the non-profiled wrapper.
+gb_marker = "paths = map wrapperScript [\n            false\n            true\n          ];"
+gb_replacement = "paths = map wrapperScript [\n            false\n          ];"
+
+if gb_marker not in gb_content:
+    print("WARNING: Could not find iserv-wrapper-both marker in "
+          "generic-builder.nix, skipping profiling patch", file=sys.stderr)
+else:
+    gb_content = gb_content.replace(gb_marker, gb_replacement, 1)
+    with open(generic_builder, "w") as f:
+        f.write(gb_content)
+    print("Patched " + generic_builder)

@@ -5,10 +5,10 @@
 #   $out/lib/*.a       — static archives
 #   $out/pkgdb/        — GHC package database (.conf + cache)
 #
-# On aarch64, includes Template Haskell cross-compilation support:
-# static iserv-proxy, native libdl, mmap wrapper, QEMU guest_base
-# overlay, and package DB patching.  These are no-ops when TH isn't
-# used, so they're always enabled for aarch64.
+# Template Haskell cross-compilation support (both architectures):
+# static iserv-proxy, native libdl, and package DB patching.
+# aarch64 additionally gets QEMU guest_base overlay and mmap wrapper
+# (for ADRP relocation range issues).
 #
 # Consumers supply their own dependencies via consumerCabalFile (IFD),
 # consumerCabal2Nix (pre-generated), or hpkgs overrides.
@@ -64,10 +64,11 @@ WRAPPER
   # Cross-compilation toolchain
   androidPkgs = pkgs.pkgsCross.${archConfig.crossAttr};
 
-  # --- aarch64 TH support: static C libraries ---
+  # --- TH support: static C libraries ---
   # Static versions of C libraries so iserv-proxy-interpreter can be
-  # linked statically.  A static binary does not need /system/bin/linker64,
-  # which lets QEMU run it on the build host during TH evaluation.
+  # linked statically.  A static binary does not need Android's dynamic
+  # linker (/system/bin/linker or linker64), which lets QEMU run it on
+  # the build host during TH evaluation.
   gmpStatic = androidPkgs.gmp.overrideAttrs (old: {
     dontDisableStatic = true;
   });
@@ -104,16 +105,12 @@ WRAPPER
     vector = pkgs.haskell.lib.dontBenchmark (pkgs.haskell.lib.dontCheck super.vector);
   };
 
-  # Template Haskell cross-compilation overrides (aarch64 only).
+  # Template Haskell cross-compilation: package DB patching.
   #
   # Overrides mkDerivation to fix TH evaluation: copies GHC's global
   # package DB entries into the local DB, resolves ${pkgroot} to absolute
   # paths, and clears dynamic-library-dirs to force LoadArchive.
-  #
-  # Builds iserv-proxy as a static binary with --export-dynamic so our
-  # dlsym can find symbols, --hash-style=sysv for DT_HASH, and
-  # --wrap=mmap to intercept NULL-hint mmaps from GHC's RTS linker.
-  thOverrides = self: super: {
+  thPackageDbOverride = self: super: {
     mkDerivation = args:
       let isIservProxy = (args.pname or "") == "iserv-proxy";
       in super.mkDerivation (args // {
@@ -155,32 +152,69 @@ WRAPPER
             fi
           '');
       });
-    # Build iserv-proxy-interpreter as a static binary so QEMU can
-    # run it without Android's /system/bin/linker64.
-    # --export-dynamic populates .dynsym so our dlsym can find symbols.
-    # --hash-style=sysv provides DT_HASH (needed by our dlsym impl).
-    # --wrap=mmap intercepts NULL-hint mmaps from GHC's RTS linker
-    # (which uses mmap(NULL,...) on aarch64 due to linkerAlwaysPic=true)
-    # and provides hints near the binary so allocations stay within
-    # the +-4 GiB ADRP relocation range.
-    iserv-proxy = pkgs.haskell.lib.appendConfigureFlags super.iserv-proxy [
-      "--ghc-option=-optl-static"
-      "--ghc-option=-optl-pie"
-      "--ghc-option=-optl-Wl,--export-dynamic"
-      "--ghc-option=-optl-Wl,--hash-style=sysv"
-      "--ghc-option=-optl-Wl,--wrap=mmap"
-      "--ghc-option=-optl-lmmap_wrapper"
-      "--extra-lib-dirs=${gmpStatic}/lib"
-      "--extra-lib-dirs=${libffiStatic}/lib"
-      "--extra-lib-dirs=${numactlStatic}/lib"
-      "--extra-lib-dirs=${libdlNative}/lib"
-    ];
+  };
+
+  # Build iserv-proxy-interpreter as a static binary so QEMU can
+  # run it without Android's dynamic linker.
+  # --export-dynamic populates .dynsym so our dlsym can find symbols.
+  # --hash-style=sysv provides DT_HASH (needed by our dlsym impl);
+  #   dl_impl.c also handles DT_GNU_HASH as fallback.
+  #
+  # aarch64 uses -pie for ASLR compatibility; armv7a uses plain static
+  # because ARM32 CRT startup doesn't reliably relocate .dynsym entries
+  # in static PIE, causing dlsym to return pre-relocation offsets.
+  iservStaticFlags = [
+    "--ghc-option=-optl-static"
+    "--ghc-option=-optl-Wl,--export-dynamic"
+    "--ghc-option=-optl-Wl,--hash-style=sysv"
+    "--extra-lib-dirs=${gmpStatic}/lib"
+    "--extra-lib-dirs=${libffiStatic}/lib"
+    "--extra-lib-dirs=${numactlStatic}/lib"
+    "--extra-lib-dirs=${libdlNative}/lib"
+  ];
+
+  # aarch64 uses -pie for ASLR.  ARM32 omits it (see above).
+  iservPieFlag = [ "--ghc-option=-optl-pie" ];
+
+  # aarch64-only: --wrap=mmap intercepts NULL-hint mmaps from GHC's
+  # RTS linker (which uses mmap(NULL,...) on aarch64 due to
+  # linkerAlwaysPic=true) and provides hints near the binary so
+  # allocations stay within the +-4 GiB ADRP relocation range.
+  iservAarch64Flags = [
+    "--ghc-option=-optl-Wl,--wrap=mmap"
+    "--ghc-option=-optl-lmmap_wrapper"
+  ];
+
+  thIservOverride = self: super: {
+    iserv-proxy = pkgs.haskell.lib.appendConfigureFlags super.iserv-proxy
+      (iservStaticFlags
+       ++ (if androidArch == "aarch64"
+           then iservPieFlag ++ iservAarch64Flags
+           else []));
+  };
+
+  # armv7a: disable profiling at the package level — the armv7a cross-GHC
+  # is built without profiling boot libraries (enableProfiledLibs = false),
+  # so Hackage packages must not request --enable-library-profiling either,
+  # or they fail with "Perhaps you haven't installed the profiling libraries
+  # for package 'base'".
+  armv7aProfilingOverride = self: super: {
+    mkDerivation = args: super.mkDerivation (args // {
+      enableLibraryProfiling = false;
+    });
   };
 
   defaultOverrides =
+    let
+      common = pkgs.lib.composeManyExtensions [
+        vectorOverride
+        thPackageDbOverride
+        thIservOverride
+      ];
+    in
     if androidArch == "aarch64"
-    then pkgs.lib.composeExtensions vectorOverride thOverrides
-    else vectorOverride;
+    then common
+    else pkgs.lib.composeExtensions common armv7aProfilingOverride;
 
   # armv7a: disable profiling — LLVM ARM backend crashes in
   # ARMAsmPrinter::emitXXStructor when compiling profiled libraries.
