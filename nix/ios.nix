@@ -5,7 +5,7 @@
 # (which injects OTHER_CFLAGS into project.yml).
 { sources ? import ../npins
 , simulator ? false
-, mainModule ? ../app/MobileMain.hs
+, mainModule ? ../test/ScrollDemoMain.hs
 , consumerCabalFile ? null
 , consumerCabal2Nix ? null
 , hpkgs ? (_: _: {})       # consumer haskellPackages overrides

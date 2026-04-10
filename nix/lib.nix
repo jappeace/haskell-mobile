@@ -10,7 +10,7 @@
 #
 # Usage:
 #   let lib = import ./lib.nix { sources = import ../npins; };
-#   in lib.mkAndroidLib { haskellMobileSrc = ../.; mainModule = ../app/MobileMain.hs; }
+#   in lib.mkAndroidLib { haskellMobileSrc = ../.; mainModule = ../test/ScrollDemoMain.hs; }
 { sources, androidArch ? "aarch64" }:
 let
   archConfig = {

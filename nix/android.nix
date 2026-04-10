@@ -1,7 +1,7 @@
 # Android shared library — thin wrapper around lib.nix.
 { sources ? import ../npins
 , androidArch ? "aarch64"
-, mainModule ? ../app/MobileMain.hs
+, mainModule ? ../test/ScrollDemoMain.hs
 , consumerCabalFile ? null
 , consumerCabal2Nix ? null
 , hpkgs ? (_: _: {})       # consumer haskellPackages overrides
