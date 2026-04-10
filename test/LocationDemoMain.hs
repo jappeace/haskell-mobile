@@ -9,56 +9,62 @@
 -- button press instead.
 module Main where
 
+import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Text (pack)
 import Foreign.Ptr (Ptr)
 import HaskellMobile
   ( MobileApp(..)
-  , UserState(..)
+  , Action
+  , LocationState(..)
   , startMobileApp
+  , derefAppContext
   , platformLog
   , startLocationUpdates
   , stopLocationUpdates
   , loggingMobileContext
   , AppContext
+  , newActionState
+  , runActionM
+  , createAction
   )
+import HaskellMobile.AppContext (AppContext(..))
 import HaskellMobile.Location (LocationData(..))
 import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do
   platformLog "Location demo app registered"
-  startMobileApp locationDemoApp
-
--- | Location demo: provides start/stop location update buttons.
--- Used by integration tests to verify the location FFI bridge end-to-end.
-locationDemoApp :: MobileApp
-locationDemoApp = MobileApp
-  { maContext = loggingMobileContext
-  , maView    = locationDemoView
-  }
+  actionState <- newActionState
+  locStateRef <- newIORef (Nothing :: Maybe LocationState)
+  (onStartLocation, onStopLocation) <- runActionM actionState $ do
+    start <- createAction $ do
+      Just locationState <- readIORef locStateRef
+      startLocationUpdates locationState $ \locationData ->
+        platformLog ("Location: " <> pack (show (ldLatitude locationData))
+                    <> "," <> pack (show (ldLongitude locationData))
+                    <> " alt=" <> pack (show (ldAltitude locationData))
+                    <> " acc=" <> pack (show (ldAccuracy locationData)))
+      platformLog "Location updates started"
+    stop <- createAction $ do
+      Just locationState <- readIORef locStateRef
+      stopLocationUpdates locationState
+      platformLog "Location updates stopped"
+    pure (start, stop)
+  ctxPtr <- startMobileApp MobileApp
+    { maContext     = loggingMobileContext
+    , maView        = \_userState -> locationDemoView onStartLocation onStopLocation
+    , maActionState = actionState
+    }
+  appCtx <- derefAppContext ctxPtr
+  writeIORef locStateRef (Just (acLocationState appCtx))
+  pure ctxPtr
 
 -- | Builds a Column with a label and start/stop location buttons.
--- The view itself is pure — all location FFI calls happen in button
--- callbacks to avoid JNI reentrancy issues during rendering.
-locationDemoView :: UserState -> IO Widget
-locationDemoView userState = pure $ Column
+locationDemoView :: Action -> Action -> IO Widget
+locationDemoView onStartLocation onStopLocation = pure $ Column
   [ Text TextConfig { tcLabel = "Location Demo", tcFontConfig = Nothing }
   , Button ButtonConfig
-      { bcLabel = "Start Location"
-      , bcAction = do
-          startLocationUpdates (userLocationState userState) $ \locationData ->
-            platformLog ("Location: " <> pack (show (ldLatitude locationData))
-                        <> "," <> pack (show (ldLongitude locationData))
-                        <> " alt=" <> pack (show (ldAltitude locationData))
-                        <> " acc=" <> pack (show (ldAccuracy locationData)))
-          platformLog "Location updates started"
-      , bcFontConfig = Nothing
-      }
+      { bcLabel = "Start Location", bcAction = onStartLocation, bcFontConfig = Nothing }
   , Button ButtonConfig
-      { bcLabel = "Stop Location"
-      , bcAction = do
-          stopLocationUpdates (userLocationState userState)
-          platformLog "Location updates stopped"
-      , bcFontConfig = Nothing
-      }
+      { bcLabel = "Stop Location", bcAction = onStopLocation, bcFontConfig = Nothing }
   ]

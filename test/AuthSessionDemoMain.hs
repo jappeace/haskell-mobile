@@ -5,18 +5,24 @@
 -- Starts directly in auth-session-demo mode so no runtime switching is needed.
 module Main where
 
-import Data.Text (pack)
+import Data.IORef (newIORef, readIORef, writeIORef)
 import Foreign.Ptr (Ptr)
 import HaskellMobile
   ( MobileApp(..)
-  , UserState(..)
+  , Action
+  , AuthSessionResult(..)
+  , AuthSessionState(..)
   , startMobileApp
+  , derefAppContext
   , platformLog
   , loggingMobileContext
   , AppContext
-  , AuthSessionResult(..)
   , startAuthSession
+  , newActionState
+  , runActionM
+  , createAction
   )
+import HaskellMobile.AppContext (AppContext(..))
 import HaskellMobile.Widget
   ( ButtonConfig(..)
   , TextConfig(..)
@@ -26,35 +32,38 @@ import HaskellMobile.Widget
 main :: IO (Ptr AppContext)
 main = do
   platformLog "AuthSession demo app registered"
-  startMobileApp authSessionDemoApp
-
--- | AuthSession demo: button starts an auth session, logs the result.
-authSessionDemoApp :: MobileApp
-authSessionDemoApp = MobileApp
-  { maContext = loggingMobileContext
-  , maView    = authSessionDemoView
-  }
+  actionState <- newActionState
+  authStateRef <- newIORef (Nothing :: Maybe AuthSessionState)
+  onStartLogin <- runActionM actionState $
+    createAction $ do
+      Just authState <- readIORef authStateRef
+      startAuthSession authState
+        "https://example.com/auth?client_id=demo&redirect_uri=haskellmobile://callback"
+        "haskellmobile"
+        (\result -> case result of
+          AuthSessionSuccess redirectUrl ->
+            platformLog ("AuthSession success: " <> redirectUrl)
+          AuthSessionCancelled ->
+            platformLog "AuthSession cancelled"
+          AuthSessionError errorMsg ->
+            platformLog ("AuthSession error: " <> errorMsg)
+        )
+  ctxPtr <- startMobileApp MobileApp
+    { maContext     = loggingMobileContext
+    , maView        = \_userState -> authSessionDemoView onStartLogin
+    , maActionState = actionState
+    }
+  appCtx <- derefAppContext ctxPtr
+  writeIORef authStateRef (Just (acAuthSessionState appCtx))
+  pure ctxPtr
 
 -- | Builds a Column with a label and a "Start Login" button.
--- The button starts an auth session with a demo URL.
-authSessionDemoView :: UserState -> IO Widget
-authSessionDemoView userState = do
-  pure $ Column
-    [ Text TextConfig { tcLabel = "AuthSession Demo", tcFontConfig = Nothing }
-    , Button ButtonConfig
-        { bcLabel = "Start Login"
-        , bcAction = startAuthSession
-            (userAuthSessionState userState)
-            "https://example.com/auth?client_id=demo&redirect_uri=haskellmobile://callback"
-            "haskellmobile"
-            (\result -> case result of
-              AuthSessionSuccess redirectUrl ->
-                platformLog ("AuthSession success: " <> redirectUrl)
-              AuthSessionCancelled ->
-                platformLog "AuthSession cancelled"
-              AuthSessionError errorMsg ->
-                platformLog ("AuthSession error: " <> errorMsg)
-            )
-        , bcFontConfig = Nothing
-        }
-    ]
+authSessionDemoView :: Action -> IO Widget
+authSessionDemoView onStartLogin = pure $ Column
+  [ Text TextConfig { tcLabel = "AuthSession Demo", tcFontConfig = Nothing }
+  , Button ButtonConfig
+      { bcLabel      = "Start Login"
+      , bcAction     = onStartLogin
+      , bcFontConfig = Nothing
+      }
+  ]

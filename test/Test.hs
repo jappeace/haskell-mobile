@@ -18,6 +18,13 @@ import Foreign.Ptr (Ptr, nullPtr)
 import HaskellMobile
   ( MobileApp(..)
   , UserState(..)
+  , Action(..)
+  , OnChange(..)
+  , ActionM
+  , createAction
+  , createOnChange
+  , newActionState
+  , runActionM
   , startMobileApp
   , haskellGreet
   , haskellRenderUI
@@ -97,7 +104,7 @@ import HaskellMobile.Camera
   , dispatchVideoFrame
   , dispatchAudioChunk
   )
-import HaskellMobile.Render (newRenderState, renderWidget, dispatchEvent, dispatchTextEvent)
+import HaskellMobile.Render (RenderState, newRenderState, renderWidget, dispatchEvent, dispatchTextEvent)
 import HaskellMobile.SecureStorage
   ( SecureStorageStatus(..)
   , SecureStorageState(..)
@@ -148,17 +155,27 @@ import HaskellMobile.Http
   , dispatchHttpResult
   )
 
+-- | Helper: create an ActionState, register actions via ActionM, and
+-- build a RenderState.  Returns the registered value together with the
+-- RenderState so tests can dispatch by handle ID.
+withActions :: ActionM a -> IO (a, RenderState)
+withActions actionM = do
+  actionState <- newActionState
+  result <- runActionM actionState actionM
+  rs <- newRenderState actionState
+  pure (result, rs)
+
 main :: IO ()
 main = do
   -- Create a single FFI context for permission round-trip tests.
   -- The C desktop stub uses a process-wide g_permission_ctx, so only
   -- one context can be active for FFI permission dispatch.
-  ffiCtxPtr <- startMobileApp testApp
+  ffiCtxPtr <- startMobileApp =<< testApp
   ffiAppCtx <- derefAppContext ffiCtxPtr
   defaultMain (tests (acPermissionState ffiAppCtx) (acSecureStorageState ffiAppCtx) (acDialogState ffiAppCtx) (acAuthSessionState ffiAppCtx) (acBottomSheetState ffiAppCtx) (acHttpState ffiAppCtx))
 
 tests :: PermissionState -> SecureStorageState -> DialogState -> AuthSessionState -> BottomSheetState -> HttpState -> TestTree
-tests ffiPermState ffiSecureStorageState ffiDialogState ffiAuthSessionState ffiBottomSheetState ffiHttpState = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, imageTests, webViewTests, styledTests, textAlignTests, colorTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, secureStorageTests ffiSecureStorageState, bleTests, dialogTests ffiDialogState, locationTests, cameraTests, authSessionTests ffiAuthSessionState, bottomSheetTests ffiBottomSheetState, httpTests ffiHttpState, appContextTests, exceptionHandlerTests]
+tests ffiPermState ffiSecureStorageState ffiDialogState ffiAuthSessionState ffiBottomSheetState ffiHttpState = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, imageTests, webViewTests, styledTests, textAlignTests, colorTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, secureStorageTests ffiSecureStorageState, bleTests, dialogTests ffiDialogState, locationTests, cameraTests, authSessionTests ffiAuthSessionState, bottomSheetTests ffiBottomSheetState, httpTests ffiHttpState, appContextTests, exceptionHandlerTests, actionTests, widgetEqTests]
 
 qcProps :: TestTree
 qcProps = testGroup "(checked by QuickCheck)"
@@ -173,6 +190,16 @@ qcProps = testGroup "(checked by QuickCheck)"
 
 oneTwoThree :: [Int]
 oneTwoThree = [1, 2, 3]
+
+-- | Trivial test app with loggingMobileContext and a simple Text view.
+testApp :: IO MobileApp
+testApp = do
+  actionState <- newActionState
+  pure MobileApp
+    { maContext     = loggingMobileContext
+    , maView        = \_userState -> pure (Text TextConfig { tcLabel = "test", tcFontConfig = Nothing })
+    , maActionState = actionState
+    }
 
 unitTests :: TestTree
 unitTests = testGroup "Unit tests"
@@ -210,20 +237,19 @@ withAppContext app action = do
 -- | Helper: create an 'AppContext' with the given lifecycle callback,
 -- run an action with the typed 'Ptr AppContext', then free the context.
 withContext :: (LifecycleEvent -> IO ()) -> (Ptr AppContext -> IO a) -> IO a
-withContext callback action = withAppContext dummyApp action
-  where
-    dummyApp = MobileApp
-      { maContext = MobileContext { onLifecycle = callback, onError = \_ -> pure () }
-      , maView    = \_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing })
-      }
+withContext callback action = do
+  dummyApp <- makeDummyApp callback
+  withAppContext dummyApp action
 
--- | Trivial test app with loggingMobileContext and a simple Text view.
--- Replaces the old App.mobileApp that used unsafePerformIO global state.
-testApp :: MobileApp
-testApp = MobileApp
-  { maContext = loggingMobileContext
-  , maView    = \_userState -> pure (Text TextConfig { tcLabel = "test", tcFontConfig = Nothing })
-  }
+-- | Create a dummy MobileApp with the given lifecycle callback.
+makeDummyApp :: (LifecycleEvent -> IO ()) -> IO MobileApp
+makeDummyApp callback = do
+  actionState <- newActionState
+  pure MobileApp
+    { maContext     = MobileContext { onLifecycle = callback, onError = \_ -> pure () }
+    , maView        = \_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing })
+    , maActionState = actionState
+    }
 
 allEvents :: [LifecycleEvent]
 allEvents = [Create, Start, Resume, Pause, Stop, Destroy, LowMemory]
@@ -261,79 +287,84 @@ lifecycleTests = testGroup "Lifecycle"
       received @?= allEvents
   , testCase "loggingMobileContext handles all events without throwing" $
       mapM_ (onLifecycle loggingMobileContext) allEvents
-  , testCase "testApp context handles all events without throwing" $
-      mapM_ (onLifecycle (maContext testApp)) allEvents
+  , testCase "testApp context handles all events without throwing" $ do
+      app <- testApp
+      mapM_ (onLifecycle (maContext app)) allEvents
   ]
 
 uiTests :: TestTree
 uiTests = testGroup "UI"
   [ testCase "callback dispatch fires registered action" $ do
       ref <- newIORef (0 :: Int)
-      rs <- newRenderState
+      (clickHandle, rs) <- withActions $
+        createAction (modifyIORef' ref (+ 1))
       let widget = Button ButtonConfig
-            { bcLabel = "click me", bcAction = modifyIORef' ref (+ 1), bcFontConfig = Nothing }
+            { bcLabel = "click me", bcAction = clickHandle, bcFontConfig = Nothing }
       renderWidget rs widget
-      -- After rendering, callback 0 should be the button's handler
-      dispatchEvent rs 0
+      dispatchEvent rs (actionId clickHandle)
       count <- readIORef ref
       count @?= 1
 
   , testCase "multiple callbacks each fire independently" $ do
       refA <- newIORef False
       refB <- newIORef False
-      rs <- newRenderState
+      ((handleA, handleB), rs) <- withActions $ do
+        hA <- createAction (modifyIORef' refA (const True))
+        hB <- createAction (modifyIORef' refB (const True))
+        pure (hA, hB)
       let widget = Row
             [ Button ButtonConfig
-                { bcLabel = "A", bcAction = modifyIORef' refA (const True), bcFontConfig = Nothing }
+                { bcLabel = "A", bcAction = handleA, bcFontConfig = Nothing }
             , Button ButtonConfig
-                { bcLabel = "B", bcAction = modifyIORef' refB (const True), bcFontConfig = Nothing }
+                { bcLabel = "B", bcAction = handleB, bcFontConfig = Nothing }
             ]
       renderWidget rs widget
-      -- Only fire callback 0 (button A)
-      dispatchEvent rs 0
+      -- Only fire A
+      dispatchEvent rs (actionId handleA)
       a <- readIORef refA
       b <- readIORef refB
       a @?= True
       b @?= False
-      -- Now fire callback 1 (button B)
-      dispatchEvent rs 1
+      -- Now fire B
+      dispatchEvent rs (actionId handleB)
       b' <- readIORef refB
       b' @?= True
 
-  , testCase "re-render resets callback IDs" $ do
-      refOld <- newIORef False
-      refNew <- newIORef False
-      rs <- newRenderState
-      -- First render with old callback
+  , testCase "re-render preserves callback handles" $ do
+      ref <- newIORef (0 :: Int)
+      (clickHandle, rs) <- withActions $
+        createAction (modifyIORef' ref (+ 1))
+      -- First render
       renderWidget rs (Button ButtonConfig
-        { bcLabel = "old", bcAction = modifyIORef' refOld (const True), bcFontConfig = Nothing })
-      -- Second render replaces it
+        { bcLabel = "old", bcAction = clickHandle, bcFontConfig = Nothing })
+      -- Second render (same handle)
       renderWidget rs (Button ButtonConfig
-        { bcLabel = "new", bcAction = modifyIORef' refNew (const True), bcFontConfig = Nothing })
-      dispatchEvent rs 0
-      old <- readIORef refOld
-      new <- readIORef refNew
-      old @?= False
-      new @?= True
+        { bcLabel = "new", bcAction = clickHandle, bcFontConfig = Nothing })
+      dispatchEvent rs (actionId clickHandle)
+      count <- readIORef ref
+      count @?= 1
 
   , testCase "dispatching unknown callback ID logs error" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs (Text TextConfig { tcLabel = "no buttons", tcFontConfig = Nothing })
       -- Should not throw (logs to stderr)
       dispatchEvent rs 42
       dispatchEvent rs 999
 
   , testCase "nested widget tree renders without error" $ do
-      rs <- newRenderState
+      ((handleA, handleB), rs) <- withActions $ do
+        hA <- createAction (pure ())
+        hB <- createAction (pure ())
+        pure (hA, hB)
       let widget = Column
             [ Text TextConfig { tcLabel = "header", tcFontConfig = Nothing }
             , Row
               [ Button ButtonConfig
-                  { bcLabel = "a", bcAction = pure (), bcFontConfig = Nothing }
+                  { bcLabel = "a", bcAction = handleA, bcFontConfig = Nothing }
               , Column
                 [ Text TextConfig { tcLabel = "nested", tcFontConfig = Nothing }
                 , Button ButtonConfig
-                    { bcLabel = "b", bcAction = pure (), bcFontConfig = Nothing }
+                    { bcLabel = "b", bcAction = handleB, bcFontConfig = Nothing }
                 ]
               ]
             , Text TextConfig { tcLabel = "footer", tcFontConfig = Nothing }
@@ -362,7 +393,8 @@ uiTests = testGroup "UI"
             , userBottomSheetState   = dummyBottomSheetState
             , userHttpState          = dummyHttpState
             }
-      widget <- maView testApp dummyUserState
+      app <- testApp
+      widget <- maView app dummyUserState
       -- testApp returns a Text widget
       case widget of
         Text _          -> pure ()
@@ -383,7 +415,7 @@ uiTests = testGroup "UI"
 scrollViewTests :: TestTree
 scrollViewTests = testGroup "ScrollView"
   [ testCase "ScrollView renders without error" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs (ScrollView
         [ Text TextConfig { tcLabel = "item 1", tcFontConfig = Nothing }
         , Text TextConfig { tcLabel = "item 2", tcFontConfig = Nothing }
@@ -391,72 +423,73 @@ scrollViewTests = testGroup "ScrollView"
 
   , testCase "button inside ScrollView fires its callback" $ do
       ref <- newIORef (0 :: Int)
-      rs <- newRenderState
+      (clickHandle, rs) <- withActions $
+        createAction (modifyIORef' ref (+ 1))
       renderWidget rs $ ScrollView
         [ Button ButtonConfig
-            { bcLabel = "press me", bcAction = modifyIORef' ref (+ 1), bcFontConfig = Nothing } ]
-      dispatchEvent rs 0
+            { bcLabel = "press me", bcAction = clickHandle, bcFontConfig = Nothing } ]
+      dispatchEvent rs (actionId clickHandle)
       count <- readIORef ref
       count @?= 1
 
   , testCase "ScrollView with nested Column renders and dispatches correctly" $ do
       ref <- newIORef False
-      rs <- newRenderState
+      (clickHandle, rs) <- withActions $
+        createAction (modifyIORef' ref (const True))
       renderWidget rs $ ScrollView
         [ Column
           [ Text TextConfig { tcLabel = "header", tcFontConfig = Nothing }
           , Button ButtonConfig
-              { bcLabel = "action", bcAction = modifyIORef' ref (const True), bcFontConfig = Nothing }
+              { bcLabel = "action", bcAction = clickHandle, bcFontConfig = Nothing }
           ]
         ]
-      dispatchEvent rs 0
+      dispatchEvent rs (actionId clickHandle)
       fired <- readIORef ref
       fired @?= True
 
-  , testCase "re-render inside ScrollView resets callbacks" $ do
-      refOld <- newIORef False
-      refNew <- newIORef False
-      rs <- newRenderState
+  , testCase "re-render inside ScrollView preserves callbacks" $ do
+      ref <- newIORef (0 :: Int)
+      (clickHandle, rs) <- withActions $
+        createAction (modifyIORef' ref (+ 1))
       renderWidget rs $ ScrollView [Button ButtonConfig
-        { bcLabel = "old", bcAction = modifyIORef' refOld (const True), bcFontConfig = Nothing }]
+        { bcLabel = "old", bcAction = clickHandle, bcFontConfig = Nothing }]
       renderWidget rs $ ScrollView [Button ButtonConfig
-        { bcLabel = "new", bcAction = modifyIORef' refNew (const True), bcFontConfig = Nothing }]
-      dispatchEvent rs 0
-      old <- readIORef refOld
-      new <- readIORef refNew
-      old @?= False
-      new @?= True
+        { bcLabel = "new", bcAction = clickHandle, bcFontConfig = Nothing }]
+      dispatchEvent rs (actionId clickHandle)
+      count <- readIORef ref
+      count @?= 1
   ]
 
 textInputTests :: TestTree
 textInputTests = testGroup "TextInput"
   [ testCase "text callback fires with correct value" $ do
       ref <- newIORef ("" :: String)
-      rs <- newRenderState
+      (changeHandle, rs) <- withActions $
+        createOnChange (\t -> modifyIORef' ref (const (show t)))
       let widget = TextInput TextInputConfig
             { tiInputType = InputText, tiHint = "hint", tiValue = ""
-            , tiOnChange = \t -> modifyIORef' ref (const (show t))
+            , tiOnChange = changeHandle
             , tiFontConfig = Nothing }
       renderWidget rs widget
-      -- Callback 0 is the text change handler
-      dispatchTextEvent rs 0 "hello"
+      dispatchTextEvent rs (onChangeId changeHandle) "hello"
       val <- readIORef ref
       val @?= show ("hello" :: String)
 
   , testCase "text callback receives updated value" $ do
       ref <- newIORef ("" :: String)
-      rs <- newRenderState
+      (changeHandle, rs) <- withActions $
+        createOnChange (\t -> modifyIORef' ref (const (show t)))
       let widget = TextInput TextInputConfig
             { tiInputType = InputText, tiHint = "enter weight", tiValue = "80"
-            , tiOnChange = \t -> modifyIORef' ref (const (show t))
+            , tiOnChange = changeHandle
             , tiFontConfig = Nothing }
       renderWidget rs widget
-      dispatchTextEvent rs 0 "95.5"
+      dispatchTextEvent rs (onChangeId changeHandle) "95.5"
       val <- readIORef ref
       val @?= show ("95.5" :: String)
 
   , testCase "dispatchTextEvent with unknown ID does not crash" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs (Text TextConfig { tcLabel = "no inputs", tcFontConfig = Nothing })
       -- Should not throw
       dispatchTextEvent rs 42 "ignored"
@@ -465,72 +498,75 @@ textInputTests = testGroup "TextInput"
   , testCase "text and click callbacks share ID space without collision" $ do
       clickRef <- newIORef False
       textRef  <- newIORef ("" :: String)
-      rs <- newRenderState
+      ((clickHandle, changeHandle), rs) <- withActions $ do
+        ch <- createAction (modifyIORef' clickRef (const True))
+        th <- createOnChange (\t -> modifyIORef' textRef (const (show t)))
+        pure (ch, th)
       let widget = Column
             [ Button ButtonConfig
-                { bcLabel = "ok", bcAction = modifyIORef' clickRef (const True), bcFontConfig = Nothing }
+                { bcLabel = "ok", bcAction = clickHandle, bcFontConfig = Nothing }
             , TextInput TextInputConfig
                 { tiInputType = InputText, tiHint = "hint", tiValue = ""
-                , tiOnChange = \t -> modifyIORef' textRef (const (show t))
+                , tiOnChange = changeHandle
                 , tiFontConfig = Nothing }
             ]
       renderWidget rs widget
-      -- Button gets callback 0, TextInput gets callback 1
-      dispatchEvent rs 0
-      dispatchTextEvent rs 1 "typed"
+      dispatchEvent rs (actionId clickHandle)
+      dispatchTextEvent rs (onChangeId changeHandle) "typed"
       click <- readIORef clickRef
       text  <- readIORef textRef
       click @?= True
       text  @?= show ("typed" :: String)
 
-  , testCase "re-render resets text callbacks" $ do
-      refOld <- newIORef ("" :: String)
-      refNew <- newIORef ("" :: String)
-      rs <- newRenderState
+  , testCase "re-render preserves text callbacks" $ do
+      ref <- newIORef ("" :: String)
+      (changeHandle, rs) <- withActions $
+        createOnChange (\t -> modifyIORef' ref (const (show t)))
       renderWidget rs $ TextInput TextInputConfig
         { tiInputType = InputText, tiHint = "old", tiValue = ""
-        , tiOnChange = \t -> modifyIORef' refOld (const (show t))
+        , tiOnChange = changeHandle
         , tiFontConfig = Nothing }
       renderWidget rs $ TextInput TextInputConfig
         { tiInputType = InputText, tiHint = "new", tiValue = ""
-        , tiOnChange = \t -> modifyIORef' refNew (const (show t))
+        , tiOnChange = changeHandle
         , tiFontConfig = Nothing }
-      dispatchTextEvent rs 0 "val"
-      old <- readIORef refOld
-      new <- readIORef refNew
-      old @?= ""
-      new @?= show ("val" :: String)
+      dispatchTextEvent rs (onChangeId changeHandle) "val"
+      val <- readIORef ref
+      val @?= show ("val" :: String)
 
   , testCase "InputNumber callback fires correctly" $ do
       ref <- newIORef ("" :: String)
-      rs <- newRenderState
+      (changeHandle, rs) <- withActions $
+        createOnChange (\t -> modifyIORef' ref (const (show t)))
       let widget = TextInput TextInputConfig
             { tiInputType = InputNumber, tiHint = "weight", tiValue = ""
-            , tiOnChange = \t -> modifyIORef' ref (const (show t))
+            , tiOnChange = changeHandle
             , tiFontConfig = Nothing }
       renderWidget rs widget
-      dispatchTextEvent rs 0 "72.5"
+      dispatchTextEvent rs (onChangeId changeHandle) "72.5"
       val <- readIORef ref
       val @?= show ("72.5" :: String)
 
   , testCase "InputText and InputNumber coexist with independent callbacks" $ do
       textRef   <- newIORef ("" :: String)
       numberRef <- newIORef ("" :: String)
-      rs <- newRenderState
+      ((textHandle, numberHandle), rs) <- withActions $ do
+        th <- createOnChange (\t -> modifyIORef' textRef (const (show t)))
+        nh <- createOnChange (\t -> modifyIORef' numberRef (const (show t)))
+        pure (th, nh)
       let widget = Column
             [ TextInput TextInputConfig
                 { tiInputType = InputText, tiHint = "name", tiValue = ""
-                , tiOnChange = \t -> modifyIORef' textRef (const (show t))
+                , tiOnChange = textHandle
                 , tiFontConfig = Nothing }
             , TextInput TextInputConfig
                 { tiInputType = InputNumber, tiHint = "weight", tiValue = ""
-                , tiOnChange = \t -> modifyIORef' numberRef (const (show t))
+                , tiOnChange = numberHandle
                 , tiFontConfig = Nothing }
             ]
       renderWidget rs widget
-      -- TextInput gets callback 0, InputNumber gets callback 1
-      dispatchTextEvent rs 0 "Alice"
-      dispatchTextEvent rs 1 "60.0"
+      dispatchTextEvent rs (onChangeId textHandle) "Alice"
+      dispatchTextEvent rs (onChangeId numberHandle) "60.0"
       tVal <- readIORef textRef
       nVal <- readIORef numberRef
       tVal @?= show ("Alice" :: String)
@@ -541,23 +577,23 @@ textInputTests = testGroup "TextInput"
 imageTests :: TestTree
 imageTests = testGroup "Image"
   [ testCase "Image with resource renders without error" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs $ Image ImageConfig
         { icSource = ImageResource (ResourceName "ic_launcher"), icScaleType = ScaleFit }
 
   , testCase "Image with ByteString data renders without error" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       let bytes = BS.pack [0x89, 0x50, 0x4E, 0x47, 0x00, 0x00, 0x00, 0x00]
       renderWidget rs $ Image ImageConfig
         { icSource = ImageData bytes, icScaleType = ScaleFill }
 
   , testCase "Image with file path renders without error" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs $ Image ImageConfig
         { icSource = ImageFile "/nonexistent/test.png", icScaleType = ScaleNone }
 
   , testCase "Image inside Column renders" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs $ Column
         [ Text TextConfig { tcLabel = "header", tcFontConfig = Nothing }
         , Image ImageConfig
@@ -565,23 +601,23 @@ imageTests = testGroup "Image"
         ]
 
   , testCase "Styled Image renders without error" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs $ Styled defaultStyle
         (Image ImageConfig
           { icSource = ImageResource (ResourceName "icon"), icScaleType = ScaleNone })
 
   , testCase "ScaleFit renders without error" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs $ Image ImageConfig
         { icSource = ImageResource (ResourceName "fit_test"), icScaleType = ScaleFit }
 
   , testCase "ScaleFill renders without error" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs $ Image ImageConfig
         { icSource = ImageResource (ResourceName "fill_test"), icScaleType = ScaleFill }
 
   , testCase "ScaleNone renders without error" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs $ Image ImageConfig
         { icSource = ImageResource (ResourceName "none_test"), icScaleType = ScaleNone }
   ]
@@ -590,31 +626,31 @@ imageTests = testGroup "Image"
 webViewTests :: TestTree
 webViewTests = testGroup "WebView"
   [ testCase "WebView renders without error" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs $ WebView WebViewConfig
         { wvUrl = "https://example.com", wvOnPageLoad = Nothing }
 
   , testCase "WebView with callback registers handler and fires" $ do
       ref <- newIORef (0 :: Int)
-      rs <- newRenderState
+      (pageLoadHandle, rs) <- withActions $
+        createAction (modifyIORef' ref (+ 1))
       renderWidget rs $ WebView WebViewConfig
         { wvUrl = "https://example.com"
-        , wvOnPageLoad = Just (modifyIORef' ref (+ 1))
+        , wvOnPageLoad = Just pageLoadHandle
         }
-      -- Callback 0 is registered for the page-load event
-      dispatchEvent rs 0
+      dispatchEvent rs (actionId pageLoadHandle)
       count <- readIORef ref
       count @?= 1
 
   , testCase "WebView without callback does not register handler" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs $ WebView WebViewConfig
         { wvUrl = "https://example.com", wvOnPageLoad = Nothing }
       -- No callbacks registered, dispatching should log error but not crash
       dispatchEvent rs 0
 
   , testCase "WebView inside Column renders" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs $ Column
         [ Text TextConfig { tcLabel = "header", tcFontConfig = Nothing }
         , WebView WebViewConfig
@@ -622,7 +658,7 @@ webViewTests = testGroup "WebView"
         ]
 
   , testCase "Styled WebView renders without error" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs $ Styled defaultStyle
         (WebView WebViewConfig
           { wvUrl = "https://example.com", wvOnPageLoad = Nothing })
@@ -632,77 +668,78 @@ webViewTests = testGroup "WebView"
 styledTests :: TestTree
 styledTests = testGroup "Styled"
   [ testCase "Styled Text renders without error" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs $ Styled (WidgetStyle (Just 8.0) Nothing Nothing Nothing)
         (Text TextConfig { tcLabel = "styled", tcFontConfig = Just (FontConfig 20.0) })
 
   , testCase "Styled Button fires callback" $ do
       ref <- newIORef (0 :: Int)
-      rs <- newRenderState
+      (clickHandle, rs) <- withActions $
+        createAction (modifyIORef' ref (+ 1))
       renderWidget rs $ Styled (WidgetStyle Nothing Nothing Nothing Nothing)
         (Button ButtonConfig
-          { bcLabel = "tap", bcAction = modifyIORef' ref (+ 1)
+          { bcLabel = "tap", bcAction = clickHandle
           , bcFontConfig = Just (FontConfig 16.0) })
-      dispatchEvent rs 0
+      dispatchEvent rs (actionId clickHandle)
       count <- readIORef ref
       count @?= 1
 
   , testCase "Styled Column renders children and dispatches" $ do
       ref <- newIORef False
-      rs <- newRenderState
+      (clickHandle, rs) <- withActions $
+        createAction (modifyIORef' ref (const True))
       renderWidget rs $ Styled defaultStyle
         (Column [ Text TextConfig { tcLabel = "info", tcFontConfig = Nothing }
                 , Button ButtonConfig
-                    { bcLabel = "go", bcAction = modifyIORef' ref (const True), bcFontConfig = Nothing }
+                    { bcLabel = "go", bcAction = clickHandle, bcFontConfig = Nothing }
                 ])
-      dispatchEvent rs 0
+      dispatchEvent rs (actionId clickHandle)
       fired <- readIORef ref
       fired @?= True
 
   , testCase "nested Styled applies both styles" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs $
         Styled (WidgetStyle (Just 12.0) Nothing Nothing Nothing)
           (Styled (WidgetStyle Nothing Nothing Nothing Nothing)
             (Text TextConfig { tcLabel = "double styled", tcFontConfig = Just (FontConfig 18.0) }))
 
   , testCase "defaultStyle is a no-op" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs $ Styled defaultStyle
         (Text TextConfig { tcLabel = "plain", tcFontConfig = Nothing })
 
-  , testCase "re-render resets callbacks through Styled" $ do
-      refOld <- newIORef False
-      refNew <- newIORef False
-      rs <- newRenderState
+  , testCase "re-render preserves callbacks through Styled" $ do
+      ref <- newIORef (0 :: Int)
+      (clickHandle, rs) <- withActions $
+        createAction (modifyIORef' ref (+ 1))
       renderWidget rs $ Styled defaultStyle
         (Button ButtonConfig
-          { bcLabel = "old", bcAction = modifyIORef' refOld (const True), bcFontConfig = Nothing })
+          { bcLabel = "old", bcAction = clickHandle, bcFontConfig = Nothing })
       renderWidget rs $ Styled defaultStyle
         (Button ButtonConfig
-          { bcLabel = "new", bcAction = modifyIORef' refNew (const True), bcFontConfig = Nothing })
-      dispatchEvent rs 0
-      old <- readIORef refOld
-      new <- readIORef refNew
-      old @?= False
-      new @?= True
+          { bcLabel = "new", bcAction = clickHandle, bcFontConfig = Nothing })
+      dispatchEvent rs (actionId clickHandle)
+      count <- readIORef ref
+      count @?= 1
   ]
 
 -- | Tests for TextAlignment support in Styled widgets.
 textAlignTests :: TestTree
 textAlignTests = testGroup "TextAlignment"
   [ testCase "Styled with AlignCenter renders without error" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs $ Styled (WidgetStyle Nothing (Just AlignCenter) Nothing Nothing)
         (Text TextConfig { tcLabel = "centered", tcFontConfig = Nothing })
 
   , testCase "Styled with AlignCenter on Button fires callback" $ do
       ref <- newIORef (0 :: Int)
-      rs <- newRenderState
+      (clickHandle, rs) <- withActions $
+        createAction (modifyIORef' ref (+ 1))
       renderWidget rs $ Styled (WidgetStyle Nothing (Just AlignCenter) Nothing Nothing)
         (Button ButtonConfig
-          { bcLabel = "tap", bcAction = modifyIORef' ref (+ 1), bcFontConfig = Nothing })
-      dispatchEvent rs 0
+          { bcLabel = "tap", bcAction = clickHandle, bcFontConfig = Nothing })
+      dispatchEvent rs (actionId clickHandle)
       count <- readIORef ref
       count @?= 1
 
@@ -710,7 +747,7 @@ textAlignTests = testGroup "TextAlignment"
       wsTextAlign defaultStyle @?= Nothing
 
   , testCase "Styled with AlignEnd renders without error" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs $ Styled (WidgetStyle Nothing (Just AlignEnd) Nothing Nothing)
         (Text TextConfig { tcLabel = "end aligned", tcFontConfig = Nothing })
   ]
@@ -720,26 +757,28 @@ colorTests :: TestTree
 colorTests = testGroup "Colors"
   [ testCase "Styled with textColor renders and callback fires" $ do
       ref <- newIORef (0 :: Int)
-      rs <- newRenderState
+      (clickHandle, rs) <- withActions $
+        createAction (modifyIORef' ref (+ 1))
       renderWidget rs $ Styled (WidgetStyle Nothing Nothing (Just (Color 255 0 0 255)) Nothing)
         (Button ButtonConfig
-          { bcLabel = "red", bcAction = modifyIORef' ref (+ 1), bcFontConfig = Nothing })
-      dispatchEvent rs 0
+          { bcLabel = "red", bcAction = clickHandle, bcFontConfig = Nothing })
+      dispatchEvent rs (actionId clickHandle)
       count <- readIORef ref
       count @?= 1
 
   , testCase "Styled with backgroundColor renders without error" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs $ Styled (WidgetStyle Nothing Nothing Nothing (Just (Color 0 255 0 255)))
         (Text TextConfig { tcLabel = "green bg", tcFontConfig = Nothing })
 
   , testCase "both textColor and backgroundColor together" $ do
       ref <- newIORef (0 :: Int)
-      rs <- newRenderState
+      (clickHandle, rs) <- withActions $
+        createAction (modifyIORef' ref (+ 1))
       renderWidget rs $ Styled (WidgetStyle Nothing Nothing (Just (Color 255 0 0 255)) (Just (Color 0 255 0 255)))
         (Button ButtonConfig
-          { bcLabel = "colored", bcAction = modifyIORef' ref (+ 1), bcFontConfig = Nothing })
-      dispatchEvent rs 0
+          { bcLabel = "colored", bcAction = clickHandle, bcFontConfig = Nothing })
+      dispatchEvent rs (actionId clickHandle)
       count <- readIORef ref
       count @?= 1
 
@@ -748,7 +787,7 @@ colorTests = testGroup "Colors"
       wsBackgroundColor defaultStyle @?= Nothing
 
   , testCase "nested Styled with different colors renders" $ do
-      rs <- newRenderState
+      ((), rs) <- withActions (pure ())
       renderWidget rs $
         Styled (WidgetStyle Nothing Nothing (Just (Color 255 0 0 255)) Nothing)
           (Styled (WidgetStyle Nothing Nothing Nothing (Just (Color 0 0 255 255)))
@@ -773,21 +812,34 @@ colorTests = testGroup "Colors"
       colorFromText (colorToHex color) @?= Just color
   ]
 
+-- | Helper: make a simple MobileApp with default context.
+makeSimpleApp :: (UserState -> IO Widget) -> IO MobileApp
+makeSimpleApp viewFn = do
+  actionState <- newActionState
+  pure MobileApp
+    { maContext     = defaultMobileContext
+    , maView        = viewFn
+    , maActionState = actionState
+    }
+
 -- | Tests for the AppContext-based registration.
 -- Each test creates its own context, so no shared global state.
 registrationTests :: TestTree
 registrationTests = testGroup "Registration"
   [ testCase "startMobileApp returns working context" $ do
-      ctxPtr <- startMobileApp testApp
+      app <- testApp
+      ctxPtr <- startMobileApp app
       appCtx <- derefAppContext ctxPtr
       -- Verify the context has a working lifecycle callback
       mapM_ (onLifecycle (acMobileContext appCtx)) [Create, Destroy]
       freeAppContext ctxPtr
 
   , testCase "view function produces a widget through AppContext" $ do
+      actionState <- newActionState
       let customApp = MobileApp
-            { maContext = MobileContext { onLifecycle = \_ -> pure (), onError = \_ -> pure () }
-            , maView = \_userState -> pure (Text TextConfig { tcLabel = "custom", tcFontConfig = Nothing })
+            { maContext     = MobileContext { onLifecycle = \_ -> pure (), onError = \_ -> pure () }
+            , maView        = \_userState -> pure (Text TextConfig { tcLabel = "custom", tcFontConfig = Nothing })
+            , maActionState = actionState
             }
       ctxPtr <- newAppContext customApp
       appCtx <- derefAppContext ctxPtr
@@ -819,13 +871,17 @@ registrationTests = testGroup "Registration"
       freeAppContext ctxPtr
 
   , testCase "two contexts are independent" $ do
+      actionStateA <- newActionState
+      actionStateB <- newActionState
       let appA = MobileApp
-            { maContext = defaultMobileContext
-            , maView = \_userState -> pure (Text TextConfig { tcLabel = "A", tcFontConfig = Nothing })
+            { maContext     = defaultMobileContext
+            , maView        = \_userState -> pure (Text TextConfig { tcLabel = "A", tcFontConfig = Nothing })
+            , maActionState = actionStateA
             }
           appB = MobileApp
-            { maContext = defaultMobileContext
-            , maView = \_userState -> pure (Text TextConfig { tcLabel = "B", tcFontConfig = Nothing })
+            { maContext     = defaultMobileContext
+            , maView        = \_userState -> pure (Text TextConfig { tcLabel = "B", tcFontConfig = Nothing })
+            , maActionState = actionStateB
             }
       ctxPtrA <- newAppContext appA
       ctxPtrB <- newAppContext appB
@@ -939,8 +995,6 @@ i18nTests = testGroup "I18n"
 permissionTests :: PermissionState -> TestTree
 permissionTests ffiPermState = sequentialTestGroup "Permission" AllFinish
   [ testCase "requestPermission fires callback with PermissionGranted on desktop" $ do
-      -- Uses the shared FFI context because the C desktop stub dispatches
-      -- via haskellOnPermissionResult(g_permission_ctx, ...).
       ref <- newIORef (Nothing :: Maybe PermissionStatus)
       requestPermission ffiPermState PermissionCamera
         (\status -> modifyIORef' ref (const (Just status)))
@@ -988,7 +1042,6 @@ permissionTests ffiPermState = sequentialTestGroup "Permission" AllFinish
       count @?= 0
 
   , testCase "multiple simultaneous pending requests dispatch independently" $ do
-      -- Uses the shared FFI context for the desktop stub round-trip
       refA <- newIORef (Nothing :: Maybe PermissionStatus)
       refB <- newIORef (Nothing :: Maybe PermissionStatus)
       requestPermission ffiPermState PermissionCamera
@@ -1057,15 +1110,12 @@ secureStorageTests ffiSecureStorageState = sequentialTestGroup "SecureStorage" A
   , testCase "delete then read returns StorageNotFound" $ do
       statusRef <- newIORef (Nothing :: Maybe SecureStorageStatus)
       valueRef  <- newIORef (Nothing :: Maybe Text.Text)
-      -- Write a key first
       secureStorageWrite ffiSecureStorageState "delete_me" "some_value"
         (\_ -> pure ())
-      -- Delete it
       secureStorageDelete ffiSecureStorageState "delete_me"
         (\status -> modifyIORef' statusRef (const (Just status)))
       deleteStatus <- readIORef statusRef
       deleteStatus @?= Just StorageSuccess
-      -- Read it back — should be gone
       secureStorageRead ffiSecureStorageState "delete_me"
         (\status maybeVal -> do
           modifyIORef' statusRef (const (Just status))
@@ -1125,8 +1175,6 @@ secureStorageTests ffiSecureStorageState = sequentialTestGroup "SecureStorage" A
   ]
 
 -- | BLE scanning tests.
--- The desktop stub reports adapter as ON and start/stop scan are no-ops,
--- so we can exercise the Haskell logic without native code.
 bleTests :: TestTree
 bleTests = testGroup "BLE"
   [ testCase "bleAdapterStatusFromInt roundtrips all constructors" $ do
@@ -1247,12 +1295,7 @@ bleTests = testGroup "BLE"
           bsrDeviceAddress scanResult @?= "FF:EE:DD:CC:BB:AA"
   ]
 
--- | Dialog tests.  The @ffiDialogState@ parameter is the 'DialogState'
--- from a context created once in 'main' via 'startMobileApp'.  This
--- ensures the C desktop stub's context pointer is valid for FFI round-trip
--- tests.
--- Uses 'sequentialTestGroup' because these tests share mutable state
--- (the Haskell callback registry and the C global context pointer).
+-- | Dialog tests.
 dialogTests :: DialogState -> TestTree
 dialogTests ffiDialogState = sequentialTestGroup "Dialog" AllFinish
   [ testCase "showDialog registers callback and desktop stub fires button1" $ do
@@ -1374,7 +1417,6 @@ authSessionTests ffiAuthSessionState = sequentialTestGroup "AuthSession" AllFini
       dispatchAuthSessionResult authState 0 0 (Just "myapp://cb") Nothing
       count1 <- readIORef ref
       count1 @?= 1
-      -- Second dispatch for same ID should be a no-op (callback removed)
       dispatchAuthSessionResult authState 0 0 (Just "myapp://cb") Nothing
       count2 <- readIORef ref
       count2 @?= 1
@@ -1391,7 +1433,6 @@ authSessionTests ffiAuthSessionState = sequentialTestGroup "AuthSession" AllFini
 
   , testCase "unknown requestId does not crash" $ do
       authState <- newAuthSessionState
-      -- Should not throw (logs to stderr)
       dispatchAuthSessionResult authState 999 0 (Just "url") Nothing
 
   , testCase "unknown status code does not fire callback" $ do
@@ -1407,10 +1448,7 @@ authSessionTests ffiAuthSessionState = sequentialTestGroup "AuthSession" AllFini
 locationTests :: TestTree
 locationTests = testGroup "Location"
   [ testCase "desktop stub dispatches fixed location on startLocationUpdates" $ do
-      let app = MobileApp
-            { maContext = defaultMobileContext
-            , maView = \_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing })
-            }
+      app <- makeSimpleApp (\_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing }))
       ctxPtr <- newAppContext app
       appCtx <- derefAppContext ctxPtr
       let locationState = acLocationState appCtx
@@ -1420,7 +1458,6 @@ locationTests = testGroup "Location"
       case result of
         Nothing -> assertFailure "callback should have been fired by desktop stub"
         Just loc -> do
-          -- Desktop stub dispatches lat=52.37, lon=4.90, alt=0.0, acc=10.0
           ldLatitude loc @?= 52.37
           ldLongitude loc @?= 4.90
           ldAltitude loc @?= 0.0
@@ -1443,14 +1480,10 @@ locationTests = testGroup "Location"
 
   , testCase "dispatchLocationUpdate with no active listener is no-op" $ do
       locationState <- newLocationState
-      -- Should not throw or crash
       dispatchLocationUpdate locationState 0.0 0.0 0.0 0.0
 
   , testCase "stopLocationUpdates clears callback" $ do
-      let app = MobileApp
-            { maContext = defaultMobileContext
-            , maView = \_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing })
-            }
+      app <- makeSimpleApp (\_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing }))
       ctxPtr <- newAppContext app
       appCtx <- derefAppContext ctxPtr
       let locationState = acLocationState appCtx
@@ -1463,23 +1496,17 @@ locationTests = testGroup "Location"
       freeAppContext ctxPtr
 
   , testCase "startLocationUpdates replaces existing callback" $ do
-      let app = MobileApp
-            { maContext = defaultMobileContext
-            , maView = \_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing })
-            }
+      app <- makeSimpleApp (\_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing }))
       ctxPtr <- newAppContext app
       appCtx <- derefAppContext ctxPtr
       let locationState = acLocationState appCtx
       refOld <- newIORef (0 :: Int)
       refNew <- newIORef (0 :: Int)
       writeIORef (lsUpdateCallback locationState) (Just (\_ -> modifyIORef' refOld (+ 1)))
-      -- Replace with new callback (startLocationUpdates calls stop first on the C side,
-      -- then installs new callback, then calls start which dispatches stub location)
       startLocationUpdates locationState (\_ -> modifyIORef' refNew (+ 1))
       oldCount <- readIORef refOld
       newCount <- readIORef refNew
       oldCount @?= 0
-      -- Desktop stub dispatches one location on start, so newCount should be 1
       newCount @?= 1
       freeAppContext ctxPtr
   ]
@@ -1502,7 +1529,7 @@ bottomSheetTests ffiBottomSheetState = sequentialTestGroup "BottomSheet" AllFini
       bottomSheetState <- newBottomSheetState
       modifyIORef' (bssCallbacks bottomSheetState) (\_ ->
         IntMap.singleton 0 (\action -> writeIORef ref (Just action)))
-      dispatchBottomSheetResult bottomSheetState 0 2  -- item index 2
+      dispatchBottomSheetResult bottomSheetState 0 2
       result <- readIORef ref
       result @?= Just (BottomSheetItemSelected 2)
 
@@ -1511,7 +1538,7 @@ bottomSheetTests ffiBottomSheetState = sequentialTestGroup "BottomSheet" AllFini
       bottomSheetState <- newBottomSheetState
       modifyIORef' (bssCallbacks bottomSheetState) (\_ ->
         IntMap.singleton 0 (\action -> writeIORef ref (Just action)))
-      dispatchBottomSheetResult bottomSheetState 0 (-1)  -- dismissed
+      dispatchBottomSheetResult bottomSheetState 0 (-1)
       result <- readIORef ref
       result @?= Just BottomSheetDismissed
 
@@ -1523,7 +1550,6 @@ bottomSheetTests ffiBottomSheetState = sequentialTestGroup "BottomSheet" AllFini
       dispatchBottomSheetResult bottomSheetState 0 0
       count1 <- readIORef ref
       count1 @?= 1
-      -- Second dispatch for same ID should be a no-op (callback removed)
       dispatchBottomSheetResult bottomSheetState 0 0
       count2 <- readIORef ref
       count2 @?= 1
@@ -1540,7 +1566,6 @@ bottomSheetTests ffiBottomSheetState = sequentialTestGroup "BottomSheet" AllFini
 
   , testCase "unknown requestId does not crash" $ do
       bottomSheetState <- newBottomSheetState
-      -- Should not throw (logs to stderr)
       dispatchBottomSheetResult bottomSheetState 999 0
   ]
 
@@ -1548,10 +1573,7 @@ bottomSheetTests ffiBottomSheetState = sequentialTestGroup "BottomSheet" AllFini
 cameraTests :: TestTree
 cameraTests = testGroup "Camera"
   [ testCase "desktop stub dispatches success with picture on capturePhoto" $ do
-      let app = MobileApp
-            { maContext = defaultMobileContext
-            , maView = \_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing })
-            }
+      app <- makeSimpleApp (\_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing }))
       ctxPtr <- newAppContext app
       appCtx <- derefAppContext ctxPtr
       let cameraState = acCameraState appCtx
@@ -1572,10 +1594,7 @@ cameraTests = testGroup "Camera"
       freeAppContext ctxPtr
 
   , testCase "desktop stub dispatches success on startVideoCapture with frame/audio callbacks" $ do
-      let app = MobileApp
-            { maContext = defaultMobileContext
-            , maView = \_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing })
-            }
+      app <- makeSimpleApp (\_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing }))
       ctxPtr <- newAppContext app
       appCtx <- derefAppContext ctxPtr
       let cameraState = acCameraState appCtx
@@ -1586,7 +1605,6 @@ cameraTests = testGroup "Camera"
         (\_ -> modifyIORef' frameCount (+ 1))
         (\_ -> modifyIORef' audioCount (+ 1))
         (\result -> writeIORef completionRef (Just result))
-      -- Desktop stub fires 2 frames, 1 audio chunk, then completion
       frames <- readIORef frameCount
       frames @?= 2
       audio <- readIORef audioCount
@@ -1649,7 +1667,6 @@ cameraTests = testGroup "Camera"
 
   , testCase "dispatchCameraResult with no callback is no-op" $ do
       cameraState <- newCameraState
-      -- Should not throw or crash
       dispatchCameraResult cameraState 99 0 Nothing 0 0
 
   , testCase "dispatchVideoFrame fires frame callback" $ do
@@ -1688,7 +1705,6 @@ cameraTests = testGroup "Camera"
       modifyIORef' (csAudioCallbacks cameraState)
         (IntMap.insert 0 (\_ -> pure ()))
       dispatchCameraResult cameraState 0 0 Nothing 0 0
-      -- After dispatch, all callbacks for requestId 0 should be gone
       callbacks <- readIORef (csCallbacks cameraState)
       IntMap.member 0 callbacks @?= False
       frameCallbacks <- readIORef (csFrameCallbacks cameraState)
@@ -1697,16 +1713,12 @@ cameraTests = testGroup "Camera"
       IntMap.member 0 audioCallbacks @?= False
 
   , testCase "capturePhoto assigns incremental request IDs" $ do
-      let app = MobileApp
-            { maContext = defaultMobileContext
-            , maView = \_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing })
-            }
+      app <- makeSimpleApp (\_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing }))
       ctxPtr <- newAppContext app
       appCtx <- derefAppContext ctxPtr
       let cameraState = acCameraState appCtx
       idsBefore <- readIORef (csNextId cameraState)
       idsBefore @?= 0
-      -- Register two captures — each should increment the ID
       capturePhoto cameraState (\_ -> pure ())
       idsAfter1 <- readIORef (csNextId cameraState)
       idsAfter1 @?= 1
@@ -1730,7 +1742,6 @@ cameraTests = testGroup "Camera"
 
   , testCase "stopCameraSession is safe when no session active" $ do
       cameraState <- newCameraState
-      -- Should not throw or crash
       stopCameraSession cameraState
   ]
 
@@ -1822,9 +1833,11 @@ appContextTests :: TestTree
 appContextTests = testGroup "AppContext"
   [ testCase "newAppContext produces working lifecycle context" $ do
       ref <- newIORef ([] :: [LifecycleEvent])
+      actionState <- newActionState
       let app = MobileApp
-            { maContext = MobileContext { onLifecycle = \event -> modifyIORef' ref (++ [event]), onError = \_ -> pure () }
-            , maView = \_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing })
+            { maContext     = MobileContext { onLifecycle = \event -> modifyIORef' ref (++ [event]), onError = \_ -> pure () }
+            , maView        = \_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing })
+            , maActionState = actionState
             }
       ctxPtr <- newAppContext app
       haskellOnLifecycle ctxPtr 0  -- Create
@@ -1870,9 +1883,11 @@ viewIsErrorWidget ctxPtr = do
 exceptionHandlerTests :: TestTree
 exceptionHandlerTests = testGroup "ExceptionHandler"
   [ testCase "exception in view is caught and view replaced with error widget" $ do
+      actionState <- newActionState
       let crashingApp = MobileApp
-            { maContext = defaultMobileContext
-            , maView    = \_userState -> throwIO (userError "test-boom")
+            { maContext     = defaultMobileContext
+            , maView        = \_userState -> throwIO (userError "test-boom")
+            , maActionState = actionState
             }
       ctxPtr <- newAppContext crashingApp
       haskellRenderUI ctxPtr
@@ -1881,19 +1896,23 @@ exceptionHandlerTests = testGroup "ExceptionHandler"
       freeAppContext ctxPtr
 
   , testCase "exception in button callback is caught" $ do
+      actionState <- newActionState
+      crashHandle <- runActionM actionState $
+        createAction (throwIO (userError "button-boom"))
       let crashingApp = MobileApp
-            { maContext = defaultMobileContext
-            , maView    = \_userState -> pure $ Button ButtonConfig
+            { maContext     = defaultMobileContext
+            , maView        = \_userState -> pure $ Button ButtonConfig
                 { bcLabel  = "crash"
-                , bcAction = throwIO (userError "button-boom")
+                , bcAction = crashHandle
                 , bcFontConfig = Nothing
                 }
+            , maActionState = actionState
             }
       ctxPtr <- newAppContext crashingApp
       -- First render to register the button callback
       haskellRenderUI ctxPtr
       -- Dispatch the button, which throws — handler overwrites view
-      haskellOnUIEvent ctxPtr 0
+      haskellOnUIEvent ctxPtr (fromIntegral (actionId crashHandle))
       isError <- viewIsErrorWidget ctxPtr
       assertBool "view should be error widget after button callback exception" isError
       freeAppContext ctxPtr
@@ -1901,6 +1920,7 @@ exceptionHandlerTests = testGroup "ExceptionHandler"
   , testCase "dismiss restores original view after transient error" $ do
       -- Transient error: throws once, then succeeds
       shouldThrow <- newIORef True
+      actionState <- newActionState
       let transientView _userState = do
             throwing <- readIORef shouldThrow
             if throwing
@@ -1909,30 +1929,34 @@ exceptionHandlerTests = testGroup "ExceptionHandler"
                 throwIO (userError "transient-error")
               else pure $ Text TextConfig { tcLabel = "recovered", tcFontConfig = Nothing }
           transientApp = MobileApp
-            { maContext = defaultMobileContext
-            , maView    = transientView
+            { maContext     = defaultMobileContext
+            , maView        = transientView
+            , maActionState = actionState
             }
       ctxPtr <- newAppContext transientApp
       -- First render throws, error widget shown, flag cleared
       haskellRenderUI ctxPtr
       isError <- viewIsErrorWidget ctxPtr
       assertBool "should show error widget" isError
-      -- Dispatch callback 0 (the dismiss button in the error widget).
-      -- This restores the original transientView, which now succeeds.
-      haskellOnUIEvent ctxPtr 0
+      -- Dispatch the dismiss action (pre-registered during newAppContext).
+      appCtx <- derefAppContext ctxPtr
+      let dismissId = actionId (acDismissAction appCtx)
+      haskellOnUIEvent ctxPtr (fromIntegral dismissId)
       isStillError <- viewIsErrorWidget ctxPtr
       assertBool "should no longer show error widget after dismiss" (not isStillError)
       freeAppContext ctxPtr
 
   , testCase "onError callback fires on exception" $ do
       ref <- newIORef (Nothing :: Maybe String)
+      actionState <- newActionState
       let ctx = MobileContext
             { onLifecycle = \_ -> pure ()
             , onError     = \exc -> writeIORef ref (Just (show exc))
             }
           crashingApp = MobileApp
-            { maContext = ctx
-            , maView    = \_userState -> throwIO (userError "onError-test")
+            { maContext     = ctx
+            , maView        = \_userState -> throwIO (userError "onError-test")
+            , maActionState = actionState
             }
       ctxPtr <- newAppContext crashingApp
       haskellRenderUI ctxPtr
@@ -1943,13 +1967,15 @@ exceptionHandlerTests = testGroup "ExceptionHandler"
       freeAppContext ctxPtr
 
   , testCase "exception in onError does not crash" $ do
+      actionState <- newActionState
       let ctx = MobileContext
             { onLifecycle = \_ -> pure ()
             , onError     = \_ -> throwIO (userError "secondary-boom")
             }
           crashingApp = MobileApp
-            { maContext = ctx
-            , maView    = \_userState -> throwIO (userError "primary-boom")
+            { maContext     = ctx
+            , maView        = \_userState -> throwIO (userError "primary-boom")
+            , maActionState = actionState
             }
       ctxPtr <- newAppContext crashingApp
       -- Should not crash despite both view and onError throwing
@@ -1960,18 +1986,91 @@ exceptionHandlerTests = testGroup "ExceptionHandler"
       freeAppContext ctxPtr
 
   , testCase "exception in lifecycle handler is caught" $ do
+      actionState <- newActionState
       let crashingApp = MobileApp
-            { maContext = MobileContext
+            { maContext     = MobileContext
                 { onLifecycle = \_ -> throwIO (userError "lifecycle-boom")
                 , onError     = \_ -> pure ()
                 }
-            , maView = \_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing })
+            , maView        = \_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing })
+            , maActionState = actionState
             }
       ctxPtr <- newAppContext crashingApp
-      -- Should not crash
       result <- try @IOException (haskellOnLifecycle ctxPtr 0)
       case result of
         Left exc -> assertFailure ("haskellOnLifecycle should not throw, but got: " ++ show exc)
         Right () -> pure ()
       freeAppContext ctxPtr
+  ]
+
+-- | Tests for Action/OnChange handle equality and creation.
+actionTests :: TestTree
+actionTests = testGroup "Action"
+  [ testCase "createAction produces unique IDs" $ do
+      actionState <- newActionState
+      (handleA, handleB) <- runActionM actionState $ do
+        hA <- createAction (pure ())
+        hB <- createAction (pure ())
+        pure (hA, hB)
+      assertBool "different actions should have different IDs" (handleA /= handleB)
+
+  , testCase "createOnChange produces unique IDs" $ do
+      actionState <- newActionState
+      (handleA, handleB) <- runActionM actionState $ do
+        hA <- createOnChange (\_ -> pure ())
+        hB <- createOnChange (\_ -> pure ())
+        pure (hA, hB)
+      assertBool "different onChange handles should have different IDs" (handleA /= handleB)
+
+  , testCase "Action and OnChange share ID space" $ do
+      actionState <- newActionState
+      (actionHandle, changeHandle) <- runActionM actionState $ do
+        ah <- createAction (pure ())
+        ch <- createOnChange (\_ -> pure ())
+        pure (ah, ch)
+      assertBool "action and onChange should have different IDs"
+        (actionId actionHandle /= onChangeId changeHandle)
+
+  , testCase "same Action handle equals itself" $ do
+      actionState <- newActionState
+      handle <- runActionM actionState $ createAction (pure ())
+      handle @?= handle
+  ]
+
+-- | Tests for Widget Eq instance (enabled by opaque handles).
+widgetEqTests :: TestTree
+widgetEqTests = testGroup "WidgetEq"
+  [ testCase "same widget with same handle is equal" $ do
+      actionState <- newActionState
+      handle <- runActionM actionState $ createAction (pure ())
+      let widgetA = Button ButtonConfig { bcLabel = "tap", bcAction = handle, bcFontConfig = Nothing }
+          widgetB = Button ButtonConfig { bcLabel = "tap", bcAction = handle, bcFontConfig = Nothing }
+      widgetA @?= widgetB
+
+  , testCase "same widget with different handles is not equal" $ do
+      actionState <- newActionState
+      (handleA, handleB) <- runActionM actionState $ do
+        hA <- createAction (pure ())
+        hB <- createAction (pure ())
+        pure (hA, hB)
+      let widgetA = Button ButtonConfig { bcLabel = "tap", bcAction = handleA, bcFontConfig = Nothing }
+          widgetB = Button ButtonConfig { bcLabel = "tap", bcAction = handleB, bcFontConfig = Nothing }
+      assertBool "different handles means different widgets" (widgetA /= widgetB)
+
+  , testCase "Text widgets with same content are equal" $ do
+      let widgetA = Text TextConfig { tcLabel = "hello", tcFontConfig = Nothing }
+          widgetB = Text TextConfig { tcLabel = "hello", tcFontConfig = Nothing }
+      widgetA @?= widgetB
+
+  , testCase "Text widgets with different content are not equal" $ do
+      let widgetA = Text TextConfig { tcLabel = "hello", tcFontConfig = Nothing }
+          widgetB = Text TextConfig { tcLabel = "world", tcFontConfig = Nothing }
+      assertBool "different labels means different widgets" (widgetA /= widgetB)
+
+  , testCase "Column equality is structural" $ do
+      let widgetA = Column [Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }]
+          widgetB = Column [Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }]
+          widgetC = Column [Text TextConfig { tcLabel = "b", tcFontConfig = Nothing }]
+      widgetA @?= widgetB
+      assertBool "different children means different Column" (widgetA /= widgetC)
   ]

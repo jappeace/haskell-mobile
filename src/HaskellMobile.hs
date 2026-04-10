@@ -4,6 +4,15 @@ module HaskellMobile
   ( MobileApp(..)
   , UserState(..)
   , startMobileApp
+  -- Action handles
+  , Action(..)
+  , OnChange(..)
+  , ActionState
+  , ActionM
+  , createAction
+  , createOnChange
+  , newActionState
+  , runActionM
   -- FFI exports
   , haskellGreet
   , haskellRenderUI
@@ -113,6 +122,16 @@ import Data.Text (Text, pack)
 import Foreign.C.String (CString, newCString, peekCString)
 import Foreign.C.Types (CDouble(..), CInt(..))
 import Foreign.Ptr (Ptr, castPtr, nullPtr)
+import HaskellMobile.Action
+  ( Action(..)
+  , OnChange(..)
+  , ActionState
+  , ActionM
+  , createAction
+  , createOnChange
+  , newActionState
+  , runActionM
+  )
 import HaskellMobile.AppContext (AppContext(..), newAppContext, freeAppContext, derefAppContext)
 import HaskellMobile.AuthSession
   ( AuthSessionResult(..)
@@ -223,18 +242,23 @@ withExceptionHandler ctxPtr action =
 
 -- | Handle an uncaught exception from an FFI entry point.
 -- Overwrites the context's view function with an error widget so
--- that subsequent renders show the error on screen. The error widget
--- includes a dismiss button that restores the original view.
+-- that subsequent renders show the error on screen. The dismiss
+-- button uses a pre-registered 'Action' handle; we write the real
+-- restore logic into 'acDismissRef'.
 -- Also logs via 'platformLog' and best-effort fires 'onError'.
 handleException :: Ptr AppContext -> SomeException -> IO ()
 handleException ctxPtr exc = do
   appCtx <- derefAppContext ctxPtr
   originalView <- readIORef (acViewFunction appCtx)
+  let dismissAction = acDismissAction appCtx
+  -- Write the real dismiss logic: restore the original view function.
+  writeIORef (acDismissRef appCtx)
+    (writeIORef (acViewFunction appCtx) originalView)
   writeIORef (acViewFunction appCtx)
-    (\_userState -> pure (errorWidget ctxPtr originalView exc))
+    (\_userState -> pure (errorWidget dismissAction exc))
   platformLog ("Uncaught exception: " <> pack (show exc))
   renderWidget (acRenderState appCtx)
-    (errorWidget ctxPtr originalView exc)
+    (errorWidget dismissAction exc)
   fireUserErrorCallback appCtx exc
 
 -- | Best-effort: read the context's 'onError' callback and fire it.
@@ -267,9 +291,10 @@ renderView ctxPtr = do
   renderWidget (acRenderState appCtx) widget
 
 -- | A widget that displays an error message with a dismiss button.
--- The dismiss button restores the original view via a closure.
-errorWidget :: Ptr AppContext -> (UserState -> IO Widget) -> SomeException -> Widget
-errorWidget ctxPtr originalView exc = Column
+-- The dismiss button uses a pre-registered 'Action' handle whose
+-- closure is populated by the exception handler.
+errorWidget :: Action -> SomeException -> Widget
+errorWidget dismissAction exc = Column
   [ Text TextConfig
       { tcLabel      = "An error occurred"
       , tcFontConfig = Just (FontConfig 20.0)
@@ -280,9 +305,7 @@ errorWidget ctxPtr originalView exc = Column
       }
   , Button ButtonConfig
       { bcLabel      = "Dismiss"
-      , bcAction     = do
-          appCtx <- derefAppContext ctxPtr
-          writeIORef (acViewFunction appCtx) originalView
+      , bcAction     = dismissAction
       , bcFontConfig = Nothing
       }
   ]

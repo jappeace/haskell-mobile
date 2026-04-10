@@ -6,38 +6,39 @@
 module Main where
 
 import Foreign.Ptr (Ptr)
-import HaskellMobile (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext)
+import HaskellMobile (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext, newActionState, runActionM, createOnChange, OnChange)
 import HaskellMobile.Widget (InputType(..), TextConfig(..), TextInputConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do
   platformLog "TextInput demo app registered"
-  startMobileApp textInputDemoApp
-
--- | TextInput demo: renders numeric and text inputs side by side.
--- Used by integration tests to verify InputType FFI binding end-to-end.
-textInputDemoApp :: MobileApp
-textInputDemoApp = MobileApp
-  { maContext = loggingMobileContext
-  , maView    = \_userState -> textInputDemoView
-  }
+  actionState <- newActionState
+  (onWeightChange, onNameChange) <- runActionM actionState $ do
+    wc <- createOnChange (\_ -> pure ())
+    nc <- createOnChange (\_ -> pure ())
+    pure (wc, nc)
+  startMobileApp MobileApp
+    { maContext     = loggingMobileContext
+    , maView        = \_userState -> textInputDemoView onWeightChange onNameChange
+    , maActionState = actionState
+    }
 
 -- | Builds a Column with a label and two TextInputs of different InputType.
-textInputDemoView :: IO Widget
-textInputDemoView = pure $ Column
+textInputDemoView :: OnChange -> OnChange -> IO Widget
+textInputDemoView onWeightChange onNameChange = pure $ Column
   [ Text TextConfig { tcLabel = "TextInput Demo", tcFontConfig = Nothing }
   , TextInput TextInputConfig
       { tiInputType  = InputNumber
       , tiHint       = "enter weight (kg)"
       , tiValue      = ""
-      , tiOnChange   = \_ -> pure ()
+      , tiOnChange   = onWeightChange
       , tiFontConfig = Nothing
       }
   , TextInput TextInputConfig
       { tiInputType  = InputText
       , tiHint       = "enter name"
       , tiValue      = ""
-      , tiOnChange   = \_ -> pure ()
+      , tiOnChange   = onNameChange
       , tiFontConfig = Nothing
       }
   ]

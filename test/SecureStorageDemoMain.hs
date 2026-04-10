@@ -5,49 +5,57 @@
 -- Starts directly in secure-storage-demo mode so no runtime switching is needed.
 module Main where
 
+import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Text (pack)
 import Foreign.Ptr (Ptr)
 import HaskellMobile
   ( MobileApp(..)
-  , UserState(..)
-  , SecureStorageStatus(..)
+  , Action
+  , SecureStorageState(..)
   , AppContext
   , startMobileApp
+  , derefAppContext
   , platformLog
   , secureStorageWrite
   , secureStorageRead
   , loggingMobileContext
+  , newActionState
+  , runActionM
+  , createAction
   )
+import HaskellMobile.AppContext (AppContext(..))
 import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do
-  ctxPtr <- startMobileApp secureStorageDemoApp
+  actionState <- newActionState
+  ssRef <- newIORef (Nothing :: Maybe SecureStorageState)
+  (onStoreToken, onReadToken) <- runActionM actionState $ do
+    store <- createAction $ do
+      Just secureStorageState <- readIORef ssRef
+      secureStorageWrite secureStorageState "oauth_token" "test-token-12345" $ \status ->
+        platformLog ("SecureStorage write result: " <> pack (show status))
+    readTok <- createAction $ do
+      Just secureStorageState <- readIORef ssRef
+      secureStorageRead secureStorageState "oauth_token" $ \status maybeValue ->
+        platformLog ("SecureStorage read result: " <> pack (show status) <> " value=" <> pack (show maybeValue))
+    pure (store, readTok)
+  ctxPtr <- startMobileApp MobileApp
+    { maContext     = loggingMobileContext
+    , maView        = \_userState -> secureStorageDemoView onStoreToken onReadToken
+    , maActionState = actionState
+    }
+  appCtx <- derefAppContext ctxPtr
+  writeIORef ssRef (Just (acSecureStorageState appCtx))
   platformLog "SecureStorage demo app registered"
   pure ctxPtr
 
--- | SecureStorage demo: writes and reads an OAuth token on button taps.
--- Used by integration tests to verify the secure storage FFI bridge end-to-end.
-secureStorageDemoApp :: MobileApp
-secureStorageDemoApp = MobileApp
-  { maContext = loggingMobileContext
-  , maView    = secureStorageDemoView
-  }
-
 -- | Builds a Column with a label, a "Store Token" button, and a "Read Token" button.
-secureStorageDemoView :: UserState -> IO Widget
-secureStorageDemoView userState = pure $ Column
+secureStorageDemoView :: Action -> Action -> IO Widget
+secureStorageDemoView onStoreToken onReadToken = pure $ Column
   [ Text TextConfig { tcLabel = "SecureStorage Demo", tcFontConfig = Nothing }
   , Button ButtonConfig
-      { bcLabel = "Store Token"
-      , bcAction = secureStorageWrite (userSecureStorageState userState) "oauth_token" "test-token-12345" $ \status ->
-          platformLog ("SecureStorage write result: " <> pack (show status))
-      , bcFontConfig = Nothing
-      }
+      { bcLabel = "Store Token", bcAction = onStoreToken, bcFontConfig = Nothing }
   , Button ButtonConfig
-      { bcLabel = "Read Token"
-      , bcAction = secureStorageRead (userSecureStorageState userState) "oauth_token" $ \status maybeValue ->
-          platformLog ("SecureStorage read result: " <> pack (show status) <> " value=" <> pack (show maybeValue))
-      , bcFontConfig = Nothing
-      }
+      { bcLabel = "Read Token", bcAction = onReadToken, bcFontConfig = Nothing }
   ]

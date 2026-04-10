@@ -9,17 +9,15 @@
 module Main where
 
 import Foreign.Ptr (Ptr)
-import HaskellMobile (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext)
+import HaskellMobile (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext, newActionState)
 import HaskellMobile.Widget (TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do
   platformLog "Consumer deps test app registered"
-  startMobileApp consumerDepsApp
-
--- | Minimal app for link-dependency verification.
-consumerDepsApp :: MobileApp
-consumerDepsApp = MobileApp
-  { maContext = loggingMobileContext
-  , maView    = \_userState -> pure (Text TextConfig { tcLabel = "consumer-deps", tcFontConfig = Nothing })
-  }
+  actionState <- newActionState
+  startMobileApp MobileApp
+    { maContext     = loggingMobileContext
+    , maView        = \_userState -> pure (Text TextConfig { tcLabel = "consumer-deps", tcFontConfig = Nothing })
+    , maActionState = actionState
+    }

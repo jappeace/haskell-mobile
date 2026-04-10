@@ -5,43 +5,53 @@
 -- Starts directly in permission-demo mode so no runtime switching is needed.
 module Main where
 
+import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Text (pack)
 import Foreign.Ptr (Ptr)
 import HaskellMobile
   ( MobileApp(..)
-  , UserState(..)
+  , Action
   , Permission(..)
-  , PermissionStatus(..)
+  , PermissionState(..)
   , startMobileApp
+  , derefAppContext
   , platformLog
   , requestPermission
   , loggingMobileContext
   , AppContext
+  , newActionState
+  , runActionM
+  , createAction
   )
+import HaskellMobile.AppContext (AppContext(..))
 import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do
   platformLog "Permission demo app registered"
-  startMobileApp permissionDemoApp
-
--- | Permission demo: requests camera permission on button tap.
--- Used by integration tests to verify the permission FFI bridge end-to-end.
-permissionDemoApp :: MobileApp
-permissionDemoApp = MobileApp
-  { maContext = loggingMobileContext
-  , maView    = permissionDemoView
-  }
+  actionState <- newActionState
+  permStateRef <- newIORef (Nothing :: Maybe PermissionState)
+  onRequestCamera <- runActionM actionState $
+    createAction $ do
+      Just permState <- readIORef permStateRef
+      requestPermission permState PermissionCamera $ \status ->
+        platformLog ("Permission result: " <> pack (show status))
+  ctxPtr <- startMobileApp MobileApp
+    { maContext     = loggingMobileContext
+    , maView        = \_userState -> permissionDemoView onRequestCamera
+    , maActionState = actionState
+    }
+  appCtx <- derefAppContext ctxPtr
+  writeIORef permStateRef (Just (acPermissionState appCtx))
+  pure ctxPtr
 
 -- | Builds a Column with a label and a "Request Camera" button.
--- The button's callback ID is 0 (first registered), matching --autotest dispatch.
-permissionDemoView :: UserState -> IO Widget
-permissionDemoView userState = pure $ Column
+permissionDemoView :: Action -> IO Widget
+permissionDemoView onRequestCamera = pure $ Column
   [ Text TextConfig { tcLabel = "Permission Demo", tcFontConfig = Nothing }
   , Button ButtonConfig
-      { bcLabel = "Request Camera"
-      , bcAction = requestPermission (userPermissionState userState) PermissionCamera $ \status ->
-          platformLog ("Permission result: " <> pack (show status))
+      { bcLabel      = "Request Camera"
+      , bcAction     = onRequestCamera
       , bcFontConfig = Nothing
       }
   ]

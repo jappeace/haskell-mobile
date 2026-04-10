@@ -3,8 +3,9 @@
 -- via the C bridge.
 --
 -- Uses a full clear-and-rebuild strategy on every render.
--- Maintains callback registries so native button presses and text
--- changes can be dispatched back to Haskell 'IO' actions.
+-- Callbacks are stored in a shared 'ActionState' registry that is
+-- never cleared during rendering — handles inside widget configs
+-- reference stable entries in the registry.
 module HaskellMobile.Render
   ( RenderState(..)
   , newRenderState
@@ -14,60 +15,26 @@ module HaskellMobile.Render
   )
 where
 
-import Data.IORef (IORef, newIORef, readIORef, writeIORef, modifyIORef')
 import Data.Int (Int32)
-import Data.IntMap.Strict (IntMap)
-import Data.IntMap.Strict qualified as IntMap
 import Data.Text (Text, pack)
+import HaskellMobile.Action (Action(..), ActionState, OnChange(..), lookupAction, lookupTextAction)
 import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), ResourceName(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), WebViewConfig(..), Widget(..), WidgetStyle(..), colorToHex)
 import HaskellMobile.UIBridge qualified as Bridge
 import System.IO (hPutStrLn, stderr)
 
 -- | Mutable state for the rendering engine.
--- Holds the callback registries and next callback ID counter.
+-- Holds a reference to the shared 'ActionState' callback registry.
 data RenderState = RenderState
-  { rsCallbacks     :: IORef (IntMap (IO ()))
-    -- ^ Map from callbackId -> IO action (for clicks)
-  , rsTextCallbacks :: IORef (IntMap (Text -> IO ()))
-    -- ^ Map from callbackId -> text change handler
-  , rsNextId        :: IORef Int32
-    -- ^ Next available callback ID
+  { rsActionState :: ActionState
+    -- ^ Shared callback registry (never cleared during rendering).
   }
 
--- | Create a fresh 'RenderState' with no registered callbacks.
-newRenderState :: IO RenderState
-newRenderState = do
-  callbacks     <- newIORef IntMap.empty
-  textCallbacks <- newIORef IntMap.empty
-  nextId        <- newIORef 0
+-- | Create a fresh 'RenderState' wrapping the given 'ActionState'.
+newRenderState :: ActionState -> IO RenderState
+newRenderState actionState =
   pure RenderState
-    { rsCallbacks     = callbacks
-    , rsTextCallbacks = textCallbacks
-    , rsNextId        = nextId
+    { rsActionState = actionState
     }
-
--- | Register a click callback and return its ID.
-registerCallback :: RenderState -> IO () -> IO Int32
-registerCallback rs action = do
-  cid <- readIORef (rsNextId rs)
-  modifyIORef' (rsCallbacks rs) (IntMap.insert (fromIntegral cid) action)
-  writeIORef (rsNextId rs) (cid + 1)
-  pure cid
-
--- | Register a text-change callback and return its ID.
-registerTextCallback :: RenderState -> (Text -> IO ()) -> IO Int32
-registerTextCallback rs action = do
-  cid <- readIORef (rsNextId rs)
-  modifyIORef' (rsTextCallbacks rs) (IntMap.insert (fromIntegral cid) action)
-  writeIORef (rsNextId rs) (cid + 1)
-  pure cid
-
--- | Reset both callback registries (called before each re-render).
-resetCallbacks :: RenderState -> IO ()
-resetCallbacks rs = do
-  writeIORef (rsCallbacks rs) IntMap.empty
-  writeIORef (rsTextCallbacks rs) IntMap.empty
-  writeIORef (rsNextId rs) 0
 
 -- | Map an 'InputType' to the numeric code sent to the platform bridge.
 inputTypeToInt :: InputType -> Int32
@@ -81,41 +48,39 @@ applyFontConfig nodeId (Just (FontConfig size)) =
 applyFontConfig _nodeId Nothing = pure ()
 
 -- | Render a single 'Widget' node, returning its native node ID.
-renderNode :: RenderState -> Widget -> IO Int32
-renderNode _rs (Text config) = do
+renderNode :: Widget -> IO Int32
+renderNode (Text config) = do
   nodeId <- Bridge.createNode Bridge.NodeText
   Bridge.setStrProp nodeId Bridge.PropText (tcLabel config)
   applyFontConfig nodeId (tcFontConfig config)
   pure nodeId
-renderNode rs (Button config) = do
+renderNode (Button config) = do
   nodeId <- Bridge.createNode Bridge.NodeButton
   Bridge.setStrProp nodeId Bridge.PropText (bcLabel config)
-  callbackId <- registerCallback rs (bcAction config)
-  Bridge.setHandler nodeId Bridge.EventClick callbackId
+  Bridge.setHandler nodeId Bridge.EventClick (actionId (bcAction config))
   applyFontConfig nodeId (bcFontConfig config)
   pure nodeId
-renderNode rs (TextInput config) = do
+renderNode (TextInput config) = do
   nodeId <- Bridge.createNode Bridge.NodeTextInput
   Bridge.setStrProp nodeId Bridge.PropText (tiValue config)
   Bridge.setStrProp nodeId Bridge.PropHint (tiHint config)
   Bridge.setNumProp nodeId Bridge.PropInputType (fromIntegral (inputTypeToInt (tiInputType config)))
-  callbackId <- registerTextCallback rs (tiOnChange config)
-  Bridge.setHandler nodeId Bridge.EventTextChange callbackId
+  Bridge.setHandler nodeId Bridge.EventTextChange (onChangeId (tiOnChange config))
   applyFontConfig nodeId (tiFontConfig config)
   pure nodeId
-renderNode rs (Column children) = do
+renderNode (Column children) = do
   nodeId <- Bridge.createNode Bridge.NodeColumn
-  renderChildren rs nodeId children
+  renderChildren nodeId children
   pure nodeId
-renderNode rs (Row children) = do
+renderNode (Row children) = do
   nodeId <- Bridge.createNode Bridge.NodeRow
-  renderChildren rs nodeId children
+  renderChildren nodeId children
   pure nodeId
-renderNode rs (ScrollView children) = do
+renderNode (ScrollView children) = do
   nodeId <- Bridge.createNode Bridge.NodeScrollView
-  renderChildren rs nodeId children
+  renderChildren nodeId children
   pure nodeId
-renderNode _rs (Image config) = do
+renderNode (Image config) = do
   nodeId <- Bridge.createNode Bridge.NodeImage
   case icSource config of
     ImageResource (ResourceName name) -> Bridge.setStrProp nodeId Bridge.PropImageResource name
@@ -123,25 +88,23 @@ renderNode _rs (Image config) = do
     ImageFile path                    -> Bridge.setStrProp nodeId Bridge.PropImageFile (pack path)
   Bridge.setNumProp nodeId Bridge.PropScaleType (scaleTypeToDouble (icScaleType config))
   pure nodeId
-renderNode rs (WebView config) = do
+renderNode (WebView config) = do
   nodeId <- Bridge.createNode Bridge.NodeWebView
   Bridge.setStrProp nodeId Bridge.PropWebViewUrl (wvUrl config)
   case wvOnPageLoad config of
-    Just action -> do
-      callbackId <- registerCallback rs action
-      Bridge.setHandler nodeId Bridge.EventClick callbackId
-    Nothing -> pure ()
+    Just action -> Bridge.setHandler nodeId Bridge.EventClick (actionId action)
+    Nothing     -> pure ()
   pure nodeId
-renderNode rs (Styled style child) = do
-  nodeId <- renderNode rs child
+renderNode (Styled style child) = do
+  nodeId <- renderNode child
   applyStyle nodeId style
   pure nodeId
 
 -- | Render a list of children and add them to a parent container.
-renderChildren :: RenderState -> Int32 -> [Widget] -> IO ()
-renderChildren rs parentId children =
+renderChildren :: Int32 -> [Widget] -> IO ()
+renderChildren parentId children =
   mapM_ (\child -> do
-    childId <- renderNode rs child
+    childId <- renderNode child
     Bridge.addChild parentId childId
   ) children
 
@@ -174,21 +137,22 @@ applyStyle nodeId style = do
     Just color -> Bridge.setStrProp nodeId Bridge.PropBgColor (colorToHex color)
     Nothing    -> pure ()
 
--- | Full render: clear the screen, reset callbacks, build the widget
--- tree, and set the root node.
+-- | Full render: clear the screen, build the widget tree, and set
+-- the root node.  Callback registries are /not/ cleared — handles
+-- in the widget tree reference stable entries in the shared
+-- 'ActionState'.
 renderWidget :: RenderState -> Widget -> IO ()
-renderWidget rs widget = do
+renderWidget _rs widget = do
   Bridge.clear
-  resetCallbacks rs
-  rootId <- renderNode rs widget
+  rootId <- renderNode widget
   Bridge.setRoot rootId
 
 -- | Dispatch a native click event to the registered Haskell callback.
 -- Logs an error to stderr if the callbackId is not found.
 dispatchEvent :: RenderState -> Int32 -> IO ()
 dispatchEvent rs callbackId = do
-  callbacks <- readIORef (rsCallbacks rs)
-  case IntMap.lookup (fromIntegral callbackId) callbacks of
+  maybeAction <- lookupAction (rsActionState rs) callbackId
+  case maybeAction of
     Just action -> action
     Nothing     -> hPutStrLn stderr $
       "dispatchEvent: unknown callback ID " ++ show callbackId
@@ -198,8 +162,8 @@ dispatchEvent rs callbackId = do
 -- Logs an error to stderr if the callbackId is not found.
 dispatchTextEvent :: RenderState -> Int32 -> Text -> IO ()
 dispatchTextEvent rs callbackId newText = do
-  callbacks <- readIORef (rsTextCallbacks rs)
-  case IntMap.lookup (fromIntegral callbackId) callbacks of
+  maybeAction <- lookupTextAction (rsActionState rs) callbackId
+  case maybeAction of
     Just action -> action newText
     Nothing     -> hPutStrLn stderr $
       "dispatchTextEvent: unknown callback ID " ++ show callbackId

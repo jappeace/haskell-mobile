@@ -7,21 +7,18 @@ module Main where
 
 import Data.ByteString qualified as BS
 import Foreign.Ptr (Ptr)
-import HaskellMobile (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext)
+import HaskellMobile (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext, newActionState)
 import HaskellMobile.Widget (ImageConfig(..), ImageSource(..), ResourceName(..), ScaleType(..), TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do
   platformLog "Image demo app registered"
-  startMobileApp imageDemoApp
-
--- | Image demo: displays images from all three source types.
--- Exercises every ImageSource constructor and every ScaleType variant.
-imageDemoApp :: MobileApp
-imageDemoApp = MobileApp
-  { maContext = loggingMobileContext
-  , maView    = \_userState -> imageDemoView
-  }
+  actionState <- newActionState
+  startMobileApp MobileApp
+    { maContext     = loggingMobileContext
+    , maView        = \_userState -> imageDemoView
+    , maActionState = actionState
+    }
 
 -- | Builds a Column with a label and three Image widgets (resource, data, file).
 imageDemoView :: IO Widget

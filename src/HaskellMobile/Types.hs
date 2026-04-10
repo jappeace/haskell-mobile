@@ -8,6 +8,7 @@ module HaskellMobile.Types
   )
 where
 
+import HaskellMobile.Action (ActionState)
 import HaskellMobile.AuthSession (AuthSessionState)
 import HaskellMobile.Ble (BleState)
 import HaskellMobile.Camera (CameraState)
@@ -39,6 +40,8 @@ data UserState = UserState
 -- | Application definition record. Downstream apps create one of these
 -- and pass it to 'startMobileApp'.
 data MobileApp = MobileApp
-  { maContext :: MobileContext
-  , maView    :: UserState -> IO Widget
+  { maContext     :: MobileContext
+  , maView        :: UserState -> IO Widget
+  , maActionState :: ActionState
+    -- ^ Shared callback registry for 'Action' / 'OnChange' handles.
   }

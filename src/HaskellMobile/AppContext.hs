@@ -11,9 +11,10 @@ module HaskellMobile.AppContext
   )
 where
 
-import Data.IORef (IORef, newIORef, writeIORef)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Foreign.Ptr (Ptr, castPtr)
 import Foreign.StablePtr (StablePtr, castPtrToStablePtr, castStablePtrToPtr, newStablePtr, deRefStablePtr, freeStablePtr)
+import HaskellMobile.Action (Action, ActionState, runActionM, createAction)
 import HaskellMobile.AuthSession (AuthSessionState(..), newAuthSessionState)
 import HaskellMobile.Ble (BleState(..), newBleState)
 import HaskellMobile.Camera (CameraState(..), newCameraState)
@@ -45,6 +46,13 @@ data AppContext = AppContext
   , acBottomSheetState    :: BottomSheetState
   , acHttpState           :: HttpState
   , acViewFunction        :: IORef (UserState -> IO Widget)
+  , acDismissAction       :: Action
+    -- ^ Pre-registered dismiss action for the error widget.
+  , acDismissRef          :: IORef (IO ())
+    -- ^ Mutable slot written by the exception handler with the
+    -- real dismiss logic. The 'acDismissAction' closure reads this.
+  , acActionState         :: ActionState
+    -- ^ Shared callback registry (from 'maActionState').
   }
 
 -- | Create a fresh 'AppContext' from a 'MobileApp', allocating a new
@@ -52,7 +60,8 @@ data AppContext = AppContext
 -- suitable for passing through the C FFI (C sees @void *@).
 newAppContext :: MobileApp -> IO (Ptr AppContext)
 newAppContext mobileApp = do
-  renderState        <- newRenderState
+  let actionState = maActionState mobileApp
+  renderState        <- newRenderState actionState
   permissionState    <- newPermissionState
   secureStorageState <- newSecureStorageState
   bleState           <- newBleState
@@ -63,6 +72,11 @@ newAppContext mobileApp = do
   bottomSheetState   <- newBottomSheetState
   httpState          <- newHttpState
   viewRef            <- newIORef (maView mobileApp)
+  -- Pre-register a dismiss action that reads from an IORef.
+  -- The real dismiss logic is written by handleException at exception time.
+  dismissRef         <- newIORef (pure ())
+  dismissAction      <- runActionM actionState
+                           (createAction (do dismissIO <- readIORef dismissRef; dismissIO))
   let appContext = AppContext
         { acMobileContext      = maContext mobileApp
         , acRenderState        = renderState
@@ -76,6 +90,9 @@ newAppContext mobileApp = do
         , acBottomSheetState   = bottomSheetState
         , acHttpState          = httpState
         , acViewFunction       = viewRef
+        , acDismissAction      = dismissAction
+        , acDismissRef         = dismissRef
+        , acActionState        = actionState
         }
   ptr <- castPtr . castStablePtrToPtr <$> newStablePtr appContext
   -- Write context pointers back so bridges can pass them to C.

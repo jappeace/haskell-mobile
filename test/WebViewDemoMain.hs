@@ -10,11 +10,15 @@ import Data.Text (pack)
 import Foreign.Ptr (Ptr)
 import HaskellMobile
   ( MobileApp(..)
-  , UserState(..)
+  , UserState
+  , Action
   , startMobileApp
   , platformLog
   , loggingMobileContext
   , AppContext
+  , newActionState
+  , runActionM
+  , createAction
   )
 import HaskellMobile.Widget
   ( ButtonConfig(..)
@@ -26,30 +30,33 @@ import HaskellMobile.Widget
 main :: IO (Ptr AppContext)
 main = do
   platformLog "WebView demo app registered"
+  actionState <- newActionState
   urlRef <- newIORef ("https://example.com" :: String)
-  startMobileApp (webViewDemoApp urlRef)
-
--- | WebView demo: loads a URL and logs when page finishes loading.
--- A button switches to a second URL to test navigation.
-webViewDemoApp :: IORef String -> MobileApp
-webViewDemoApp urlRef = MobileApp
-  { maContext = loggingMobileContext
-  , maView    = webViewDemoView urlRef
-  }
+  (onPageLoad, onLoadExampleOrg) <- runActionM actionState $ do
+    pl <- createAction (do
+      currentUrl <- readIORef urlRef
+      platformLog ("WebView page loaded: " <> pack currentUrl))
+    sw <- createAction (writeIORef urlRef "https://example.org")
+    pure (pl, sw)
+  startMobileApp MobileApp
+    { maContext     = loggingMobileContext
+    , maView        = webViewDemoView urlRef onPageLoad onLoadExampleOrg
+    , maActionState = actionState
+    }
 
 -- | Builds a Column with a WebView, a status label, and a URL-switch button.
-webViewDemoView :: IORef String -> UserState -> IO Widget
-webViewDemoView urlRef _userState = do
+webViewDemoView :: IORef String -> Action -> Action -> UserState -> IO Widget
+webViewDemoView urlRef onPageLoad onLoadExampleOrg _userState = do
   currentUrl <- readIORef urlRef
   pure $ Column
     [ Text TextConfig { tcLabel = "WebView Demo", tcFontConfig = Nothing }
     , WebView WebViewConfig
         { wvUrl = pack currentUrl
-        , wvOnPageLoad = Just (platformLog ("WebView page loaded: " <> pack currentUrl))
+        , wvOnPageLoad = Just onPageLoad
         }
     , Button ButtonConfig
         { bcLabel = "Load example.org"
-        , bcAction = writeIORef urlRef "https://example.org"
+        , bcAction = onLoadExampleOrg
         , bcFontConfig = Nothing
         }
     ]

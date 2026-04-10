@@ -8,7 +8,7 @@ module Main where
 
 import Data.Text (pack)
 import Foreign.Ptr (Ptr)
-import HaskellMobile (MobileApp(..), UserState(..), startMobileApp, AppContext)
+import HaskellMobile (MobileApp(..), UserState(..), startMobileApp, AppContext, newActionState)
 import HaskellMobile.Lifecycle (loggingMobileContext)
 import HaskellMobile.Widget (TextConfig(..), Widget(..))
 
@@ -21,7 +21,10 @@ nodePoolTestView _userState = pure $ Column $
     }) [1..299]
 
 main :: IO (Ptr AppContext)
-main = startMobileApp MobileApp
-  { maContext = loggingMobileContext
-  , maView    = nodePoolTestView
-  }
+main = do
+  actionState <- newActionState
+  startMobileApp MobileApp
+    { maContext     = loggingMobileContext
+    , maView        = nodePoolTestView
+    , maActionState = actionState
+    }

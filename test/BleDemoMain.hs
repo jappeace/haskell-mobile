@@ -9,60 +9,64 @@
 -- button press instead.
 module Main where
 
+import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Text (pack)
 import Foreign.Ptr (Ptr)
 import HaskellMobile
   ( MobileApp(..)
-  , UserState(..)
+  , Action
+  , BleState(..)
   , startMobileApp
+  , derefAppContext
   , platformLog
   , checkBleAdapter
   , startBleScan
   , stopBleScan
   , loggingMobileContext
   , AppContext
+  , newActionState
+  , runActionM
+  , createAction
   )
+import HaskellMobile.AppContext (AppContext(..))
 import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do
   platformLog "BLE demo app registered"
-  startMobileApp bleDemoApp
-
--- | BLE demo: provides adapter check and scan start/stop buttons.
--- Used by integration tests to verify the BLE FFI bridge end-to-end.
-bleDemoApp :: MobileApp
-bleDemoApp = MobileApp
-  { maContext = loggingMobileContext
-  , maView    = bleDemoView
-  }
+  actionState <- newActionState
+  bleStateRef <- newIORef (Nothing :: Maybe BleState)
+  (onCheckAdapter, onStartScan, onStopScan) <- runActionM actionState $ do
+    check <- createAction $ do
+      adapterStatus <- checkBleAdapter
+      platformLog ("BLE adapter: " <> pack (show adapterStatus))
+    start <- createAction $ do
+      Just bleState <- readIORef bleStateRef
+      startBleScan bleState $ \scanResult ->
+        platformLog ("BLE scan result: " <> pack (show scanResult))
+      platformLog "BLE scan started"
+    stop <- createAction $ do
+      Just bleState <- readIORef bleStateRef
+      stopBleScan bleState
+      platformLog "BLE scan stopped"
+    pure (check, start, stop)
+  ctxPtr <- startMobileApp MobileApp
+    { maContext     = loggingMobileContext
+    , maView        = \_userState -> bleDemoView onCheckAdapter onStartScan onStopScan
+    , maActionState = actionState
+    }
+  appCtx <- derefAppContext ctxPtr
+  writeIORef bleStateRef (Just (acBleState appCtx))
+  pure ctxPtr
 
 -- | Builds a Column with a label, adapter check button, and scan buttons.
--- The view itself is pure — all BLE FFI calls happen in button callbacks
--- to avoid JNI reentrancy issues during rendering.
-bleDemoView :: UserState -> IO Widget
-bleDemoView userState = pure $ Column
+bleDemoView :: Action -> Action -> Action -> IO Widget
+bleDemoView onCheckAdapter onStartScan onStopScan = pure $ Column
   [ Text TextConfig { tcLabel = "BLE Demo", tcFontConfig = Nothing }
   , Button ButtonConfig
-      { bcLabel = "Check Adapter"
-      , bcAction = do
-          adapterStatus <- checkBleAdapter
-          platformLog ("BLE adapter: " <> pack (show adapterStatus))
-      , bcFontConfig = Nothing
-      }
+      { bcLabel = "Check Adapter", bcAction = onCheckAdapter, bcFontConfig = Nothing }
   , Button ButtonConfig
-      { bcLabel = "Start Scan"
-      , bcAction = do
-          startBleScan (userBleState userState) $ \scanResult ->
-            platformLog ("BLE scan result: " <> pack (show scanResult))
-          platformLog "BLE scan started"
-      , bcFontConfig = Nothing
-      }
+      { bcLabel = "Start Scan", bcAction = onStartScan, bcFontConfig = Nothing }
   , Button ButtonConfig
-      { bcLabel = "Stop Scan"
-      , bcAction = do
-          stopBleScan (userBleState userState)
-          platformLog "BLE scan stopped"
-      , bcFontConfig = Nothing
-      }
+      { bcLabel = "Stop Scan", bcAction = onStopScan, bcFontConfig = Nothing }
   ]

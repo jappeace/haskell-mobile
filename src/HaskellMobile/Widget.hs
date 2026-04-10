@@ -4,6 +4,11 @@
 -- Pure data describing the UI tree. Rendering is handled by
 -- "HaskellMobile.Render", which traverses this tree and issues
 -- FFI calls to the platform bridge.
+--
+-- Callback fields carry opaque 'Action' \/ 'OnChange' handles
+-- (from "HaskellMobile.Action") rather than raw @IO ()@ closures.
+-- This lets 'Widget' derive 'Eq', enabling O(1) "skip if unchanged"
+-- in the render diff.
 module HaskellMobile.Widget
   ( FontConfig(..)
   , TextConfig(..)
@@ -30,6 +35,7 @@ import Data.Char (digitToInt, isHexDigit, intToDigit)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Word (Word8)
+import HaskellMobile.Action (Action, OnChange)
 
 -- | Font configuration for text-bearing widgets.
 -- Only 'Text', 'Button', and 'TextInput' can carry a 'FontConfig'.
@@ -50,11 +56,11 @@ data TextConfig = TextConfig
 data ButtonConfig = ButtonConfig
   { bcLabel      :: Text
     -- ^ The button's label text.
-  , bcAction     :: IO ()
-    -- ^ Callback fired when the button is tapped.
+  , bcAction     :: Action
+    -- ^ Handle for the callback fired when the button is tapped.
   , bcFontConfig :: Maybe FontConfig
     -- ^ Optional font override.
-  }
+  } deriving (Show, Eq)
 
 -- | The kind of on-screen keyboard to show for a 'TextInput'.
 data InputType
@@ -71,11 +77,11 @@ data TextInputConfig = TextInputConfig
     -- ^ Placeholder text shown when the field is empty.
   , tiValue     :: Text
     -- ^ Current text value (controlled by Haskell).
-  , tiOnChange  :: Text -> IO ()
-    -- ^ Callback fired when the user edits the field.
+  , tiOnChange  :: OnChange
+    -- ^ Handle for the callback fired when the user edits the field.
   , tiFontConfig :: Maybe FontConfig
     -- ^ Optional font override.
-  }
+  } deriving (Show, Eq)
 
 -- | Horizontal text alignment for text-bearing widgets.
 data TextAlignment
@@ -178,9 +184,9 @@ data ImageConfig = ImageConfig
 data WebViewConfig = WebViewConfig
   { wvUrl        :: Text
     -- ^ URL to load in the web view.
-  , wvOnPageLoad :: Maybe (IO ())
-    -- ^ Optional callback fired when a page finishes loading.
-  }
+  , wvOnPageLoad :: Maybe Action
+    -- ^ Optional handle for a callback fired when a page finishes loading.
+  } deriving (Show, Eq)
 
 -- | A declarative description of a UI element.
 data Widget
@@ -202,3 +208,4 @@ data Widget
     -- ^ An embedded web view loading a URL.
   | Styled WidgetStyle Widget
     -- ^ Apply visual style overrides to a child widget.
+  deriving (Show, Eq)
