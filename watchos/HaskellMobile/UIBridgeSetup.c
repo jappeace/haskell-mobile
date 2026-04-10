@@ -9,6 +9,7 @@
 #include "UIBridge.h"
 #include "SecureStorageBridge.h"
 #include "DialogBridge.h"
+#include "AuthSessionBridge.h"
 #include <os/log.h>
 #include <string.h>
 
@@ -43,6 +44,11 @@ extern void watchos_dialog_show(void *ctx, int32_t requestId,
                                  const char *title, const char *message,
                                  const char *button1, const char *button2,
                                  const char *button3);
+
+/* Forward declaration of Swift @_cdecl auth session function */
+extern void watchos_auth_session_start(void *ctx, int32_t requestId,
+                                        const char *authUrl,
+                                        const char *callbackScheme);
 
 static UIBridgeCallbacks g_watchos_callbacks = {
     .createNode  = watchos_create_node,
@@ -85,4 +91,8 @@ void setup_watchos_ui_bridge(void *haskellCtx)
     /* Register Swift dialog callback with platform-agnostic dispatcher */
     dialog_register_impl(watchos_dialog_show);
     os_log_info(log, "watchOS dialog bridge initialized");
+
+    /* Register Swift auth session callback with platform-agnostic dispatcher */
+    auth_session_register_impl(watchos_auth_session_start);
+    os_log_info(log, "watchOS auth session bridge initialized");
 }

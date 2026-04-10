@@ -18,6 +18,7 @@
 #include "BleBridge.h"
 #include "DialogBridge.h"
 #include "LocationBridge.h"
+#include "AuthSessionBridge.h"
 
 /* Runs the user's Haskell main via RTS API (cbits/run_main.c).
  * Returns the opaque AppContext pointer. */
@@ -41,6 +42,10 @@ extern void haskellOnSecureStorageResult(void *ctx, int32_t requestId,
 extern void haskellOnBleScanResult(void *ctx, const char *name, const char *address, int32_t rssi);
 extern void haskellOnDialogResult(void *ctx, int32_t requestId, int32_t actionCode);
 extern void haskellOnLocationUpdate(void *ctx, double lat, double lon, double alt, double acc);
+extern void haskellOnAuthSessionResult(void *ctx, int32_t requestId,
+                                        int32_t statusCode,
+                                        const char *redirectUrl,
+                                        const char *errorMessage);
 
 /* Android UI bridge (from ui_bridge_android.c) */
 extern void setup_android_ui_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
@@ -61,6 +66,9 @@ extern void setup_android_dialog_bridge(JNIEnv *env, jobject activity, void *has
 
 /* Android location bridge (from location_bridge_android.c) */
 extern void setup_android_location_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
+
+/* Android auth session bridge (from auth_session_android.c) */
+extern void setup_android_auth_session_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
 
 /* Lifecycle event codes (must match HaskellMobile.h) */
 #define LIFECYCLE_CREATE     0
@@ -137,6 +145,7 @@ JNI_METHOD(renderUI)(JNIEnv *env, jobject thiz)
     setup_android_ble_bridge(env, thiz, g_haskell_ctx);
     setup_android_dialog_bridge(env, thiz, g_haskell_ctx);
     setup_android_location_bridge(env, thiz, g_haskell_ctx);
+    setup_android_auth_session_bridge(env, thiz, g_haskell_ctx);
     haskellRenderUI(g_haskell_ctx);
 }
 

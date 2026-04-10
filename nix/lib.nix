@@ -173,6 +173,14 @@ in {
           -o location_bridge_android.o \
           ${haskellMobileSrc}/cbits/location_bridge_android.c
 
+        ${ndkCc} -c -fPIC \
+          -DJNI_PACKAGE=me_jappie_haskellmobile \
+          -I${sysroot}/usr/include \
+          -I$RTS_INCLUDE \
+          -I${haskellMobileSrc}/include \
+          -o auth_session_android.o \
+          ${haskellMobileSrc}/cbits/auth_session_android.c
+
         # Compile extra JNI bridge sources (consumer-specific JNI methods)
         ${builtins.concatStringsSep "\n" (builtins.genList (i:
           let src = builtins.elemAt extraJniBridge i;
@@ -207,6 +215,8 @@ in {
         cp ${haskellMobileSrc}/src/HaskellMobile/Ble.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/Dialog.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/Location.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/AuthSession.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/AppContext.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile.hs .
 
         # Default App.hs — only copy if not already present (consumer may override)
@@ -234,6 +244,7 @@ in {
         cp ${haskellMobileSrc}/cbits/ble_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/dialog_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/location_bridge.c cbits/
+        cp ${haskellMobileSrc}/cbits/auth_session_bridge.c cbits/
 
         # Step 4: Compile Haskell to shared library with cross-GHC.
         # Discover library paths dynamically — hash suffixes vary across nixpkgs.
@@ -290,6 +301,7 @@ in {
           cbits/ble_bridge.c \
           cbits/dialog_bridge.c \
           cbits/location_bridge.c \
+          cbits/auth_session_bridge.c \
           -optl-L${androidPkgs.gmp}/lib \
           -optl-L${androidPkgs.libffi}/lib \
           -optl-lffi \
@@ -302,6 +314,7 @@ in {
           -optl$(pwd)/ble_bridge_android.o \
           -optl$(pwd)/dialog_bridge_android.o \
           -optl$(pwd)/location_bridge_android.o \
+          -optl$(pwd)/auth_session_android.o \
           ${builtins.concatStringsSep " " (builtins.genList (i: "-optl$(pwd)/extra_jni_${toString i}.o") (builtins.length extraJniBridge))} \
           ${builtins.concatStringsSep " " (map (o: "-optl${o}") extraLinkObjects)} \
           -optl-Wl,-u,haskellRunMain \
@@ -315,6 +328,7 @@ in {
           -optl-Wl,-u,haskellOnBleScanResult \
           -optl-Wl,-u,haskellOnDialogResult \
           -optl-Wl,-u,haskellOnLocationUpdate \
+          -optl-Wl,-u,haskellOnAuthSessionResult \
           -optl-Wl,-u,haskellLogLocale \
           -optl-Wl,--no-undefined \
           -optl-Wl,--whole-archive \
@@ -502,6 +516,8 @@ in {
         cp ${haskellMobileSrc}/src/HaskellMobile/Ble.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/Dialog.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/Location.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/AuthSession.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/AppContext.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile.hs .
 
         # Default App.hs — only copy if not already present
@@ -525,6 +541,7 @@ in {
         cp ${haskellMobileSrc}/cbits/ble_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/dialog_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/location_bridge.c cbits/
+        cp ${haskellMobileSrc}/cbits/auth_session_bridge.c cbits/
 
         ghc -staticlib \
           -O2 \
@@ -542,6 +559,7 @@ in {
           -optl-Wl,-u,_haskellOnBleScanResult \
           -optl-Wl,-u,_haskellOnDialogResult \
           -optl-Wl,-u,_haskellOnLocationUpdate \
+          -optl-Wl,-u,_haskellOnAuthSessionResult \
           -optl-Wl,-u,_haskellLogLocale \
           cbits/platform_log.c \
           cbits/ui_bridge.c \
@@ -552,6 +570,7 @@ in {
           cbits/ble_bridge.c \
           cbits/dialog_bridge.c \
           cbits/location_bridge.c \
+          cbits/auth_session_bridge.c \
           Main.hs \
           HaskellMobile.hs
       '';
@@ -574,6 +593,7 @@ in {
         cp ${haskellMobileSrc}/include/BleBridge.h $out/include/BleBridge.h
         cp ${haskellMobileSrc}/include/DialogBridge.h $out/include/DialogBridge.h
         cp ${haskellMobileSrc}/include/LocationBridge.h $out/include/LocationBridge.h
+        cp ${haskellMobileSrc}/include/AuthSessionBridge.h $out/include/AuthSessionBridge.h
       '';
     };
 
@@ -629,6 +649,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${iosLib}/include/BleBridge.h $out/share/ios/include/
         cp ${iosLib}/include/DialogBridge.h $out/share/ios/include/
         cp ${iosLib}/include/LocationBridge.h $out/share/ios/include/
+        cp ${iosLib}/include/AuthSessionBridge.h $out/share/ios/include/
         ${patchProjectYml}
       '';
 
@@ -679,6 +700,8 @@ open(sys.argv[1], "w").write(yml)
         cp ${haskellMobileSrc}/src/HaskellMobile/Ble.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/Dialog.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/Location.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/AuthSession.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/AppContext.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile.hs .
 
         # Default App.hs — only copy if not already present
@@ -702,6 +725,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${haskellMobileSrc}/cbits/ble_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/dialog_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/location_bridge.c cbits/
+        cp ${haskellMobileSrc}/cbits/auth_session_bridge.c cbits/
 
         ghc -staticlib \
           -O2 \
@@ -719,6 +743,7 @@ open(sys.argv[1], "w").write(yml)
           -optl-Wl,-u,_haskellOnBleScanResult \
           -optl-Wl,-u,_haskellOnDialogResult \
           -optl-Wl,-u,_haskellOnLocationUpdate \
+          -optl-Wl,-u,_haskellOnAuthSessionResult \
           -optl-Wl,-u,_haskellLogLocale \
           cbits/platform_log.c \
           cbits/ui_bridge.c \
@@ -729,6 +754,7 @@ open(sys.argv[1], "w").write(yml)
           cbits/ble_bridge.c \
           cbits/dialog_bridge.c \
           cbits/location_bridge.c \
+          cbits/auth_session_bridge.c \
           Main.hs \
           HaskellMobile.hs
       '';
@@ -751,6 +777,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${haskellMobileSrc}/include/BleBridge.h $out/include/BleBridge.h
         cp ${haskellMobileSrc}/include/DialogBridge.h $out/include/DialogBridge.h
         cp ${haskellMobileSrc}/include/LocationBridge.h $out/include/LocationBridge.h
+        cp ${haskellMobileSrc}/include/AuthSessionBridge.h $out/include/AuthSessionBridge.h
       '';
     };
 
@@ -781,6 +808,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${watchosLib}/include/BleBridge.h $out/share/watchos/include/
         cp ${watchosLib}/include/DialogBridge.h $out/share/watchos/include/
         cp ${watchosLib}/include/LocationBridge.h $out/share/watchos/include/
+        cp ${watchosLib}/include/AuthSessionBridge.h $out/share/watchos/include/
       '';
 
       installPhase = "true";

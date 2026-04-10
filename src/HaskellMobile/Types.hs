@@ -8,6 +8,7 @@ module HaskellMobile.Types
   )
 where
 
+import HaskellMobile.AuthSession (AuthSessionState)
 import HaskellMobile.Ble (BleState)
 import HaskellMobile.Dialog (DialogState)
 import HaskellMobile.Lifecycle (MobileContext)
@@ -26,6 +27,7 @@ data UserState = UserState
   , userBleState           :: BleState
   , userDialogState        :: DialogState
   , userLocationState      :: LocationState
+  , userAuthSessionState   :: AuthSessionState
   }
 
 -- | Application definition record. Downstream apps create one of these

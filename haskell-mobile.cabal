@@ -75,6 +75,7 @@ library
       HaskellMobile.Ble
       HaskellMobile.Dialog
       HaskellMobile.Location
+      HaskellMobile.AuthSession
   hs-source-dirs:
       src
   build-depends:
@@ -91,6 +92,7 @@ library
       cbits/ble_bridge.c
       cbits/dialog_bridge.c
       cbits/location_bridge.c
+      cbits/auth_session_bridge.c
   include-dirs:
       include
 

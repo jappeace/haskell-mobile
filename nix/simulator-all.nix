@@ -133,6 +133,17 @@ let
     name = "haskell-mobile-webview-simulator-app";
   };
 
+  authSessionIos = import ./ios.nix {
+    inherit sources;
+    mainModule = ../test/AuthSessionDemoMain.hs;
+    simulator = true;
+  };
+  authSessionSimApp = lib.mkSimulatorApp {
+    iosLib = authSessionIos;
+    iosSrc = ../ios;
+    name = "haskell-mobile-authsession-simulator-app";
+  };
+
   xcodegen = pkgs.xcodegen;
 
   testScripts = builtins.path { path = ../test; name = "test-scripts"; };
@@ -164,6 +175,7 @@ BLE_SHARE_DIR="${bleSimApp}/share/ios"
 DIALOG_SHARE_DIR="${dialogSimApp}/share/ios"
 LOCATION_SHARE_DIR="${locationSimApp}/share/ios"
 WEBVIEW_SHARE_DIR="${webviewSimApp}/share/ios"
+AUTH_SESSION_SHARE_DIR="${authSessionSimApp}/share/ios"
 TEST_SCRIPTS="${testScripts}"
 
 # --- Temp working directory ---
@@ -180,6 +192,7 @@ PHASE6_OK=0
 PHASE7_OK=0
 PHASE8_OK=0
 PHASE9_OK=0
+PHASE10_OK=0
 
 cleanup() {
     echo ""
@@ -212,7 +225,8 @@ for share_dir in \
     "$IMAGE_SHARE_DIR" \
     "$NODEPOOL_SHARE_DIR" \
     "$BLE_SHARE_DIR" \
-    "$DIALOG_SHARE_DIR"; do
+    "$DIALOG_SHARE_DIR" \
+    "$AUTH_SESSION_SHARE_DIR"; do
     a_path="$share_dir/lib/libHaskellMobile.a"
     A_BYTES=$(stat -f %z "$a_path" 2>/dev/null || stat -c %s "$a_path" 2>/dev/null || echo 0)
     A_MB=$((A_BYTES / 1048576))
@@ -250,6 +264,7 @@ cp "$COUNTER_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/counter/include
 cp "$COUNTER_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/counter/include/"
 cp "$COUNTER_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/counter/include/"
 cp "$COUNTER_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/counter/include/"
+cp "$COUNTER_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/counter/include/"
 cp -r "$COUNTER_SHARE_DIR/HaskellMobile" "$WORK_DIR/counter/"
 cp "$COUNTER_SHARE_DIR/project.yml" "$WORK_DIR/counter/"
 chmod -R u+w "$WORK_DIR/counter"
@@ -289,6 +304,7 @@ cp "$SCROLL_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/scroll/include/"
 cp "$SCROLL_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/scroll/include/"
 cp "$SCROLL_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/scroll/include/"
 cp "$SCROLL_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/scroll/include/"
+cp "$SCROLL_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/scroll/include/"
 cp -r "$SCROLL_SHARE_DIR/HaskellMobile" "$WORK_DIR/scroll/"
 cp "$SCROLL_SHARE_DIR/project.yml" "$WORK_DIR/scroll/"
 chmod -R u+w "$WORK_DIR/scroll"
@@ -328,6 +344,7 @@ cp "$TEXTINPUT_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/textinput/inc
 cp "$TEXTINPUT_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/textinput/include/"
 cp "$TEXTINPUT_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/textinput/include/"
 cp "$TEXTINPUT_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/textinput/include/"
+cp "$TEXTINPUT_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/textinput/include/"
 cp -r "$TEXTINPUT_SHARE_DIR/HaskellMobile" "$WORK_DIR/textinput/"
 cp "$TEXTINPUT_SHARE_DIR/project.yml" "$WORK_DIR/textinput/"
 chmod -R u+w "$WORK_DIR/textinput"
@@ -367,6 +384,7 @@ cp "$PERMISSION_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/permission/i
 cp "$PERMISSION_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/permission/include/"
 cp "$PERMISSION_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/permission/include/"
 cp "$PERMISSION_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/permission/include/"
+cp "$PERMISSION_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/permission/include/"
 cp -r "$PERMISSION_SHARE_DIR/HaskellMobile" "$WORK_DIR/permission/"
 cp "$PERMISSION_SHARE_DIR/project.yml" "$WORK_DIR/permission/"
 chmod -R u+w "$WORK_DIR/permission"
@@ -406,6 +424,7 @@ cp "$SECURE_STORAGE_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/securest
 cp "$SECURE_STORAGE_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/securestorage/include/"
 cp "$SECURE_STORAGE_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/securestorage/include/"
 cp "$SECURE_STORAGE_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/securestorage/include/"
+cp "$SECURE_STORAGE_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/securestorage/include/"
 cp -r "$SECURE_STORAGE_SHARE_DIR/HaskellMobile" "$WORK_DIR/securestorage/"
 cp "$SECURE_STORAGE_SHARE_DIR/project.yml" "$WORK_DIR/securestorage/"
 chmod -R u+w "$WORK_DIR/securestorage"
@@ -445,6 +464,7 @@ cp "$IMAGE_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/image/include/"
 cp "$IMAGE_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/image/include/"
 cp "$IMAGE_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/image/include/"
 cp "$IMAGE_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/image/include/"
+cp "$IMAGE_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/image/include/"
 cp -r "$IMAGE_SHARE_DIR/HaskellMobile" "$WORK_DIR/image/"
 cp "$IMAGE_SHARE_DIR/project.yml" "$WORK_DIR/image/"
 chmod -R u+w "$WORK_DIR/image"
@@ -484,6 +504,7 @@ cp "$NODEPOOL_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/nodepool/inclu
 cp "$NODEPOOL_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/nodepool/include/"
 cp "$NODEPOOL_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/nodepool/include/"
 cp "$NODEPOOL_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/nodepool/include/"
+cp "$NODEPOOL_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/nodepool/include/"
 cp -r "$NODEPOOL_SHARE_DIR/HaskellMobile" "$WORK_DIR/nodepool/"
 cp "$NODEPOOL_SHARE_DIR/project.yml" "$WORK_DIR/nodepool/"
 chmod -R u+w "$WORK_DIR/nodepool"
@@ -523,6 +544,7 @@ cp "$BLE_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/ble/include/"
 cp "$BLE_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/ble/include/"
 cp "$BLE_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/ble/include/"
 cp "$BLE_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/ble/include/"
+cp "$BLE_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/ble/include/"
 cp -r "$BLE_SHARE_DIR/HaskellMobile" "$WORK_DIR/ble/"
 cp "$BLE_SHARE_DIR/project.yml" "$WORK_DIR/ble/"
 chmod -R u+w "$WORK_DIR/ble"
@@ -562,6 +584,7 @@ cp "$DIALOG_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/dialog/include/"
 cp "$DIALOG_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/dialog/include/"
 cp "$DIALOG_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/dialog/include/"
 cp "$DIALOG_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/dialog/include/"
+cp "$DIALOG_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/dialog/include/"
 cp -r "$DIALOG_SHARE_DIR/HaskellMobile" "$WORK_DIR/dialog/"
 cp "$DIALOG_SHARE_DIR/project.yml" "$WORK_DIR/dialog/"
 chmod -R u+w "$WORK_DIR/dialog"
@@ -601,6 +624,7 @@ cp "$LOCATION_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/location/inclu
 cp "$LOCATION_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/location/include/"
 cp "$LOCATION_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/location/include/"
 cp "$LOCATION_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/location/include/"
+cp "$LOCATION_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/location/include/"
 cp -r "$LOCATION_SHARE_DIR/HaskellMobile" "$WORK_DIR/location/"
 cp "$LOCATION_SHARE_DIR/project.yml" "$WORK_DIR/location/"
 chmod -R u+w "$WORK_DIR/location"
@@ -640,6 +664,7 @@ cp "$WEBVIEW_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/webview/include
 cp "$WEBVIEW_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/webview/include/"
 cp "$WEBVIEW_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/webview/include/"
 cp "$WEBVIEW_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/webview/include/"
+cp "$WEBVIEW_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/webview/include/"
 cp -r "$WEBVIEW_SHARE_DIR/HaskellMobile" "$WORK_DIR/webview/"
 cp "$WEBVIEW_SHARE_DIR/project.yml" "$WORK_DIR/webview/"
 chmod -R u+w "$WORK_DIR/webview"
@@ -667,6 +692,46 @@ if [ -z "$WEBVIEW_APP" ]; then
     exit 1
 fi
 echo "WebView app: $WEBVIEW_APP"
+
+# --- Stage and build authsession demo app ---
+echo "=== Staging authsession demo app ==="
+mkdir -p "$WORK_DIR/authsession/lib" "$WORK_DIR/authsession/include"
+cp "$AUTH_SESSION_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/authsession/lib/"
+cp "$AUTH_SESSION_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/authsession/include/"
+cp "$AUTH_SESSION_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/authsession/include/"
+cp "$AUTH_SESSION_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/authsession/include/"
+cp "$AUTH_SESSION_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/authsession/include/"
+cp "$AUTH_SESSION_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/authsession/include/"
+cp "$AUTH_SESSION_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/authsession/include/"
+cp "$AUTH_SESSION_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/authsession/include/"
+cp "$AUTH_SESSION_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/authsession/include/"
+cp -r "$AUTH_SESSION_SHARE_DIR/HaskellMobile" "$WORK_DIR/authsession/"
+cp "$AUTH_SESSION_SHARE_DIR/project.yml" "$WORK_DIR/authsession/"
+chmod -R u+w "$WORK_DIR/authsession"
+
+echo "=== Generating authsession Xcode project ==="
+cd "$WORK_DIR/authsession"
+${xcodegen}/bin/xcodegen generate
+
+echo "=== Building authsession demo app for simulator ==="
+xcodebuild build \
+    -project HaskellMobile.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk iphonesimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/authsession-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+AUTH_SESSION_APP=$(find "$WORK_DIR/authsession-build" -name "*.app" -type d | head -1)
+if [ -z "$AUTH_SESSION_APP" ]; then
+    echo "ERROR: Could not find authsession .app bundle"
+    exit 1
+fi
+echo "AuthSession app: $AUTH_SESSION_APP"
 
 # --- Discover latest iOS runtime ---
 echo "=== Discovering iOS runtime ==="
@@ -729,7 +794,7 @@ sleep 5
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP WORK_DIR
+export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -740,6 +805,7 @@ PHASE6_EXIT=0
 PHASE7_EXIT=0
 PHASE8_EXIT=0
 PHASE9_EXIT=0
+PHASE10_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -802,6 +868,8 @@ echo "--- location ---"
 run_with_retry "location" bash "$TEST_SCRIPTS/ios/location.sh" || PHASE7_EXIT=1
 echo "--- webview ---"
 run_with_retry "webview" bash "$TEST_SCRIPTS/ios/webview.sh" || PHASE9_EXIT=1
+echo "--- authsession ---"
+run_with_retry "authsession" bash "$TEST_SCRIPTS/ios/authsession.sh" || PHASE10_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -892,6 +960,16 @@ else
     echo "PHASE 9 FAILED"
 fi
 
+if [ $PHASE10_EXIT -eq 0 ]; then
+    PHASE10_OK=1
+    echo ""
+    echo "PHASE 10 PASSED"
+else
+    PHASE10_OK=0
+    echo ""
+    echo "PHASE 10 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -962,6 +1040,13 @@ if [ $PHASE9_OK -eq 1 ]; then
     echo "PASS  Phase 9 — WebView demo app"
 else
     echo "FAIL  Phase 9 — WebView demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE10_OK -eq 1 ]; then
+    echo "PASS  Phase 10 — AuthSession demo app"
+else
+    echo "FAIL  Phase 10 — AuthSession demo app"
     FINAL_EXIT=1
 fi
 

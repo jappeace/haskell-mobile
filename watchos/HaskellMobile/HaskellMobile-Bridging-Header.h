@@ -5,6 +5,7 @@
 #include "BleBridge.h"
 #include "DialogBridge.h"
 #include "LocationBridge.h"
+#include "AuthSessionBridge.h"
 
 /* Dispatch a text change event to Haskell.
  * Not declared in HaskellMobile.h but exported via foreign export ccall. */

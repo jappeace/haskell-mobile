@@ -5,6 +5,7 @@
 #include "BleBridge.h"
 #include "DialogBridge.h"
 #include "LocationBridge.h"
+#include "AuthSessionBridge.h"
 
 /* iOS UI bridge setup — called from Swift before haskellRenderUI */
 void setup_ios_ui_bridge(void *viewController, void *haskellCtx);
@@ -23,3 +24,6 @@ void setup_ios_dialog_bridge(void *haskellCtx);
 
 /* iOS location bridge setup — called from Swift during initialisation */
 void setup_ios_location_bridge(void *haskellCtx);
+
+/* iOS auth session bridge setup — called from Swift during initialisation */
+void setup_ios_auth_session_bridge(void *haskellCtx);

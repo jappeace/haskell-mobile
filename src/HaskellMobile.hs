@@ -14,6 +14,7 @@ module HaskellMobile
   , haskellOnBleScanResult
   , haskellOnDialogResult
   , haskellOnLocationUpdate
+  , haskellOnAuthSessionResult
   -- Error handling
   , errorWidget
   -- Re-exports from Lifecycle
@@ -71,6 +72,10 @@ module HaskellMobile
   , LocationState(..)
   , startLocationUpdates
   , stopLocationUpdates
+  -- Re-exports from AuthSession
+  , AuthSessionResult(..)
+  , AuthSessionState(..)
+  , startAuthSession
   )
 where
 
@@ -81,6 +86,12 @@ import Foreign.C.String (CString, newCString, peekCString)
 import Foreign.C.Types (CDouble(..), CInt(..))
 import Foreign.Ptr (Ptr, nullPtr)
 import HaskellMobile.AppContext (AppContext(..), newAppContext, freeAppContext, derefAppContext)
+import HaskellMobile.AuthSession
+  ( AuthSessionResult(..)
+  , AuthSessionState(..)
+  , startAuthSession
+  , dispatchAuthSessionResult
+  )
 import HaskellMobile.Ble
   ( BleAdapterStatus(..)
   , BleScanResult(..)
@@ -186,6 +197,7 @@ renderView ctxPtr = do
         , userBleState           = acBleState appCtx
         , userDialogState        = acDialogState appCtx
         , userLocationState      = acLocationState appCtx
+        , userAuthSessionState   = acAuthSessionState appCtx
         }
   widget <- viewFunction userState
   renderWidget (acRenderState appCtx) widget
@@ -321,6 +333,20 @@ haskellOnSecureStorageResult ctxPtr requestId statusCode cValue =
     dispatchSecureStorageResult (acSecureStorageState appCtx) requestId statusCode maybeValue
 
 foreign export ccall haskellOnSecureStorageResult :: Ptr AppContext -> CInt -> CInt -> CString -> IO ()
+
+-- | Handle an auth session result from native code. Dispatches to the
+-- callback registered by 'startAuthSession'. The @cRedirectUrl@ parameter
+-- is non-null only for successful sessions. The @cErrorMsg@ parameter
+-- is non-null only for error sessions.
+haskellOnAuthSessionResult :: Ptr AppContext -> CInt -> CInt -> CString -> CString -> IO ()
+haskellOnAuthSessionResult ctxPtr requestId statusCode cRedirectUrl cErrorMsg =
+  withExceptionHandler ctxPtr $ do
+    appCtx <- derefAppContext ctxPtr
+    maybeRedirectUrl <- peekOptionalCString cRedirectUrl
+    maybeErrorMsg <- peekOptionalCString cErrorMsg
+    dispatchAuthSessionResult (acAuthSessionState appCtx) requestId statusCode maybeRedirectUrl maybeErrorMsg
+
+foreign export ccall haskellOnAuthSessionResult :: Ptr AppContext -> CInt -> CInt -> CString -> CString -> IO ()
 
 -- | Peek an optional CString: returns 'Nothing' for null pointers,
 -- 'Just' with the decoded 'Text' otherwise.

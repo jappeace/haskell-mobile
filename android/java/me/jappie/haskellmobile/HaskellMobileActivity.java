@@ -9,8 +9,11 @@ import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanResult;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.Handler;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -55,6 +58,8 @@ public class HaskellMobileActivity extends Activity implements View.OnClickListe
     private native void onBleScanResult(String deviceName, String deviceAddress, int rssi);
     private native void onDialogResult(int requestId, int actionCode);
     private native void onLocationResult(double lat, double lon, double alt, double acc);
+    private native void onAuthSessionResult(int requestId, int statusCode,
+                                             String redirectUrl, String errorMsg);
 
     private static final String SECURE_PREFS_NAME = "haskell_mobile_secure_storage";
 
@@ -63,6 +68,9 @@ public class HaskellMobileActivity extends Activity implements View.OnClickListe
 
     private LocationManager locationManager;
     private LocationListener locationListener;
+
+    private int pendingAuthRequestId = -1;
+    private boolean authRedirectReceived = false;
 
     /**
      * Map a permission code (from PermissionBridge.h) to an Android permission string.
@@ -349,6 +357,30 @@ public class HaskellMobileActivity extends Activity implements View.OnClickListe
         }
     }
 
+    /**
+     * Start an auth session by opening the system browser. Called from native code via JNI.
+     * requestId: opaque ID passed back in the result callback.
+     * authUrl: URL to open in the system browser.
+     * callbackScheme: URL scheme for the redirect (e.g. "haskellmobile").
+     */
+    public void startAuthSession(int requestId, String authUrl, String callbackScheme) {
+        pendingAuthRequestId = requestId;
+        authRedirectReceived = false;
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(authUrl));
+        startActivity(intent);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if (intent.getData() != null && pendingAuthRequestId >= 0) {
+            authRedirectReceived = true;
+            onAuthSessionResult(pendingAuthRequestId, 0,
+                                 intent.getData().toString(), null);
+            pendingAuthRequestId = -1;
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -406,6 +438,21 @@ public class HaskellMobileActivity extends Activity implements View.OnClickListe
     protected void onResume() {
         super.onResume();
         onLifecycleResume();
+
+        // Auth session cancellation detection: if we return to the activity
+        // without receiving a redirect, the user cancelled the browser.
+        if (pendingAuthRequestId >= 0 && !authRedirectReceived) {
+            final int requestId = pendingAuthRequestId;
+            new Handler().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    if (pendingAuthRequestId == requestId && !authRedirectReceived) {
+                        onAuthSessionResult(requestId, 1 /* CANCELLED */, null, null);
+                        pendingAuthRequestId = -1;
+                    }
+                }
+            }, 500);
+        }
     }
 
     @Override

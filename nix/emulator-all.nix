@@ -149,6 +149,17 @@ let
     name = "haskell-mobile-webview-apk";
   };
 
+  authSessionAndroid = import ./android.nix {
+    inherit sources androidArch;
+    mainModule = ../test/AuthSessionDemoMain.hs;
+  };
+  authSessionApk = lib.mkApk {
+    sharedLibs = [{ lib = authSessionAndroid; inherit abiDir; }];
+    androidSrc = ../android;
+    apkName = "haskell-mobile-authsession.apk";
+    name = "haskell-mobile-authsession-apk";
+  };
+
   androidComposition = pkgs.androidenv.composeAndroidPackages {
     platformVersions = [ emulatorApiLevel ];
     includeEmulator = true;
@@ -198,6 +209,7 @@ BLE_APK="${bleApk}/haskell-mobile-ble.apk"
 DIALOG_APK="${dialogApk}/haskell-mobile-dialog.apk"
 LOCATION_APK="${locationApk}/haskell-mobile-location.apk"
 WEBVIEW_APK="${webviewApk}/haskell-mobile-webview.apk"
+AUTH_SESSION_APK="${authSessionApk}/haskell-mobile-authsession.apk"
 PACKAGE="me.jappie.haskellmobile"
 ACTIVITY=".MainActivity"
 DEVICE_NAME="test_all"
@@ -218,7 +230,8 @@ for so_path in \
     "${nodepoolAndroid}/lib/${abiDir}/libhaskellmobile.so" \
     "${bleAndroid}/lib/${abiDir}/libhaskellmobile.so" \
     "${dialogAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${webviewAndroid}/lib/${abiDir}/libhaskellmobile.so"; do
+    "${webviewAndroid}/lib/${abiDir}/libhaskellmobile.so" \
+    "${authSessionAndroid}/lib/${abiDir}/libhaskellmobile.so"; do
     SO_BYTES=$(stat -c %s "$so_path")
     SO_MB=$((SO_BYTES / 1048576))
     SO_LABEL=$(echo "$so_path" | grep -oP '[^/]+(?=/lib/)')
@@ -281,6 +294,7 @@ PHASE6_OK=0
 PHASE7_OK=0
 PHASE8_OK=0
 PHASE9_OK=0
+PHASE10_OK=0
 
 cleanup() {
     echo ""
@@ -397,7 +411,7 @@ sleep 30
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK PACKAGE ACTIVITY WORK_DIR
+export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PACKAGE ACTIVITY WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -408,6 +422,7 @@ PHASE6_EXIT=0
 PHASE7_EXIT=0
 PHASE8_EXIT=0
 PHASE9_EXIT=0
+PHASE10_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -470,6 +485,8 @@ echo "--- location ---"
 run_with_retry "location" bash "$TEST_SCRIPTS/android/location.sh" || PHASE7_EXIT=1
 echo "--- webview ---"
 run_with_retry "webview" bash "$TEST_SCRIPTS/android/webview.sh" || PHASE9_EXIT=1
+echo "--- authsession ---"
+run_with_retry "authsession" bash "$TEST_SCRIPTS/android/authsession.sh" || PHASE10_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -560,6 +577,16 @@ else
     echo "PHASE 9 FAILED"
 fi
 
+if [ $PHASE10_EXIT -eq 0 ]; then
+    PHASE10_OK=1
+    echo ""
+    echo "PHASE 10 PASSED"
+else
+    PHASE10_OK=0
+    echo ""
+    echo "PHASE 10 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -630,6 +657,13 @@ if [ $PHASE9_OK -eq 1 ]; then
     echo "PASS  Phase 9 — WebView demo app"
 else
     echo "FAIL  Phase 9 — WebView demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE10_OK -eq 1 ]; then
+    echo "PASS  Phase 10 — AuthSession demo app"
+else
+    echo "FAIL  Phase 10 — AuthSession demo app"
     FINAL_EXIT=1
 fi
 

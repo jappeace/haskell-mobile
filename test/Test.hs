@@ -102,6 +102,14 @@ import HaskellMobile.Dialog
   , dispatchDialogResult
   , dialogActionFromInt
   )
+import HaskellMobile.AuthSession
+  ( AuthSessionResult(..)
+  , AuthSessionState(..)
+  , newAuthSessionState
+  , startAuthSession
+  , dispatchAuthSessionResult
+  , authSessionResultFromInt
+  )
 
 main :: IO ()
 main = do
@@ -110,10 +118,10 @@ main = do
   -- one context can be active for FFI permission dispatch.
   ffiCtxPtr <- startMobileApp mobileApp
   ffiAppCtx <- derefAppContext ffiCtxPtr
-  defaultMain (tests (acPermissionState ffiAppCtx) (acSecureStorageState ffiAppCtx) (acDialogState ffiAppCtx))
+  defaultMain (tests (acPermissionState ffiAppCtx) (acSecureStorageState ffiAppCtx) (acDialogState ffiAppCtx) (acAuthSessionState ffiAppCtx))
 
-tests :: PermissionState -> SecureStorageState -> DialogState -> TestTree
-tests ffiPermState ffiSecureStorageState ffiDialogState = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, imageTests, webViewTests, styledTests, textAlignTests, colorTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, secureStorageTests ffiSecureStorageState, bleTests, dialogTests ffiDialogState, locationTests, appContextTests, exceptionHandlerTests]
+tests :: PermissionState -> SecureStorageState -> DialogState -> AuthSessionState -> TestTree
+tests ffiPermState ffiSecureStorageState ffiDialogState ffiAuthSessionState = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, imageTests, webViewTests, styledTests, textAlignTests, colorTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, secureStorageTests ffiSecureStorageState, bleTests, dialogTests ffiDialogState, locationTests, authSessionTests ffiAuthSessionState, appContextTests, exceptionHandlerTests]
 
 qcProps :: TestTree
 qcProps = testGroup "(checked by QuickCheck)"
@@ -294,12 +302,14 @@ uiTests = testGroup "UI"
       dummyBleState  <- newBleState
       dummyDialogState <- newDialogState
       dummyLocationState <- newLocationState
+      dummyAuthSessionState <- newAuthSessionState
       let dummyUserState = UserState
             { userPermissionState    = dummyPermState
             , userSecureStorageState = dummySecureStorageState
             , userBleState           = dummyBleState
             , userDialogState        = dummyDialogState
             , userLocationState      = dummyLocationState
+            , userAuthSessionState   = dummyAuthSessionState
             }
       widget <- maView mobileApp dummyUserState
       -- mobileApp is the counter demo; verify it's a column
@@ -735,12 +745,14 @@ registrationTests = testGroup "Registration"
       dummyBleState  <- newBleState
       dummyDialogState <- newDialogState
       dummyLocationState <- newLocationState
+      dummyAuthSessionState <- newAuthSessionState
       let dummyUserState = UserState
             { userPermissionState    = dummyPermState
             , userSecureStorageState = dummySecureStorageState
             , userBleState           = dummyBleState
             , userDialogState        = dummyDialogState
             , userLocationState      = dummyLocationState
+            , userAuthSessionState   = dummyAuthSessionState
             }
       viewFn <- readIORef (acViewFunction appCtx)
       widget <- viewFn dummyUserState
@@ -767,12 +779,14 @@ registrationTests = testGroup "Registration"
       dummyBleState  <- newBleState
       dummyDialogState <- newDialogState
       dummyLocationState <- newLocationState
+      dummyAuthSessionState <- newAuthSessionState
       let dummyUserState = UserState
             { userPermissionState    = dummyPermState
             , userSecureStorageState = dummySecureStorageState
             , userBleState           = dummyBleState
             , userDialogState        = dummyDialogState
             , userLocationState      = dummyLocationState
+            , userAuthSessionState   = dummyAuthSessionState
             }
       viewFnA <- readIORef (acViewFunction appCtxA)
       viewFnB <- readIORef (acViewFunction appCtxB)
@@ -1247,6 +1261,86 @@ dialogTests ffiDialogState = sequentialTestGroup "Dialog" AllFinish
       dialogActionFromInt 100 @?= Nothing
   ]
 
+authSessionTests :: AuthSessionState -> TestTree
+authSessionTests ffiAuthSessionState = sequentialTestGroup "AuthSession" AllFinish
+  [ testCase "desktop stub returns success with fake redirect URL" $ do
+      ref <- newIORef (Nothing :: Maybe AuthSessionResult)
+      startAuthSession ffiAuthSessionState
+        "https://example.com/auth?client_id=demo"
+        "haskellmobile"
+        (\result -> writeIORef ref (Just result))
+      result <- readIORef ref
+      case result of
+        Just (AuthSessionSuccess redirectUrl) -> do
+          assertBool "redirect URL contains scheme" ("haskellmobile://" `Text.isPrefixOf` redirectUrl)
+          assertBool "redirect URL contains code param" ("code=DESKTOP_STUB_CODE" `Text.isInfixOf` redirectUrl)
+        _ -> assertFailure $ "expected AuthSessionSuccess, got: " ++ show result
+
+  , testCase "dispatchAuthSessionResult fires Success callback with redirect URL" $ do
+      ref <- newIORef (Nothing :: Maybe AuthSessionResult)
+      authState <- newAuthSessionState
+      modifyIORef' (asCallbacks authState) (\_ ->
+        IntMap.singleton 0 (\result -> writeIORef ref (Just result)))
+      dispatchAuthSessionResult authState 0 0 (Just "myapp://cb?code=abc") Nothing
+      result <- readIORef ref
+      result @?= Just (AuthSessionSuccess "myapp://cb?code=abc")
+
+  , testCase "dispatchAuthSessionResult fires Cancelled callback" $ do
+      ref <- newIORef (Nothing :: Maybe AuthSessionResult)
+      authState <- newAuthSessionState
+      modifyIORef' (asCallbacks authState) (\_ ->
+        IntMap.singleton 0 (\result -> writeIORef ref (Just result)))
+      dispatchAuthSessionResult authState 0 1 Nothing Nothing
+      result <- readIORef ref
+      result @?= Just AuthSessionCancelled
+
+  , testCase "dispatchAuthSessionResult fires Error callback with message" $ do
+      ref <- newIORef (Nothing :: Maybe AuthSessionResult)
+      authState <- newAuthSessionState
+      modifyIORef' (asCallbacks authState) (\_ ->
+        IntMap.singleton 0 (\result -> writeIORef ref (Just result)))
+      dispatchAuthSessionResult authState 0 2 Nothing (Just "network error")
+      result <- readIORef ref
+      result @?= Just (AuthSessionError "network error")
+
+  , testCase "callback removed after dispatch (idempotency)" $ do
+      ref <- newIORef (0 :: Int)
+      authState <- newAuthSessionState
+      modifyIORef' (asCallbacks authState) (\_ ->
+        IntMap.singleton 0 (\_ -> modifyIORef' ref (+ 1)))
+      dispatchAuthSessionResult authState 0 0 (Just "myapp://cb") Nothing
+      count1 <- readIORef ref
+      count1 @?= 1
+      -- Second dispatch for same ID should be a no-op (callback removed)
+      dispatchAuthSessionResult authState 0 0 (Just "myapp://cb") Nothing
+      count2 <- readIORef ref
+      count2 @?= 1
+
+  , testCase "authSessionResultFromInt roundtrips valid codes" $ do
+      authSessionResultFromInt 0 (Just "url") Nothing @?= Just (AuthSessionSuccess "url")
+      authSessionResultFromInt 1 Nothing Nothing @?= Just AuthSessionCancelled
+      authSessionResultFromInt 2 Nothing (Just "err") @?= Just (AuthSessionError "err")
+
+  , testCase "authSessionResultFromInt rejects unknown codes" $ do
+      authSessionResultFromInt 3 Nothing Nothing @?= Nothing
+      authSessionResultFromInt (-1) Nothing Nothing @?= Nothing
+      authSessionResultFromInt 100 Nothing Nothing @?= Nothing
+
+  , testCase "unknown requestId does not crash" $ do
+      authState <- newAuthSessionState
+      -- Should not throw (logs to stderr)
+      dispatchAuthSessionResult authState 999 0 (Just "url") Nothing
+
+  , testCase "unknown status code does not fire callback" $ do
+      ref <- newIORef (0 :: Int)
+      authState <- newAuthSessionState
+      modifyIORef' (asCallbacks authState) (\_ ->
+        IntMap.singleton 0 (\_ -> modifyIORef' ref (+ 1)))
+      dispatchAuthSessionResult authState 0 42 Nothing Nothing
+      count <- readIORef ref
+      count @?= 0
+  ]
+
 locationTests :: TestTree
 locationTests = testGroup "Location"
   [ testCase "desktop stub dispatches fixed location on startLocationUpdates" $ do
@@ -1357,6 +1451,7 @@ viewIsErrorWidget ctxPtr = do
         , userBleState           = acBleState appCtx
         , userDialogState        = acDialogState appCtx
         , userLocationState      = acLocationState appCtx
+        , userAuthSessionState   = acAuthSessionState appCtx
         }
   widget <- viewFn userState
   case widget of

@@ -105,4 +105,21 @@ void haskellOnDialogResult(void *ctx, int32_t requestId, int32_t actionCode);
  * ctx must be a pointer returned by haskellRunMain(). */
 void haskellOnLocationUpdate(void *ctx, double lat, double lon, double alt, double acc);
 
+/* Auth session status codes */
+#define AUTH_SESSION_SUCCESS    0
+#define AUTH_SESSION_CANCELLED  1
+#define AUTH_SESSION_ERROR      2
+
+/* Dispatch an auth session result from native code back to Haskell.
+ * requestId:   opaque ID from the original auth_session_start() call.
+ * statusCode:  AUTH_SESSION_SUCCESS (0), AUTH_SESSION_CANCELLED (1),
+ *              or AUTH_SESSION_ERROR (2).
+ * redirectUrl: null-terminated redirect URL string for success, or NULL.
+ * errorMessage: null-terminated error message for errors, or NULL.
+ * ctx must be a pointer returned by haskellRunMain(). */
+void haskellOnAuthSessionResult(void *ctx, int32_t requestId,
+                                 int32_t statusCode,
+                                 const char *redirectUrl,
+                                 const char *errorMessage);
+
 #endif /* HASKELL_MOBILE_H */
