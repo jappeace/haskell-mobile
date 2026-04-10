@@ -535,14 +535,7 @@ run_with_retry "camera" bash "$TEST_SCRIPTS/android/camera.sh" || PHASE10_EXIT=1
 echo "--- bottomsheet ---"
 run_with_retry "bottomsheet" bash "$TEST_SCRIPTS/android/bottomsheet.sh" || PHASE11_EXIT=1
 echo "--- http ---"
-# Start a local HTTP server and expose it to the emulator via adb reverse
-python3 -m http.server 8765 --directory "$WORK_DIR" &
-HTTP_SERVER_PID=$!
-sleep 2
-"$ADB" -s "$EMULATOR_SERIAL" reverse tcp:8765 tcp:8765 || echo "WARNING: adb reverse failed"
 run_with_retry "http" bash "$TEST_SCRIPTS/android/http.sh" || PHASE12_EXIT=1
-kill "$HTTP_SERVER_PID" 2>/dev/null || true
-"$ADB" -s "$EMULATOR_SERIAL" reverse --remove tcp:8765 2>/dev/null || true
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
