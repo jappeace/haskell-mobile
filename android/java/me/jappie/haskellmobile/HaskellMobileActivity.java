@@ -366,6 +366,21 @@ public class HaskellMobileActivity extends Activity implements View.OnClickListe
     public void httpRequest(final int requestId, final int method,
                             final String url, final String headers,
                             final byte[] body) {
+        /* In autotest mode, return stub 200 success without making a real request.
+         * CI emulators may not have network access to arbitrary hosts.
+         * Pass --ez autotest true via am start to enable. */
+        if (getIntent().getBooleanExtra("autotest", false)) {
+            android.util.Log.i("HttpBridge", "http_request: autotest mode -- returning stub success");
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    onHttpResult(requestId, 0 /* SUCCESS */, 200,
+                                 "Content-Type: text/plain\n", new byte[0]);
+                }
+            });
+            return;
+        }
+
         new Thread(new Runnable() {
             @Override
             public void run() {
