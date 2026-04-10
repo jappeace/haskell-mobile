@@ -12,6 +12,18 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraCaptureSession;
+import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.CameraDevice;
+import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.TotalCaptureResult;
+import android.graphics.ImageFormat;
+import android.graphics.SurfaceTexture;
+import android.media.Image;
+import android.media.ImageReader;
+import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Handler;
 import android.location.Location;
@@ -60,6 +72,10 @@ public class HaskellMobileActivity extends Activity implements View.OnClickListe
     private native void onLocationResult(double lat, double lon, double alt, double acc);
     private native void onAuthSessionResult(int requestId, int statusCode,
                                              String redirectUrl, String errorMsg);
+    private native void onCameraResult(int requestId, int statusCode,
+                                       byte[] imageData, int width, int height);
+    private native void onVideoFrame(int requestId, byte[] frameData, int width, int height);
+    private native void onAudioChunk(int requestId, byte[] audioData);
 
     private static final String SECURE_PREFS_NAME = "haskell_mobile_secure_storage";
 
@@ -71,6 +87,15 @@ public class HaskellMobileActivity extends Activity implements View.OnClickListe
 
     private int pendingAuthRequestId = -1;
     private boolean authRedirectReceived = false;
+
+    private CameraDevice cameraDevice;
+    private CameraCaptureSession cameraCaptureSession;
+    private ImageReader imageReader;
+    private ImageReader videoFrameReader;
+    private android.media.AudioRecord audioRecord;
+    private Thread audioRecordThread;
+    private volatile boolean audioRecording;
+    private int videoRequestId;
 
     /**
      * Map a permission code (from PermissionBridge.h) to an Android permission string.
@@ -378,6 +403,309 @@ public class HaskellMobileActivity extends Activity implements View.OnClickListe
             onAuthSessionResult(pendingAuthRequestId, 0,
                                  intent.getData().toString(), null);
             pendingAuthRequestId = -1;
+        }
+    }
+
+    /**
+     * Start a camera session using Camera2 API. Called from native code via JNI.
+     * facing: 0 = back camera, 1 = front camera.
+     */
+    public void startCameraSession(int facing) {
+        try {
+            CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+            if (cameraManager == null) {
+                android.util.Log.e("CameraBridge", "CameraManager unavailable");
+                return;
+            }
+
+            int lensFacing = (facing == 1)
+                ? CameraCharacteristics.LENS_FACING_FRONT
+                : CameraCharacteristics.LENS_FACING_BACK;
+
+            String targetCameraId = null;
+            for (String cameraId : cameraManager.getCameraIdList()) {
+                CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraId);
+                Integer cameraLensFacing = characteristics.get(CameraCharacteristics.LENS_FACING);
+                if (cameraLensFacing != null && cameraLensFacing == lensFacing) {
+                    targetCameraId = cameraId;
+                    break;
+                }
+            }
+
+            if (targetCameraId == null) {
+                android.util.Log.e("CameraBridge", "No camera found for facing=" + facing);
+                return;
+            }
+
+            /* Set up an ImageReader for photo capture */
+            imageReader = ImageReader.newInstance(1920, 1080, ImageFormat.JPEG, 2);
+
+            cameraManager.openCamera(targetCameraId, new CameraDevice.StateCallback() {
+                @Override
+                public void onOpened(CameraDevice camera) {
+                    cameraDevice = camera;
+                    android.util.Log.i("CameraBridge", "Camera opened: " + camera.getId());
+                }
+
+                @Override
+                public void onDisconnected(CameraDevice camera) {
+                    camera.close();
+                    cameraDevice = null;
+                    android.util.Log.w("CameraBridge", "Camera disconnected");
+                }
+
+                @Override
+                public void onError(CameraDevice camera, int error) {
+                    camera.close();
+                    cameraDevice = null;
+                    android.util.Log.e("CameraBridge", "Camera error: " + error);
+                }
+            }, null);
+        } catch (CameraAccessException e) {
+            android.util.Log.e("CameraBridge",
+                "startCameraSession: camera access error: " + e.getMessage());
+        } catch (SecurityException e) {
+            android.util.Log.e("CameraBridge",
+                "startCameraSession: permission denied: " + e.getMessage());
+        } catch (Exception e) {
+            android.util.Log.e("CameraBridge",
+                "startCameraSession failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Stop the active camera session. Called from native code via JNI.
+     */
+    public void stopCameraSession() {
+        try {
+            if (cameraCaptureSession != null) {
+                cameraCaptureSession.close();
+                cameraCaptureSession = null;
+            }
+            if (cameraDevice != null) {
+                cameraDevice.close();
+                cameraDevice = null;
+            }
+            if (imageReader != null) {
+                imageReader.close();
+                imageReader = null;
+            }
+        } catch (Exception e) {
+            android.util.Log.e("CameraBridge",
+                "stopCameraSession failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Capture a photo. Called from native code via JNI.
+     * requestId: opaque ID passed back in the result callback.
+     */
+    public void capturePhoto(final int requestId) {
+        try {
+            if (cameraDevice == null) {
+                android.util.Log.e("CameraBridge", "capturePhoto: no camera device");
+                onCameraResult(requestId, 4 /* CAMERA_ERROR */, null, 0, 0);
+                return;
+            }
+
+            final ImageReader reader = ImageReader.newInstance(1920, 1080, ImageFormat.JPEG, 1);
+            reader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
+                @Override
+                public void onImageAvailable(ImageReader r) {
+                    Image image = r.acquireLatestImage();
+                    if (image != null) {
+                        int imgWidth = image.getWidth();
+                        int imgHeight = image.getHeight();
+                        java.nio.ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+                        byte[] bytes = new byte[buffer.remaining()];
+                        buffer.get(bytes);
+                        image.close();
+
+                        onCameraResult(requestId, 0 /* CAMERA_SUCCESS */,
+                            bytes, imgWidth, imgHeight);
+                    }
+                    reader.close();
+                }
+            }, null);
+
+            final CaptureRequest.Builder captureBuilder =
+                cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+            captureBuilder.addTarget(reader.getSurface());
+
+            cameraDevice.createCaptureSession(
+                java.util.Arrays.asList(reader.getSurface()),
+                new CameraCaptureSession.StateCallback() {
+                    @Override
+                    public void onConfigured(CameraCaptureSession session) {
+                        try {
+                            session.capture(captureBuilder.build(),
+                                new CameraCaptureSession.CaptureCallback() {}, null);
+                        } catch (CameraAccessException e) {
+                            android.util.Log.e("CameraBridge",
+                                "capturePhoto: capture failed: " + e.getMessage());
+                            onCameraResult(requestId, 4 /* CAMERA_ERROR */,
+                                null, 0, 0);
+                        }
+                    }
+
+                    @Override
+                    public void onConfigureFailed(CameraCaptureSession session) {
+                        android.util.Log.e("CameraBridge",
+                            "capturePhoto: session config failed");
+                        onCameraResult(requestId, 4 /* CAMERA_ERROR */,
+                            null, 0, 0);
+                    }
+                }, null);
+        } catch (CameraAccessException e) {
+            android.util.Log.e("CameraBridge",
+                "capturePhoto: camera access error: " + e.getMessage());
+            onCameraResult(requestId, 4 /* CAMERA_ERROR */, null, 0, 0);
+        } catch (Exception e) {
+            android.util.Log.e("CameraBridge",
+                "capturePhoto failed: " + e.getMessage());
+            onCameraResult(requestId, 4 /* CAMERA_ERROR */, null, 0, 0);
+        }
+    }
+
+    /**
+     * Start recording video with per-frame and per-audio-chunk push
+     * callbacks. Called from native code via JNI.
+     * requestId: opaque ID passed back in callbacks.
+     *
+     * Uses ImageReader for JPEG video frames and AudioRecord for PCM
+     * audio chunks, pushing each to Haskell via onVideoFrame/onAudioChunk.
+     */
+    public void startVideoCapture(final int requestId) {
+        try {
+            if (cameraDevice == null) {
+                android.util.Log.e("CameraBridge", "startVideoCapture: no camera device");
+                onCameraResult(requestId, 4 /* CAMERA_ERROR */, null, 0, 0);
+                return;
+            }
+
+            videoRequestId = requestId;
+
+            /* ImageReader for JPEG video frames */
+            videoFrameReader = ImageReader.newInstance(1920, 1080, ImageFormat.JPEG, 2);
+            videoFrameReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
+                @Override
+                public void onImageAvailable(ImageReader r) {
+                    Image image = r.acquireLatestImage();
+                    if (image != null) {
+                        int imgWidth = image.getWidth();
+                        int imgHeight = image.getHeight();
+                        java.nio.ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+                        byte[] bytes = new byte[buffer.remaining()];
+                        buffer.get(bytes);
+                        image.close();
+                        onVideoFrame(requestId, bytes, imgWidth, imgHeight);
+                    }
+                }
+            }, null);
+
+            final CaptureRequest.Builder recordBuilder =
+                cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
+            recordBuilder.addTarget(videoFrameReader.getSurface());
+
+            cameraDevice.createCaptureSession(
+                java.util.Arrays.asList(videoFrameReader.getSurface()),
+                new CameraCaptureSession.StateCallback() {
+                    @Override
+                    public void onConfigured(CameraCaptureSession session) {
+                        cameraCaptureSession = session;
+                        try {
+                            session.setRepeatingRequest(recordBuilder.build(), null, null);
+                            android.util.Log.i("CameraBridge", "Video frame capture started");
+                        } catch (CameraAccessException e) {
+                            android.util.Log.e("CameraBridge",
+                                "startVideoCapture: repeating request failed: " + e.getMessage());
+                            onCameraResult(requestId, 4 /* CAMERA_ERROR */,
+                                null, 0, 0);
+                        }
+                    }
+
+                    @Override
+                    public void onConfigureFailed(CameraCaptureSession session) {
+                        android.util.Log.e("CameraBridge",
+                            "startVideoCapture: session config failed");
+                        onCameraResult(requestId, 4 /* CAMERA_ERROR */,
+                            null, 0, 0);
+                    }
+                }, null);
+
+            /* AudioRecord for PCM audio chunks */
+            try {
+                int sampleRate = 44100;
+                int channelConfig = android.media.AudioFormat.CHANNEL_IN_MONO;
+                int audioFormat = android.media.AudioFormat.ENCODING_PCM_16BIT;
+                int bufferSize = android.media.AudioRecord.getMinBufferSize(
+                    sampleRate, channelConfig, audioFormat);
+                audioRecord = new android.media.AudioRecord(
+                    android.media.MediaRecorder.AudioSource.MIC,
+                    sampleRate, channelConfig, audioFormat, bufferSize);
+                audioRecording = true;
+                audioRecord.startRecording();
+                audioRecordThread = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        byte[] buffer = new byte[4096];
+                        while (audioRecording) {
+                            int read = audioRecord.read(buffer, 0, buffer.length);
+                            if (read > 0) {
+                                byte[] chunk = new byte[read];
+                                System.arraycopy(buffer, 0, chunk, 0, read);
+                                onAudioChunk(requestId, chunk);
+                            }
+                        }
+                    }
+                });
+                audioRecordThread.start();
+            } catch (Exception e) {
+                android.util.Log.w("CameraBridge",
+                    "AudioRecord setup failed (audio callbacks disabled): " + e.getMessage());
+            }
+        } catch (Exception e) {
+            android.util.Log.e("CameraBridge",
+                "startVideoCapture failed: " + e.getMessage());
+            onCameraResult(requestId, 4 /* CAMERA_ERROR */, null, 0, 0);
+        }
+    }
+
+    /**
+     * Stop recording video. Called from native code via JNI.
+     * Stops frame/audio capture and fires the completion callback.
+     */
+    public void stopVideoCapture() {
+        try {
+            /* Stop audio recording */
+            audioRecording = false;
+            if (audioRecordThread != null) {
+                try { audioRecordThread.join(1000); } catch (InterruptedException ignored) {}
+                audioRecordThread = null;
+            }
+            if (audioRecord != null) {
+                audioRecord.stop();
+                audioRecord.release();
+                audioRecord = null;
+            }
+
+            /* Stop video frame capture */
+            if (cameraCaptureSession != null) {
+                cameraCaptureSession.close();
+                cameraCaptureSession = null;
+            }
+            if (videoFrameReader != null) {
+                videoFrameReader.close();
+                videoFrameReader = null;
+            }
+
+            onCameraResult(videoRequestId, 0 /* CAMERA_SUCCESS */,
+                null, 0, 0);
+        } catch (Exception e) {
+            android.util.Log.e("CameraBridge",
+                "stopVideoCapture failed: " + e.getMessage());
+            onCameraResult(videoRequestId, 4 /* CAMERA_ERROR */,
+                null, 0, 0);
         }
     }
 

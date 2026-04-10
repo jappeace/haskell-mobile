@@ -15,6 +15,7 @@ module HaskellMobile
   , haskellOnDialogResult
   , haskellOnLocationUpdate
   , haskellOnAuthSessionResult
+  , haskellOnCameraResult
   -- Error handling
   , errorWidget
   -- Re-exports from Lifecycle
@@ -76,6 +77,19 @@ module HaskellMobile
   , AuthSessionResult(..)
   , AuthSessionState(..)
   , startAuthSession
+  -- Re-exports from Camera
+  , CameraSource(..)
+  , CameraStatus(..)
+  , Picture(..)
+  , CameraResult(..)
+  , CameraState(..)
+  , startCameraSession
+  , stopCameraSession
+  , capturePhoto
+  , startVideoCapture
+  , stopVideoCapture
+  , haskellOnVideoFrame
+  , haskellOnAudioChunk
   )
 where
 
@@ -84,7 +98,7 @@ import Data.IORef (readIORef, writeIORef)
 import Data.Text (Text, pack)
 import Foreign.C.String (CString, newCString, peekCString)
 import Foreign.C.Types (CDouble(..), CInt(..))
-import Foreign.Ptr (Ptr, nullPtr)
+import Foreign.Ptr (Ptr, castPtr, nullPtr)
 import HaskellMobile.AppContext (AppContext(..), newAppContext, freeAppContext, derefAppContext)
 import HaskellMobile.AuthSession
   ( AuthSessionResult(..)
@@ -100,6 +114,23 @@ import HaskellMobile.Ble
   , startBleScan
   , stopBleScan
   , dispatchBleScanResult
+  )
+import Data.ByteString qualified as BS
+import Data.Word (Word8)
+import HaskellMobile.Camera
+  ( CameraSource(..)
+  , CameraStatus(..)
+  , Picture(..)
+  , CameraResult(..)
+  , CameraState(..)
+  , startCameraSession
+  , stopCameraSession
+  , capturePhoto
+  , startVideoCapture
+  , stopVideoCapture
+  , dispatchCameraResult
+  , dispatchVideoFrame
+  , dispatchAudioChunk
   )
 import HaskellMobile.Dialog
   ( DialogAction(..)
@@ -198,6 +229,7 @@ renderView ctxPtr = do
         , userDialogState        = acDialogState appCtx
         , userLocationState      = acLocationState appCtx
         , userAuthSessionState   = acAuthSessionState appCtx
+        , userCameraState        = acCameraState appCtx
         }
   widget <- viewFunction userState
   renderWidget (acRenderState appCtx) widget
@@ -347,6 +379,53 @@ haskellOnAuthSessionResult ctxPtr requestId statusCode cRedirectUrl cErrorMsg =
     dispatchAuthSessionResult (acAuthSessionState appCtx) requestId statusCode maybeRedirectUrl maybeErrorMsg
 
 foreign export ccall haskellOnAuthSessionResult :: Ptr AppContext -> CInt -> CInt -> CString -> CString -> IO ()
+
+-- | Handle a camera result from native code. Dispatches to the
+-- callback registered by 'capturePhoto' or 'startVideoCapture'.
+-- The @imageDataPtr@/@imageDataLen@/@width@/@height@ parameters carry
+-- raw JPEG bytes for photo captures; null\/0 for video completions and
+-- error results.
+haskellOnCameraResult :: Ptr AppContext -> CInt -> CInt
+                      -> Ptr Word8 -> CInt -> CInt -> CInt -> IO ()
+haskellOnCameraResult ctxPtr requestId statusCode
+                      imageDataPtr imageDataLen width height =
+  withExceptionHandler ctxPtr $ do
+    appCtx <- derefAppContext ctxPtr
+    maybeImageData <- if imageDataPtr == nullPtr || imageDataLen <= 0
+      then pure Nothing
+      else Just <$> BS.packCStringLen (castPtr imageDataPtr, fromIntegral imageDataLen)
+    dispatchCameraResult (acCameraState appCtx) requestId statusCode
+      maybeImageData width height
+
+foreign export ccall haskellOnCameraResult
+  :: Ptr AppContext -> CInt -> CInt
+  -> Ptr Word8 -> CInt -> CInt -> CInt -> IO ()
+
+-- | Handle a video frame from native code. Dispatches to the
+-- per-frame callback registered by 'startVideoCapture'.
+haskellOnVideoFrame :: Ptr AppContext -> CInt
+                    -> Ptr Word8 -> CInt -> CInt -> CInt -> IO ()
+haskellOnVideoFrame ctxPtr requestId frameDataPtr frameDataLen width height =
+  withExceptionHandler ctxPtr $ do
+    appCtx <- derefAppContext ctxPtr
+    frameBytes <- BS.packCStringLen (castPtr frameDataPtr, fromIntegral frameDataLen)
+    dispatchVideoFrame (acCameraState appCtx) requestId frameBytes width height
+
+foreign export ccall haskellOnVideoFrame
+  :: Ptr AppContext -> CInt -> Ptr Word8 -> CInt -> CInt -> CInt -> IO ()
+
+-- | Handle an audio chunk from native code. Dispatches to the
+-- per-audio-chunk callback registered by 'startVideoCapture'.
+haskellOnAudioChunk :: Ptr AppContext -> CInt
+                    -> Ptr Word8 -> CInt -> IO ()
+haskellOnAudioChunk ctxPtr requestId audioDataPtr audioDataLen =
+  withExceptionHandler ctxPtr $ do
+    appCtx <- derefAppContext ctxPtr
+    audioBytes <- BS.packCStringLen (castPtr audioDataPtr, fromIntegral audioDataLen)
+    dispatchAudioChunk (acCameraState appCtx) requestId audioBytes
+
+foreign export ccall haskellOnAudioChunk
+  :: Ptr AppContext -> CInt -> Ptr Word8 -> CInt -> IO ()
 
 -- | Peek an optional CString: returns 'Nothing' for null pointers,
 -- 'Just' with the decoded 'Text' otherwise.

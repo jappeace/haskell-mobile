@@ -82,6 +82,22 @@ import HaskellMobile.Location
   , stopLocationUpdates
   , dispatchLocationUpdate
   )
+import HaskellMobile.Camera
+  ( CameraSource(..)
+  , CameraStatus(..)
+  , Picture(..)
+  , CameraResult(..)
+  , CameraState(..)
+  , newCameraState
+  , cameraSourceToInt
+  , cameraStatusFromInt
+  , capturePhoto
+  , startVideoCapture
+  , stopCameraSession
+  , dispatchCameraResult
+  , dispatchVideoFrame
+  , dispatchAudioChunk
+  )
 import HaskellMobile.Render (newRenderState, renderWidget, dispatchEvent, dispatchTextEvent)
 import HaskellMobile.SecureStorage
   ( SecureStorageStatus(..)
@@ -121,7 +137,7 @@ main = do
   defaultMain (tests (acPermissionState ffiAppCtx) (acSecureStorageState ffiAppCtx) (acDialogState ffiAppCtx) (acAuthSessionState ffiAppCtx))
 
 tests :: PermissionState -> SecureStorageState -> DialogState -> AuthSessionState -> TestTree
-tests ffiPermState ffiSecureStorageState ffiDialogState ffiAuthSessionState = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, imageTests, webViewTests, styledTests, textAlignTests, colorTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, secureStorageTests ffiSecureStorageState, bleTests, dialogTests ffiDialogState, locationTests, authSessionTests ffiAuthSessionState, appContextTests, exceptionHandlerTests]
+tests ffiPermState ffiSecureStorageState ffiDialogState ffiAuthSessionState = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, imageTests, webViewTests, styledTests, textAlignTests, colorTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, secureStorageTests ffiSecureStorageState, bleTests, dialogTests ffiDialogState, locationTests, cameraTests, authSessionTests ffiAuthSessionState, appContextTests, exceptionHandlerTests]
 
 qcProps :: TestTree
 qcProps = testGroup "(checked by QuickCheck)"
@@ -303,6 +319,7 @@ uiTests = testGroup "UI"
       dummyDialogState <- newDialogState
       dummyLocationState <- newLocationState
       dummyAuthSessionState <- newAuthSessionState
+      dummyCameraState <- newCameraState
       let dummyUserState = UserState
             { userPermissionState    = dummyPermState
             , userSecureStorageState = dummySecureStorageState
@@ -310,6 +327,7 @@ uiTests = testGroup "UI"
             , userDialogState        = dummyDialogState
             , userLocationState      = dummyLocationState
             , userAuthSessionState   = dummyAuthSessionState
+            , userCameraState        = dummyCameraState
             }
       widget <- maView mobileApp dummyUserState
       -- mobileApp is the counter demo; verify it's a column
@@ -746,6 +764,7 @@ registrationTests = testGroup "Registration"
       dummyDialogState <- newDialogState
       dummyLocationState <- newLocationState
       dummyAuthSessionState <- newAuthSessionState
+      dummyCameraState <- newCameraState
       let dummyUserState = UserState
             { userPermissionState    = dummyPermState
             , userSecureStorageState = dummySecureStorageState
@@ -753,6 +772,7 @@ registrationTests = testGroup "Registration"
             , userDialogState        = dummyDialogState
             , userLocationState      = dummyLocationState
             , userAuthSessionState   = dummyAuthSessionState
+            , userCameraState        = dummyCameraState
             }
       viewFn <- readIORef (acViewFunction appCtx)
       widget <- viewFn dummyUserState
@@ -780,6 +800,7 @@ registrationTests = testGroup "Registration"
       dummyDialogState <- newDialogState
       dummyLocationState <- newLocationState
       dummyAuthSessionState <- newAuthSessionState
+      dummyCameraState <- newCameraState
       let dummyUserState = UserState
             { userPermissionState    = dummyPermState
             , userSecureStorageState = dummySecureStorageState
@@ -787,6 +808,7 @@ registrationTests = testGroup "Registration"
             , userDialogState        = dummyDialogState
             , userLocationState      = dummyLocationState
             , userAuthSessionState   = dummyAuthSessionState
+            , userCameraState        = dummyCameraState
             }
       viewFnA <- readIORef (acViewFunction appCtxA)
       viewFnB <- readIORef (acViewFunction appCtxB)
@@ -1422,6 +1444,195 @@ locationTests = testGroup "Location"
   ]
 
 -- | Tests for the AppContext FFI path.
+cameraTests :: TestTree
+cameraTests = testGroup "Camera"
+  [ testCase "desktop stub dispatches success with picture on capturePhoto" $ do
+      let app = MobileApp
+            { maContext = defaultMobileContext
+            , maView = \_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing })
+            }
+      ctxPtr <- newAppContext app
+      appCtx <- derefAppContext ctxPtr
+      let cameraState = acCameraState appCtx
+      ref <- newIORef (Nothing :: Maybe CameraResult)
+      capturePhoto cameraState (\result -> writeIORef ref (Just result))
+      maybeResult <- readIORef ref
+      case maybeResult of
+        Nothing -> assertFailure "callback should have been fired by desktop stub"
+        Just result -> do
+          crStatus result @?= CameraSuccess
+          case crPicture result of
+            Nothing -> assertFailure "picture should be present for photo capture"
+            Just pic -> do
+              pictureWidth pic @?= 1
+              pictureHeight pic @?= 1
+              assertBool "picture data should not be empty"
+                (not (BS.null (pictureData pic)))
+      freeAppContext ctxPtr
+
+  , testCase "desktop stub dispatches success on startVideoCapture with frame/audio callbacks" $ do
+      let app = MobileApp
+            { maContext = defaultMobileContext
+            , maView = \_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing })
+            }
+      ctxPtr <- newAppContext app
+      appCtx <- derefAppContext ctxPtr
+      let cameraState = acCameraState appCtx
+      completionRef <- newIORef (Nothing :: Maybe CameraResult)
+      frameCount <- newIORef (0 :: Int)
+      audioCount <- newIORef (0 :: Int)
+      startVideoCapture cameraState
+        (\_ -> modifyIORef' frameCount (+ 1))
+        (\_ -> modifyIORef' audioCount (+ 1))
+        (\result -> writeIORef completionRef (Just result))
+      -- Desktop stub fires 2 frames, 1 audio chunk, then completion
+      frames <- readIORef frameCount
+      frames @?= 2
+      audio <- readIORef audioCount
+      audio @?= 1
+      maybeResult <- readIORef completionRef
+      case maybeResult of
+        Nothing -> assertFailure "completion callback should have been fired by desktop stub"
+        Just result -> do
+          crStatus result @?= CameraSuccess
+          crPicture result @?= Nothing
+      freeAppContext ctxPtr
+
+  , testCase "dispatchCameraResult fires callback with picture data" $ do
+      cameraState <- newCameraState
+      ref <- newIORef (Nothing :: Maybe CameraResult)
+      modifyIORef' (csCallbacks cameraState)
+        (IntMap.insert 0 (\result -> writeIORef ref (Just result)))
+      let jpegBytes = BS.pack [0xFF, 0xD8, 0xFF, 0xD9]
+      dispatchCameraResult cameraState 0 0
+        (Just jpegBytes) 640 480
+      maybeResult <- readIORef ref
+      case maybeResult of
+        Nothing -> assertFailure "callback should have been fired"
+        Just result -> do
+          crStatus result @?= CameraSuccess
+          case crPicture result of
+            Nothing -> assertFailure "picture should be present"
+            Just pic -> do
+              pictureWidth pic @?= 640
+              pictureHeight pic @?= 480
+              pictureData pic @?= jpegBytes
+
+  , testCase "dispatchCameraResult without image data has no picture" $ do
+      cameraState <- newCameraState
+      ref <- newIORef (Nothing :: Maybe CameraResult)
+      modifyIORef' (csCallbacks cameraState)
+        (IntMap.insert 0 (\result -> writeIORef ref (Just result)))
+      dispatchCameraResult cameraState 0 0
+        Nothing 0 0
+      maybeResult <- readIORef ref
+      case maybeResult of
+        Nothing -> assertFailure "callback should have been fired"
+        Just result -> do
+          crStatus result @?= CameraSuccess
+          crPicture result @?= Nothing
+
+  , testCase "dispatchCameraResult with error status has no picture" $ do
+      cameraState <- newCameraState
+      ref <- newIORef (Nothing :: Maybe CameraResult)
+      modifyIORef' (csCallbacks cameraState)
+        (IntMap.insert 0 (\result -> writeIORef ref (Just result)))
+      let jpegBytes = BS.pack [0xFF, 0xD8, 0xFF, 0xD9]
+      dispatchCameraResult cameraState 0 4 (Just jpegBytes) 1 1
+      maybeResult <- readIORef ref
+      case maybeResult of
+        Nothing -> assertFailure "callback should have been fired"
+        Just result -> do
+          crStatus result @?= CameraError
+          crPicture result @?= Nothing
+
+  , testCase "dispatchCameraResult with no callback is no-op" $ do
+      cameraState <- newCameraState
+      -- Should not throw or crash
+      dispatchCameraResult cameraState 99 0 Nothing 0 0
+
+  , testCase "dispatchVideoFrame fires frame callback" $ do
+      cameraState <- newCameraState
+      ref <- newIORef (Nothing :: Maybe Picture)
+      modifyIORef' (csFrameCallbacks cameraState)
+        (IntMap.insert 0 (\pic -> writeIORef ref (Just pic)))
+      let jpegBytes = BS.pack [0xFF, 0xD8, 0xFF, 0xD9]
+      dispatchVideoFrame cameraState 0 jpegBytes 320 240
+      maybePic <- readIORef ref
+      case maybePic of
+        Nothing -> assertFailure "frame callback should have been fired"
+        Just pic -> do
+          pictureWidth pic @?= 320
+          pictureHeight pic @?= 240
+          pictureData pic @?= jpegBytes
+
+  , testCase "dispatchAudioChunk fires audio callback" $ do
+      cameraState <- newCameraState
+      ref <- newIORef (Nothing :: Maybe BS.ByteString)
+      modifyIORef' (csAudioCallbacks cameraState)
+        (IntMap.insert 0 (\chunk -> writeIORef ref (Just chunk)))
+      let pcmBytes = BS.pack [0x00, 0x01, 0x02, 0x03]
+      dispatchAudioChunk cameraState 0 pcmBytes
+      maybeChunk <- readIORef ref
+      case maybeChunk of
+        Nothing -> assertFailure "audio callback should have been fired"
+        Just chunk -> chunk @?= pcmBytes
+
+  , testCase "dispatchCameraResult cleans up frame/audio callbacks" $ do
+      cameraState <- newCameraState
+      modifyIORef' (csCallbacks cameraState)
+        (IntMap.insert 0 (\_ -> pure ()))
+      modifyIORef' (csFrameCallbacks cameraState)
+        (IntMap.insert 0 (\_ -> pure ()))
+      modifyIORef' (csAudioCallbacks cameraState)
+        (IntMap.insert 0 (\_ -> pure ()))
+      dispatchCameraResult cameraState 0 0 Nothing 0 0
+      -- After dispatch, all callbacks for requestId 0 should be gone
+      callbacks <- readIORef (csCallbacks cameraState)
+      IntMap.member 0 callbacks @?= False
+      frameCallbacks <- readIORef (csFrameCallbacks cameraState)
+      IntMap.member 0 frameCallbacks @?= False
+      audioCallbacks <- readIORef (csAudioCallbacks cameraState)
+      IntMap.member 0 audioCallbacks @?= False
+
+  , testCase "capturePhoto assigns incremental request IDs" $ do
+      let app = MobileApp
+            { maContext = defaultMobileContext
+            , maView = \_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing })
+            }
+      ctxPtr <- newAppContext app
+      appCtx <- derefAppContext ctxPtr
+      let cameraState = acCameraState appCtx
+      idsBefore <- readIORef (csNextId cameraState)
+      idsBefore @?= 0
+      -- Register two captures — each should increment the ID
+      capturePhoto cameraState (\_ -> pure ())
+      idsAfter1 <- readIORef (csNextId cameraState)
+      idsAfter1 @?= 1
+      capturePhoto cameraState (\_ -> pure ())
+      idsAfter2 <- readIORef (csNextId cameraState)
+      idsAfter2 @?= 2
+      freeAppContext ctxPtr
+
+  , testCase "cameraStatusFromInt round-trips known codes" $ do
+      cameraStatusFromInt 0 @?= Just CameraSuccess
+      cameraStatusFromInt 1 @?= Just CameraCancelled
+      cameraStatusFromInt 2 @?= Just CameraPermissionDenied
+      cameraStatusFromInt 3 @?= Just CameraUnavailable
+      cameraStatusFromInt 4 @?= Just CameraError
+      cameraStatusFromInt 5 @?= Nothing
+      cameraStatusFromInt (-1) @?= Nothing
+
+  , testCase "cameraSourceToInt maps sources correctly" $ do
+      cameraSourceToInt CameraBack @?= 0
+      cameraSourceToInt CameraFront @?= 1
+
+  , testCase "stopCameraSession is safe when no session active" $ do
+      cameraState <- newCameraState
+      -- Should not throw or crash
+      stopCameraSession cameraState
+  ]
+
 appContextTests :: TestTree
 appContextTests = testGroup "AppContext"
   [ testCase "newAppContext produces working lifecycle context" $ do
@@ -1452,6 +1663,7 @@ viewIsErrorWidget ctxPtr = do
         , userDialogState        = acDialogState appCtx
         , userLocationState      = acLocationState appCtx
         , userAuthSessionState   = acAuthSessionState appCtx
+        , userCameraState        = acCameraState appCtx
         }
   widget <- viewFn userState
   case widget of
