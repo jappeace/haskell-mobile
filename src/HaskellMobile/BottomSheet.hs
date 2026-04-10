@@ -1,5 +1,6 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE OverloadedStrings #-}
 -- | Bottom sheet / action menu API for mobile platforms.
 --
 -- Provides an imperative API for showing platform-native bottom sheets
