@@ -20,7 +20,16 @@ let
 
   lib = import ./lib.nix { inherit sources; };
 
-  counterSimApp = import ./simulator-app.nix { inherit sources; };
+  counterIos = import ./ios.nix {
+    inherit sources;
+    mainModule = ../test/CounterDemoMain.hs;
+    simulator = true;
+  };
+  counterSimApp = lib.mkSimulatorApp {
+    iosLib = counterIos;
+    iosSrc = ../ios;
+    name = "haskell-mobile-simulator-app";
+  };
 
   scrollIos = import ./ios.nix {
     inherit sources;

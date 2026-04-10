@@ -30,7 +30,10 @@ let
 
   lib = import ./lib.nix { inherit sources androidArch; };
 
-  counterAndroid = import ./android.nix { inherit sources androidArch; };
+  counterAndroid = import ./android.nix {
+    inherit sources androidArch;
+    mainModule = ../test/CounterDemoMain.hs;
+  };
   counterApk = lib.mkApk {
     sharedLibs = [{ lib = counterAndroid; inherit abiDir; }];
     androidSrc = ../android;

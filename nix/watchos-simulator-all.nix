@@ -20,7 +20,16 @@ let
 
   lib = import ./lib.nix { inherit sources; };
 
-  counterSimApp = import ./watchos-simulator-app.nix { inherit sources; };
+  counterWatchos = import ./watchos.nix {
+    inherit sources;
+    mainModule = ../test/CounterDemoMain.hs;
+    simulator = true;
+  };
+  counterSimApp = lib.mkWatchOSSimulatorApp {
+    watchosLib = counterWatchos;
+    watchosSrc = ../watchos;
+    name = "haskell-mobile-watchos-simulator-app";
+  };
 
   scrollWatchos = import ./watchos.nix {
     inherit sources;
