@@ -10,7 +10,7 @@
 -- Platform implementations:
 --   * Android: @Intent.ACTION_VIEW@ + intent filter for redirect scheme
 --   * iOS: @ASWebAuthenticationSession@
---   * watchOS: not supported (returns error immediately)
+--   * watchOS: @ASWebAuthenticationSession@
 --   * Desktop: stub returns a fake redirect URL synchronously
 --
 -- The callback registry follows the same sequential 'IORef' 'Int32'

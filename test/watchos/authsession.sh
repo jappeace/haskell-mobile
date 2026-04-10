@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # watchOS auth session test: install auth session app, launch with --autotest-buttons,
-# assert that auth sessions return "not supported" error.
+# assert the autotest stub returns success with the redirect URL.
 #
 # Required env vars (set by watchos-simulator-all.nix harness):
 #   SIM_UDID, BUNDLE_ID, AUTH_SESSION_APP, WORK_DIR
@@ -65,8 +65,8 @@ assert_log "$FULL_LOG" "setRoot" "setRoot"
 # Demo app registered
 assert_log "$FULL_LOG" "AuthSession demo app registered" "demo app registered"
 
-# Auth session error (not supported on watchOS)
-assert_log "$FULL_LOG" "AuthSession error: auth sessions not supported on watchOS" "AuthSession error: not supported on watchOS"
+# Auth session success via autotest stub
+assert_log "$FULL_LOG" "AuthSession success:" "AuthSession success logged"
 
 xcrun simctl uninstall "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
 
