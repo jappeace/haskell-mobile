@@ -77,6 +77,8 @@ public class HaskellMobileActivity extends Activity implements View.OnClickListe
     private native void onVideoFrame(int requestId, byte[] frameData, int width, int height);
     private native void onAudioChunk(int requestId, byte[] audioData);
     private native void onBottomSheetResult(int requestId, int actionCode);
+    private native void onHttpResult(int requestId, int resultCode, int httpStatus,
+                                      String headers, byte[] body);
 
     private static final String SECURE_PREFS_NAME = "haskell_mobile_secure_storage";
 
@@ -351,6 +353,136 @@ public class HaskellMobileActivity extends Activity implements View.OnClickListe
             }
         });
         builder.show();
+    }
+
+    /**
+     * Perform an HTTP request on a background thread. Called from native code via JNI.
+     * requestId: opaque ID passed back in the result callback.
+     * method: 0=GET, 1=POST, 2=PUT, 3=DELETE.
+     * url: request URL.
+     * headers: newline-delimited "Key: Value\n" headers, or null.
+     * body: request body bytes, or null.
+     */
+    public void httpRequest(final int requestId, final int method,
+                            final String url, final String headers,
+                            final byte[] body) {
+        /* In autotest mode, return stub 200 success without making a real request.
+         * CI emulators may not have network access to arbitrary hosts.
+         * Pass --ez autotest true via am start to enable. */
+        if (getIntent().getBooleanExtra("autotest", false)) {
+            android.util.Log.i("HttpBridge", "http_request: autotest mode -- returning stub success");
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    onHttpResult(requestId, 0 /* SUCCESS */, 200,
+                                 "Content-Type: text/plain\n", new byte[0]);
+                }
+            });
+            return;
+        }
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    java.net.URL urlObj = new java.net.URL(url);
+                    java.net.HttpURLConnection conn =
+                        (java.net.HttpURLConnection) urlObj.openConnection();
+
+                    String[] methodNames = {"GET", "POST", "PUT", "DELETE"};
+                    String methodName = (method >= 0 && method < methodNames.length)
+                        ? methodNames[method] : "GET";
+                    conn.setRequestMethod(methodName);
+                    conn.setConnectTimeout(30000);
+                    conn.setReadTimeout(30000);
+
+                    /* Set request headers */
+                    if (headers != null) {
+                        for (String line : headers.split("\n")) {
+                            int colonIdx = line.indexOf(": ");
+                            if (colonIdx > 0) {
+                                String key = line.substring(0, colonIdx);
+                                String value = line.substring(colonIdx + 2);
+                                conn.setRequestProperty(key, value);
+                            }
+                        }
+                    }
+
+                    /* Write request body for POST/PUT */
+                    if (body != null && body.length > 0
+                        && (method == 1 || method == 2)) {
+                        conn.setDoOutput(true);
+                        conn.getOutputStream().write(body);
+                        conn.getOutputStream().close();
+                    }
+
+                    final int httpStatus = conn.getResponseCode();
+
+                    /* Read response headers */
+                    StringBuilder respHeaders = new StringBuilder();
+                    for (int i = 0; ; i++) {
+                        String headerName = conn.getHeaderFieldKey(i);
+                        String headerValue = conn.getHeaderField(i);
+                        if (headerValue == null) break;
+                        if (headerName != null) {
+                            respHeaders.append(headerName)
+                                       .append(": ")
+                                       .append(headerValue)
+                                       .append("\n");
+                        }
+                    }
+
+                    /* Read response body */
+                    java.io.InputStream inputStream;
+                    try {
+                        inputStream = conn.getInputStream();
+                    } catch (java.io.IOException e) {
+                        inputStream = conn.getErrorStream();
+                    }
+                    byte[] respBody = new byte[0];
+                    if (inputStream != null) {
+                        java.io.ByteArrayOutputStream baos =
+                            new java.io.ByteArrayOutputStream();
+                        byte[] buf = new byte[4096];
+                        int bytesRead;
+                        while ((bytesRead = inputStream.read(buf)) != -1) {
+                            baos.write(buf, 0, bytesRead);
+                        }
+                        respBody = baos.toByteArray();
+                        inputStream.close();
+                    }
+
+                    conn.disconnect();
+
+                    final String finalHeaders = respHeaders.toString();
+                    final byte[] finalBody = respBody;
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            onHttpResult(requestId, 0 /* SUCCESS */,
+                                         httpStatus, finalHeaders, finalBody);
+                        }
+                    });
+                } catch (java.net.SocketTimeoutException e) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            onHttpResult(requestId, 2 /* TIMEOUT */,
+                                         0, null, null);
+                        }
+                    });
+                } catch (final Exception e) {
+                    final String errorMsg = e.getMessage();
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            onHttpResult(requestId, 1 /* NETWORK_ERROR */,
+                                         0, errorMsg, null);
+                        }
+                    });
+                }
+            }
+        }).start();
     }
 
     /**

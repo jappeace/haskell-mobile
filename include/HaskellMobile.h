@@ -162,6 +162,25 @@ void haskellOnVideoFrame(void *ctx, int32_t requestId,
  * ctx must be a pointer returned by haskellRunMain(). */
 void haskellOnAudioChunk(void *ctx, int32_t requestId,
                           const uint8_t *audioData, int32_t audioDataLen);
+/* HTTP result codes */
+#define HTTP_RESULT_SUCCESS       0
+#define HTTP_RESULT_NETWORK_ERROR 1
+#define HTTP_RESULT_TIMEOUT       2
+
+/* Dispatch an HTTP result from native code back to Haskell.
+ * requestId:  opaque ID from the original http_request() call.
+ * resultCode: HTTP_RESULT_SUCCESS (0), HTTP_RESULT_NETWORK_ERROR (1),
+ *             or HTTP_RESULT_TIMEOUT (2).
+ * httpStatus: HTTP status code (e.g. 200, 404) for success, or 0.
+ * headers:    newline-delimited "Key: Value\n" response headers, or NULL.
+ * body:       response body bytes, or NULL.
+ * bodyLen:    length of body in bytes, or 0.
+ * ctx must be a pointer returned by haskellRunMain(). */
+void haskellOnHttpResult(void *ctx, int32_t requestId,
+                          int32_t resultCode, int32_t httpStatus,
+                          const char *headers,
+                          const uint8_t *body, int32_t bodyLen);
+
 /* Bottom sheet action codes */
 #define BOTTOM_SHEET_DISMISSED -1
 /* actionCode >= 0: 0-based index of the selected item */

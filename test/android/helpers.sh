@@ -10,9 +10,14 @@
 #   WORK_DIR        — temp dir for scratch files
 
 # install_apk APK_PATH
-# Installs the given APK with up to 3 attempts, 10s delay between retries.
+# Uninstalls any existing package first (prevents INSTALL_FAILED_UPDATE_INCOMPATIBLE
+# when a previous test exited before its cleanup), then installs the given APK
+# with up to 3 attempts, 10s delay between retries.
 install_apk() {
     local apk_path="$1"
+    # Remove leftover package from a previous test that may have exited early.
+    # All test APKs share the same package name but may have different signing keys.
+    "$ADB" -s "$EMULATOR_SERIAL" uninstall "$PACKAGE" 2>/dev/null || true
     local install_ok=0
     for attempt in 1 2 3; do
         if "$ADB" -s "$EMULATOR_SERIAL" install -t "$apk_path" 2>&1; then

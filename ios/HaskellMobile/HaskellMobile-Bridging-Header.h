@@ -8,6 +8,7 @@
 #include "AuthSessionBridge.h"
 #include "CameraBridge.h"
 #include "BottomSheetBridge.h"
+#include "HttpBridge.h"
 
 /* iOS UI bridge setup — called from Swift before haskellRenderUI */
 void setup_ios_ui_bridge(void *viewController, void *haskellCtx);
@@ -34,3 +35,6 @@ void setup_ios_auth_session_bridge(void *haskellCtx);
 void setup_ios_camera_bridge(void *haskellCtx);
 /* iOS bottom sheet bridge setup — called from Swift during initialisation */
 void setup_ios_bottom_sheet_bridge(void *haskellCtx);
+
+/* iOS HTTP bridge setup — called from Swift during initialisation */
+void setup_ios_http_bridge(void *haskellCtx);

@@ -17,6 +17,7 @@ module HaskellMobile
   , haskellOnAuthSessionResult
   , haskellOnCameraResult
   , haskellOnBottomSheetResult
+  , haskellOnHttpResult
   -- Error handling
   , errorWidget
   -- Re-exports from Lifecycle
@@ -96,6 +97,13 @@ module HaskellMobile
   , BottomSheetConfig(..)
   , BottomSheetState(..)
   , showBottomSheet
+  -- Re-exports from Http
+  , HttpMethod(..)
+  , HttpRequest(..)
+  , HttpResponse(..)
+  , HttpError(..)
+  , HttpState(..)
+  , performRequest
   )
 where
 
@@ -144,6 +152,15 @@ import HaskellMobile.Camera
   , dispatchCameraResult
   , dispatchVideoFrame
   , dispatchAudioChunk
+  )
+import HaskellMobile.Http
+  ( HttpMethod(..)
+  , HttpRequest(..)
+  , HttpResponse(..)
+  , HttpError(..)
+  , HttpState(..)
+  , performRequest
+  , dispatchHttpResult
   )
 import HaskellMobile.Dialog
   ( DialogAction(..)
@@ -244,6 +261,7 @@ renderView ctxPtr = do
         , userAuthSessionState   = acAuthSessionState appCtx
         , userCameraState        = acCameraState appCtx
         , userBottomSheetState   = acBottomSheetState appCtx
+        , userHttpState          = acHttpState appCtx
         }
   widget <- viewFunction userState
   renderWidget (acRenderState appCtx) widget
@@ -449,6 +467,27 @@ haskellOnBottomSheetResult ctxPtr requestId actionCode =
     dispatchBottomSheetResult (acBottomSheetState appCtx) requestId actionCode
 
 foreign export ccall haskellOnBottomSheetResult :: Ptr AppContext -> CInt -> CInt -> IO ()
+
+-- | Handle an HTTP result from native code. Dispatches to the
+-- callback registered by 'performRequest'. The @cHeaders@ parameter
+-- is newline-delimited key-value pairs for success, or an error message
+-- for network errors. The @bodyPtr@/@bodyLen@ carry the response body.
+haskellOnHttpResult :: Ptr AppContext -> CInt -> CInt -> CInt
+                    -> CString -> Ptr Word8 -> CInt -> IO ()
+haskellOnHttpResult ctxPtr requestId resultCode httpStatus
+                    cHeaders bodyPtr bodyLen =
+  withExceptionHandler ctxPtr $ do
+    appCtx <- derefAppContext ctxPtr
+    maybeHeaders <- peekOptionalCString cHeaders
+    responseBody <- if bodyPtr == nullPtr || bodyLen <= 0
+      then pure BS.empty
+      else BS.packCStringLen (castPtr bodyPtr, fromIntegral bodyLen)
+    dispatchHttpResult (acHttpState appCtx) requestId resultCode httpStatus
+      maybeHeaders responseBody
+
+foreign export ccall haskellOnHttpResult
+  :: Ptr AppContext -> CInt -> CInt -> CInt
+  -> CString -> Ptr Word8 -> CInt -> IO ()
 
 -- | Peek an optional CString: returns 'Nothing' for null pointers,
 -- 'Just' with the decoded 'Text' otherwise.

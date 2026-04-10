@@ -197,6 +197,14 @@ in {
           -o bottom_sheet_android.o \
           ${haskellMobileSrc}/cbits/bottom_sheet_android.c
 
+        ${ndkCc} -c -fPIC \
+          -DJNI_PACKAGE=me_jappie_haskellmobile \
+          -I${sysroot}/usr/include \
+          -I$RTS_INCLUDE \
+          -I${haskellMobileSrc}/include \
+          -o http_bridge_android.o \
+          ${haskellMobileSrc}/cbits/http_bridge_android.c
+
         # Compile extra JNI bridge sources (consumer-specific JNI methods)
         ${builtins.concatStringsSep "\n" (builtins.genList (i:
           let src = builtins.elemAt extraJniBridge i;
@@ -234,6 +242,7 @@ in {
         cp ${haskellMobileSrc}/src/HaskellMobile/AuthSession.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/Camera.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/BottomSheet.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/Http.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/AppContext.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile.hs .
 
@@ -260,6 +269,7 @@ in {
         cp ${haskellMobileSrc}/cbits/auth_session_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/camera_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/bottom_sheet_bridge.c cbits/
+        cp ${haskellMobileSrc}/cbits/http_bridge.c cbits/
 
         # Step 4: Compile Haskell to shared library with cross-GHC.
         # Discover library paths dynamically — hash suffixes vary across nixpkgs.
@@ -319,6 +329,7 @@ in {
           cbits/auth_session_bridge.c \
           cbits/camera_bridge.c \
           cbits/bottom_sheet_bridge.c \
+          cbits/http_bridge.c \
           -optl-L${androidPkgs.gmp}/lib \
           -optl-L${androidPkgs.libffi}/lib \
           -optl-lffi \
@@ -334,6 +345,7 @@ in {
           -optl$(pwd)/auth_session_android.o \
           -optl$(pwd)/camera_bridge_android.o \
           -optl$(pwd)/bottom_sheet_android.o \
+          -optl$(pwd)/http_bridge_android.o \
           ${builtins.concatStringsSep " " (builtins.genList (i: "-optl$(pwd)/extra_jni_${toString i}.o") (builtins.length extraJniBridge))} \
           ${builtins.concatStringsSep " " (map (o: "-optl${o}") extraLinkObjects)} \
           -optl-Wl,-u,haskellRunMain \
@@ -352,6 +364,7 @@ in {
           -optl-Wl,-u,haskellOnVideoFrame \
           -optl-Wl,-u,haskellOnAudioChunk \
           -optl-Wl,-u,haskellOnBottomSheetResult \
+          -optl-Wl,-u,haskellOnHttpResult \
           -optl-Wl,-u,haskellLogLocale \
           -optl-Wl,--no-undefined \
           -optl-Wl,--whole-archive \
@@ -552,6 +565,7 @@ in {
         cp ${haskellMobileSrc}/src/HaskellMobile/AuthSession.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/Camera.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/BottomSheet.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/Http.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/AppContext.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile.hs .
 
@@ -574,6 +588,7 @@ in {
         cp ${haskellMobileSrc}/cbits/auth_session_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/camera_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/bottom_sheet_bridge.c cbits/
+        cp ${haskellMobileSrc}/cbits/http_bridge.c cbits/
 
         ghc -staticlib \
           -O2 \
@@ -596,6 +611,7 @@ in {
           -optl-Wl,-u,_haskellOnVideoFrame \
           -optl-Wl,-u,_haskellOnAudioChunk \
           -optl-Wl,-u,_haskellOnBottomSheetResult \
+          -optl-Wl,-u,_haskellOnHttpResult \
           -optl-Wl,-u,_haskellLogLocale \
           cbits/platform_log.c \
           cbits/ui_bridge.c \
@@ -609,6 +625,7 @@ in {
           cbits/auth_session_bridge.c \
           cbits/camera_bridge.c \
           cbits/bottom_sheet_bridge.c \
+          cbits/http_bridge.c \
           Main.hs \
           HaskellMobile.hs
       '';
@@ -634,6 +651,7 @@ in {
         cp ${haskellMobileSrc}/include/AuthSessionBridge.h $out/include/AuthSessionBridge.h
         cp ${haskellMobileSrc}/include/CameraBridge.h $out/include/CameraBridge.h
         cp ${haskellMobileSrc}/include/BottomSheetBridge.h $out/include/BottomSheetBridge.h
+        cp ${haskellMobileSrc}/include/HttpBridge.h $out/include/HttpBridge.h
       '';
     };
 
@@ -692,6 +710,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${iosLib}/include/AuthSessionBridge.h $out/share/ios/include/
         cp ${iosLib}/include/CameraBridge.h $out/share/ios/include/
         cp ${iosLib}/include/BottomSheetBridge.h $out/share/ios/include/
+        cp ${iosLib}/include/HttpBridge.h $out/share/ios/include/
         ${patchProjectYml}
       '';
 
@@ -745,6 +764,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${haskellMobileSrc}/src/HaskellMobile/AuthSession.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/Camera.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/BottomSheet.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/Http.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/AppContext.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile.hs .
 
@@ -767,6 +787,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${haskellMobileSrc}/cbits/auth_session_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/camera_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/bottom_sheet_bridge.c cbits/
+        cp ${haskellMobileSrc}/cbits/http_bridge.c cbits/
 
         ghc -staticlib \
           -O2 \
@@ -789,6 +810,7 @@ open(sys.argv[1], "w").write(yml)
           -optl-Wl,-u,_haskellOnVideoFrame \
           -optl-Wl,-u,_haskellOnAudioChunk \
           -optl-Wl,-u,_haskellOnBottomSheetResult \
+          -optl-Wl,-u,_haskellOnHttpResult \
           -optl-Wl,-u,_haskellLogLocale \
           cbits/platform_log.c \
           cbits/ui_bridge.c \
@@ -802,6 +824,7 @@ open(sys.argv[1], "w").write(yml)
           cbits/auth_session_bridge.c \
           cbits/camera_bridge.c \
           cbits/bottom_sheet_bridge.c \
+          cbits/http_bridge.c \
           Main.hs \
           HaskellMobile.hs
       '';
@@ -827,6 +850,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${haskellMobileSrc}/include/AuthSessionBridge.h $out/include/AuthSessionBridge.h
         cp ${haskellMobileSrc}/include/CameraBridge.h $out/include/CameraBridge.h
         cp ${haskellMobileSrc}/include/BottomSheetBridge.h $out/include/BottomSheetBridge.h
+        cp ${haskellMobileSrc}/include/HttpBridge.h $out/include/HttpBridge.h
       '';
     };
 
@@ -860,6 +884,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${watchosLib}/include/AuthSessionBridge.h $out/share/watchos/include/
         cp ${watchosLib}/include/CameraBridge.h $out/share/watchos/include/
         cp ${watchosLib}/include/BottomSheetBridge.h $out/share/watchos/include/
+        cp ${watchosLib}/include/HttpBridge.h $out/share/watchos/include/
       '';
 
       installPhase = "true";

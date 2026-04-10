@@ -13,6 +13,7 @@ import HaskellMobile.Ble (BleState)
 import HaskellMobile.Camera (CameraState)
 import HaskellMobile.BottomSheet (BottomSheetState)
 import HaskellMobile.Dialog (DialogState)
+import HaskellMobile.Http (HttpState)
 import HaskellMobile.Lifecycle (MobileContext)
 import HaskellMobile.Location (LocationState)
 import HaskellMobile.Permission (PermissionState)
@@ -32,6 +33,7 @@ data UserState = UserState
   , userAuthSessionState   :: AuthSessionState
   , userCameraState        :: CameraState
   , userBottomSheetState   :: BottomSheetState
+  , userHttpState          :: HttpState
   }
 
 -- | Application definition record. Downstream apps create one of these
