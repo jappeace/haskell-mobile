@@ -25,7 +25,7 @@ import HaskellMobile.Permission (PermissionState(..), newPermissionState)
 import HaskellMobile.Render (RenderState, newRenderState)
 import HaskellMobile.SecureStorage (SecureStorageState(..), newSecureStorageState)
 import HaskellMobile.Types (MobileApp(..), UserState(..))
-import HaskellMobile.Widget (Widget)
+import HaskellMobile.Widget (User, Widget)
 
 -- | Combines user-supplied lifecycle callbacks with the rendering engine's
 -- mutable state, the permission callback registry, the secure storage
@@ -42,7 +42,7 @@ data AppContext = AppContext
   , acAuthSessionState    :: AuthSessionState
   , acCameraState         :: CameraState
   , acBottomSheetState    :: BottomSheetState
-  , acViewFunction        :: IORef (UserState -> IO Widget)
+  , acViewFunction        :: IORef (UserState -> IO (Widget User))
   }
 
 -- | Create a fresh 'AppContext' from a 'MobileApp', allocating a new

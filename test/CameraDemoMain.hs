@@ -25,6 +25,7 @@ import HaskellMobile
 import HaskellMobile.Widget
   ( ButtonConfig(..)
   , TextConfig(..)
+  , User
   , Widget(..)
   )
 
@@ -42,7 +43,7 @@ cameraDemoApp = MobileApp
 
 -- | Builds a Column with a label and a "Capture Photo" button.
 -- The button captures a photo and logs the result.
-cameraDemoView :: UserState -> IO Widget
+cameraDemoView :: UserState -> IO (Widget User)
 cameraDemoView userState = do
   pure $ Column
     [ Text TextConfig { tcLabel = "Camera Demo", tcFontConfig = Nothing }

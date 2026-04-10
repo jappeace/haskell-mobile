@@ -9,7 +9,7 @@ import Data.IORef (IORef, newIORef, readIORef, modifyIORef')
 import Data.Text qualified as Text
 import Foreign.Ptr (Ptr)
 import HaskellMobile (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext)
-import HaskellMobile.Widget (ButtonConfig(..), Color(..), FontConfig(..), TextAlignment(..), TextConfig(..), Widget(..), WidgetStyle(..))
+import HaskellMobile.Widget (ButtonConfig(..), Color(..), FontConfig(..), TextAlignment(..), TextConfig(..), User, Widget(..), WidgetStyle(..))
 import System.IO.Unsafe (unsafePerformIO)
 
 main :: IO (Ptr AppContext)
@@ -30,7 +30,7 @@ counterState = unsafePerformIO (newIORef 0)
 {-# NOINLINE counterState #-}
 
 -- | Counter view: displays current count with styled label and +/- buttons.
-counterView :: IO Widget
+counterView :: IO (Widget User)
 counterView = do
   n <- readIORef counterState
   pure $ Column

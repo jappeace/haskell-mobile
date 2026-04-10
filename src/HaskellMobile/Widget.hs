@@ -1,11 +1,25 @@
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE TypeFamilies #-}
 -- | Declarative UI widget ADT.
 --
 -- Pure data describing the UI tree. Rendering is handled by
 -- "HaskellMobile.Render", which traverses this tree and issues
 -- FFI calls to the platform bridge.
+--
+-- Uses the Trees That Grow (TTG) pattern: 'Widget', 'ButtonConfig',
+-- 'TextInputConfig', and 'WebViewConfig' are parameterised over a
+-- phase type @p@. The 'User' phase carries real 'IO' callbacks;
+-- the @()@ phase replaces every callback with @()@, enabling a
+-- derived 'Eq' instance for structural diffing.
 module HaskellMobile.Widget
-  ( FontConfig(..)
+  ( -- * Phase types
+    User
+    -- * Callback type families
+  , ButtonCb
+  , TextChangeCb
+  , PageLoadCb
+    -- * Widget types
+  , FontConfig(..)
   , TextConfig(..)
   , ButtonConfig(..)
   , InputType(..)
@@ -22,6 +36,8 @@ module HaskellMobile.Widget
   , colorFromText
   , colorToHex
   , defaultStyle
+    -- * Phase conversion
+  , toUnit
   )
 where
 
@@ -30,6 +46,27 @@ import Data.Char (digitToInt, isHexDigit, intToDigit)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Word (Word8)
+
+-- | The user-facing phase: callbacks are real 'IO' actions.
+data User
+
+-- | Closed type family for button click callbacks.
+-- 'User' carries @IO ()@; any other phase @p@ carries @p@ itself.
+type family ButtonCb p where
+  ButtonCb User = IO ()
+  ButtonCb p    = p
+
+-- | Closed type family for text-change callbacks.
+-- 'User' carries @Text -> IO ()@; any other phase @p@ carries @p@ itself.
+type family TextChangeCb p where
+  TextChangeCb User = Text -> IO ()
+  TextChangeCb p    = p
+
+-- | Closed type family for page-load callbacks.
+-- 'User' carries @IO ()@; any other phase @p@ carries @p@ itself.
+type family PageLoadCb p where
+  PageLoadCb User = IO ()
+  PageLoadCb p    = p
 
 -- | Font configuration for text-bearing widgets.
 -- Only 'Text', 'Button', and 'TextInput' can carry a 'FontConfig'.
@@ -47,10 +84,12 @@ data TextConfig = TextConfig
   } deriving (Show, Eq)
 
 -- | Configuration for a tappable button.
-data ButtonConfig = ButtonConfig
+-- Parameterised over phase @p@: 'bcAction' is @IO ()@ for 'User',
+-- @()@ for the unit phase, etc.
+data ButtonConfig p = ButtonConfig
   { bcLabel      :: Text
     -- ^ The button's label text.
-  , bcAction     :: IO ()
+  , bcAction     :: ButtonCb p
     -- ^ Callback fired when the button is tapped.
   , bcFontConfig :: Maybe FontConfig
     -- ^ Optional font override.
@@ -64,14 +103,16 @@ data InputType
 
 -- | Configuration for a text input field.
 -- Follows a controlled-component pattern: Haskell owns the state.
-data TextInputConfig = TextInputConfig
+-- Parameterised over phase @p@: 'tiOnChange' is @Text -> IO ()@
+-- for 'User', @()@ for the unit phase, etc.
+data TextInputConfig p = TextInputConfig
   { tiInputType :: InputType
     -- ^ Which on-screen keyboard to present.
   , tiHint      :: Text
     -- ^ Placeholder text shown when the field is empty.
   , tiValue     :: Text
     -- ^ Current text value (controlled by Haskell).
-  , tiOnChange  :: Text -> IO ()
+  , tiOnChange  :: TextChangeCb p
     -- ^ Callback fired when the user edits the field.
   , tiFontConfig :: Maybe FontConfig
     -- ^ Optional font override.
@@ -175,30 +216,62 @@ data ImageConfig = ImageConfig
   } deriving (Show, Eq)
 
 -- | Configuration for an embedded web view.
-data WebViewConfig = WebViewConfig
+-- Parameterised over phase @p@: 'wvOnPageLoad' is @Maybe (IO ())@
+-- for 'User', @Maybe ()@ for the unit phase, etc.
+data WebViewConfig p = WebViewConfig
   { wvUrl        :: Text
     -- ^ URL to load in the web view.
-  , wvOnPageLoad :: Maybe (IO ())
+  , wvOnPageLoad :: Maybe (PageLoadCb p)
     -- ^ Optional callback fired when a page finishes loading.
   }
 
 -- | A declarative description of a UI element.
-data Widget
+-- Parameterised over phase @p@ via the Trees That Grow pattern.
+data Widget p
   = Text TextConfig
     -- ^ A read-only text label.
-  | Button ButtonConfig
+  | Button (ButtonConfig p)
     -- ^ A tappable button with a label and click handler.
-  | TextInput TextInputConfig
+  | TextInput (TextInputConfig p)
     -- ^ A text input field.
-  | Column [Widget]
+  | Column [Widget p]
     -- ^ A vertical container laying out children top-to-bottom.
-  | Row [Widget]
+  | Row [Widget p]
     -- ^ A horizontal container laying out children left-to-right.
-  | ScrollView [Widget]
+  | ScrollView [Widget p]
     -- ^ A vertically scrollable container.
   | Image ImageConfig
     -- ^ An image widget displaying resource, file, or raw data.
-  | WebView WebViewConfig
+  | WebView (WebViewConfig p)
     -- ^ An embedded web view loading a URL.
-  | Styled WidgetStyle Widget
+  | Styled WidgetStyle (Widget p)
     -- ^ Apply visual style overrides to a child widget.
+
+-- Eq and Show instances for the () phase (all callbacks become (), which has Eq/Show).
+deriving instance Eq (ButtonConfig ())
+deriving instance Eq (TextInputConfig ())
+deriving instance Eq (WebViewConfig ())
+deriving instance Eq (Widget ())
+deriving instance Show (ButtonConfig ())
+deriving instance Show (TextInputConfig ())
+deriving instance Show (WebViewConfig ())
+deriving instance Show (Widget ())
+
+-- | Strip all callbacks from a widget tree, replacing them with @()@.
+-- The resulting @Widget ()@ can be compared with derived 'Eq' for
+-- structural diffing. Compiler-verified: adding a field without
+-- updating 'toUnit' causes a compile error.
+toUnit :: Widget p -> Widget ()
+toUnit (Text config)        = Text config
+toUnit (Button config)      = Button ButtonConfig
+  { bcLabel = bcLabel config, bcAction = (), bcFontConfig = bcFontConfig config }
+toUnit (TextInput config)   = TextInput TextInputConfig
+  { tiInputType = tiInputType config, tiHint = tiHint config
+  , tiValue = tiValue config, tiOnChange = (), tiFontConfig = tiFontConfig config }
+toUnit (Column children)    = Column (map toUnit children)
+toUnit (Row children)       = Row (map toUnit children)
+toUnit (ScrollView children) = ScrollView (map toUnit children)
+toUnit (Image config)       = Image config
+toUnit (WebView config)     = WebView WebViewConfig
+  { wvUrl = wvUrl config, wvOnPageLoad = Nothing }
+toUnit (Styled style child) = Styled style (toUnit child)

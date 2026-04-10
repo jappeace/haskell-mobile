@@ -7,6 +7,7 @@ import Test.Tasty.HUnit
 import Data.ByteString qualified as BS
 import Data.Either (isLeft)
 import Data.List (isInfixOf, sort)
+import Data.Int (Int32)
 import Data.IntMap.Strict qualified as IntMap
 import Control.Exception (IOException, throwIO, try)
 import Data.IORef (newIORef, readIORef, modifyIORef', writeIORef)
@@ -49,7 +50,7 @@ import HaskellMobile.Lifecycle
   , lifecycleToInt
   , loggingMobileContext
   )
-import HaskellMobile.Widget (ButtonConfig(..), Color(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), ResourceName(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), WebViewConfig(..), Widget(..), WidgetStyle(..), colorFromText, colorToHex, defaultStyle)
+import HaskellMobile.Widget (ButtonConfig(..), Color(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), ResourceName(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), User, WebViewConfig(..), Widget(..), WidgetStyle(..), colorFromText, colorToHex, defaultStyle, toUnit)
 import HaskellMobile.Permission
   ( Permission(..)
   , PermissionStatus(..)
@@ -97,7 +98,7 @@ import HaskellMobile.Camera
   , dispatchVideoFrame
   , dispatchAudioChunk
   )
-import HaskellMobile.Render (newRenderState, renderWidget, dispatchEvent, dispatchTextEvent)
+import HaskellMobile.Render (RenderState(..), RenderedNode(..), newRenderState, renderWidget, dispatchEvent, dispatchTextEvent)
 import HaskellMobile.SecureStorage
   ( SecureStorageStatus(..)
   , SecureStorageState(..)
@@ -145,7 +146,7 @@ main = do
   defaultMain (tests (acPermissionState ffiAppCtx) (acSecureStorageState ffiAppCtx) (acDialogState ffiAppCtx) (acAuthSessionState ffiAppCtx) (acBottomSheetState ffiAppCtx))
 
 tests :: PermissionState -> SecureStorageState -> DialogState -> AuthSessionState -> BottomSheetState -> TestTree
-tests ffiPermState ffiSecureStorageState ffiDialogState ffiAuthSessionState ffiBottomSheetState = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, imageTests, webViewTests, styledTests, textAlignTests, colorTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, secureStorageTests ffiSecureStorageState, bleTests, dialogTests ffiDialogState, locationTests, cameraTests, authSessionTests ffiAuthSessionState, bottomSheetTests ffiBottomSheetState, appContextTests, exceptionHandlerTests]
+tests ffiPermState ffiSecureStorageState ffiDialogState ffiAuthSessionState ffiBottomSheetState = testGroup "Tests" [qcProps, unitTests, lifecycleTests, uiTests, scrollViewTests, textInputTests, imageTests, webViewTests, styledTests, textAlignTests, colorTests, registrationTests, localeTests, i18nTests, permissionTests ffiPermState, secureStorageTests ffiSecureStorageState, bleTests, dialogTests ffiDialogState, locationTests, cameraTests, authSessionTests ffiAuthSessionState, bottomSheetTests ffiBottomSheetState, appContextTests, exceptionHandlerTests, incrementalRenderTests]
 
 qcProps :: TestTree
 qcProps = testGroup "(checked by QuickCheck)"
@@ -287,17 +288,18 @@ uiTests = testGroup "UI"
       b' <- readIORef refB
       b' @?= True
 
-  , testCase "re-render resets callback IDs" $ do
+  , testCase "re-render with changed label creates new callback" $ do
       refOld <- newIORef False
       refNew <- newIORef False
       rs <- newRenderState
-      -- First render with old callback
+      -- First render with old callback (gets callback ID 0)
       renderWidget rs (Button ButtonConfig
         { bcLabel = "old", bcAction = modifyIORef' refOld (const True), bcFontConfig = Nothing })
-      -- Second render replaces it
+      -- Second render: different label → old node destroyed, new node created
+      -- with fresh callback ID (1, since rsNextId grows monotonically).
       renderWidget rs (Button ButtonConfig
         { bcLabel = "new", bcAction = modifyIORef' refNew (const True), bcFontConfig = Nothing })
-      dispatchEvent rs 0
+      dispatchEvent rs 1
       old <- readIORef refOld
       new <- readIORef refNew
       old @?= False
@@ -398,15 +400,16 @@ scrollViewTests = testGroup "ScrollView"
       fired <- readIORef ref
       fired @?= True
 
-  , testCase "re-render inside ScrollView resets callbacks" $ do
+  , testCase "re-render inside ScrollView with changed label creates new callback" $ do
       refOld <- newIORef False
       refNew <- newIORef False
       rs <- newRenderState
       renderWidget rs $ ScrollView [Button ButtonConfig
         { bcLabel = "old", bcAction = modifyIORef' refOld (const True), bcFontConfig = Nothing }]
+      -- Different label → old node destroyed, new node created with callback 1
       renderWidget rs $ ScrollView [Button ButtonConfig
         { bcLabel = "new", bcAction = modifyIORef' refNew (const True), bcFontConfig = Nothing }]
-      dispatchEvent rs 0
+      dispatchEvent rs 1
       old <- readIORef refOld
       new <- readIORef refNew
       old @?= False
@@ -468,7 +471,7 @@ textInputTests = testGroup "TextInput"
       click @?= True
       text  @?= show ("typed" :: String)
 
-  , testCase "re-render resets text callbacks" $ do
+  , testCase "re-render with changed hint creates new text callback" $ do
       refOld <- newIORef ("" :: String)
       refNew <- newIORef ("" :: String)
       rs <- newRenderState
@@ -476,11 +479,12 @@ textInputTests = testGroup "TextInput"
         { tiInputType = InputText, tiHint = "old", tiValue = ""
         , tiOnChange = \t -> modifyIORef' refOld (const (show t))
         , tiFontConfig = Nothing }
+      -- Different hint → old node destroyed, new node created with callback 1
       renderWidget rs $ TextInput TextInputConfig
         { tiInputType = InputText, tiHint = "new", tiValue = ""
         , tiOnChange = \t -> modifyIORef' refNew (const (show t))
         , tiFontConfig = Nothing }
-      dispatchTextEvent rs 0 "val"
+      dispatchTextEvent rs 1 "val"
       old <- readIORef refOld
       new <- readIORef refNew
       old @?= ""
@@ -666,7 +670,7 @@ styledTests = testGroup "Styled"
       renderWidget rs $ Styled defaultStyle
         (Button ButtonConfig
           { bcLabel = "new", bcAction = modifyIORef' refNew (const True), bcFontConfig = Nothing })
-      dispatchEvent rs 0
+      dispatchEvent rs 1
       old <- readIORef refOld
       new <- readIORef refNew
       old @?= False
@@ -1870,4 +1874,259 @@ exceptionHandlerTests = testGroup "ExceptionHandler"
         Left exc -> assertFailure ("haskellOnLifecycle should not throw, but got: " ++ show exc)
         Right () -> pure ()
       freeAppContext ctxPtr
+  ]
+
+-- ---------------------------------------------------------------------------
+-- Incremental rendering tests
+-- ---------------------------------------------------------------------------
+
+-- | Helper to extract the rendered node ID from a RenderedNode.
+nodeIdOf :: RenderedNode -> Int32
+nodeIdOf (RenderedLeaf _ nodeId _)     = nodeId
+nodeIdOf (RenderedContainer _ nodeId _) = nodeId
+nodeIdOf (RenderedStyled _ _ child)     = nodeIdOf child
+
+-- | Helper to extract children from a RenderedContainer.
+childrenOf :: RenderedNode -> [RenderedNode]
+childrenOf (RenderedContainer _ _ children) = children
+childrenOf _                                = []
+
+incrementalRenderTests :: TestTree
+incrementalRenderTests = testGroup "Incremental rendering"
+  [ testGroup "toUnit"
+      [ testCase "same structure produces equal unit widgets" $ do
+          let widget1 :: Widget User
+              widget1 = Button ButtonConfig
+                { bcLabel = "X", bcAction = pure (), bcFontConfig = Nothing }
+              widget2 :: Widget User
+              widget2 = Button ButtonConfig
+                { bcLabel = "X", bcAction = putStrLn "different!", bcFontConfig = Nothing }
+          toUnit widget1 @?= toUnit widget2
+
+      , testCase "different label produces unequal unit widgets" $ do
+          let widget1 :: Widget User
+              widget1 = Button ButtonConfig
+                { bcLabel = "A", bcAction = pure (), bcFontConfig = Nothing }
+              widget2 :: Widget User
+              widget2 = Button ButtonConfig
+                { bcLabel = "B", bcAction = pure (), bcFontConfig = Nothing }
+          assertBool "toUnit should differ for different labels"
+            (toUnit widget1 /= toUnit widget2)
+
+      , testCase "nested containers compare structurally" $ do
+          let tree1 :: Widget User
+              tree1 = Column
+                [ Text TextConfig { tcLabel = "hi", tcFontConfig = Nothing }
+                , Button ButtonConfig { bcLabel = "go", bcAction = pure (), bcFontConfig = Nothing }
+                ]
+              tree2 :: Widget User
+              tree2 = Column
+                [ Text TextConfig { tcLabel = "hi", tcFontConfig = Nothing }
+                , Button ButtonConfig { bcLabel = "go", bcAction = putStrLn "other", bcFontConfig = Nothing }
+                ]
+          toUnit tree1 @?= toUnit tree2
+
+      , testCase "different child count produces unequal" $ do
+          let tree1 :: Widget User
+              tree1 = Column
+                [ Text TextConfig { tcLabel = "a", tcFontConfig = Nothing } ]
+              tree2 :: Widget User
+              tree2 = Column
+                [ Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }
+                , Text TextConfig { tcLabel = "b", tcFontConfig = Nothing }
+                ]
+          assertBool "different child count should differ"
+            (toUnit tree1 /= toUnit tree2)
+
+      , testCase "TextInput ignores callback for equality" $ do
+          let ti1 :: Widget User
+              ti1 = TextInput TextInputConfig
+                { tiInputType = InputText, tiHint = "h", tiValue = "v"
+                , tiOnChange = \_ -> pure (), tiFontConfig = Nothing }
+              ti2 :: Widget User
+              ti2 = TextInput TextInputConfig
+                { tiInputType = InputText, tiHint = "h", tiValue = "v"
+                , tiOnChange = \_ -> putStrLn "changed", tiFontConfig = Nothing }
+          toUnit ti1 @?= toUnit ti2
+
+      , testCase "WebView ignores callback for equality" $ do
+          let wv1 :: Widget User
+              wv1 = WebView WebViewConfig
+                { wvUrl = "https://example.com", wvOnPageLoad = Just (pure ()) }
+              wv2 :: Widget User
+              wv2 = WebView WebViewConfig
+                { wvUrl = "https://example.com", wvOnPageLoad = Just (putStrLn "loaded") }
+          toUnit wv1 @?= toUnit wv2
+      ]
+
+  , testGroup "Node reuse"
+      [ testCase "identical re-render retains same node ID" $ do
+          rs <- newRenderState
+          let widget = Text TextConfig { tcLabel = "static", tcFontConfig = Nothing }
+          renderWidget rs widget
+          tree1 <- readIORef (rsRenderedTree rs)
+          let nodeId1 = case tree1 of
+                Just node -> nodeIdOf node
+                Nothing -> -1
+          renderWidget rs widget
+          tree2 <- readIORef (rsRenderedTree rs)
+          let nodeId2 = case tree2 of
+                Just node -> nodeIdOf node
+                Nothing -> -2
+          nodeId1 @?= nodeId2
+
+      , testCase "single child change only changes that child's node ID" $ do
+          rs <- newRenderState
+          let widget1 = Column
+                [ Text TextConfig { tcLabel = "stable", tcFontConfig = Nothing }
+                , Text TextConfig { tcLabel = "will change", tcFontConfig = Nothing }
+                ]
+          renderWidget rs widget1
+          tree1 <- readIORef (rsRenderedTree rs)
+          (child0Id1, child1Id1) <- case tree1 of
+            Just node -> case childrenOf node of
+              [c0, c1] -> pure (nodeIdOf c0, nodeIdOf c1)
+              _        -> assertFailure "expected 2 children" >> pure (-1, -1)
+            Nothing -> assertFailure "expected rendered tree" >> pure (-1, -1)
+          let widget2 = Column
+                [ Text TextConfig { tcLabel = "stable", tcFontConfig = Nothing }
+                , Text TextConfig { tcLabel = "changed!", tcFontConfig = Nothing }
+                ]
+          renderWidget rs widget2
+          tree2 <- readIORef (rsRenderedTree rs)
+          (child0Id2, child1Id2) <- case tree2 of
+            Just node -> case childrenOf node of
+              [c0, c1] -> pure (nodeIdOf c0, nodeIdOf c1)
+              _        -> assertFailure "expected 2 children" >> pure (-1, -1)
+            Nothing -> assertFailure "expected rendered tree" >> pure (-1, -1)
+          -- First child (unchanged) keeps same node ID
+          child0Id1 @?= child0Id2
+          -- Second child (changed) gets a different node ID
+          assertBool "changed child should get new node ID"
+            (child1Id1 /= child1Id2)
+
+      , testCase "callback-only change reuses node and updates closure" $ do
+          ref <- newIORef ("none" :: String)
+          rs <- newRenderState
+          -- Render button with action1
+          let widget1 = Button ButtonConfig
+                { bcLabel = "same label", bcAction = writeIORef ref "action1", bcFontConfig = Nothing }
+          renderWidget rs widget1
+          tree1 <- readIORef (rsRenderedTree rs)
+          let nodeId1 = case tree1 of
+                Just node -> nodeIdOf node
+                Nothing -> -1
+          -- Render same button label with action2
+          let widget2 = Button ButtonConfig
+                { bcLabel = "same label", bcAction = writeIORef ref "action2", bcFontConfig = Nothing }
+          renderWidget rs widget2
+          tree2 <- readIORef (rsRenderedTree rs)
+          let nodeId2 = case tree2 of
+                Just node -> nodeIdOf node
+                Nothing -> -2
+              callbackId2 = case tree2 of
+                Just (RenderedLeaf _ _ (Just cbId)) -> cbId
+                _ -> -1
+          -- Same node ID (reused)
+          nodeId1 @?= nodeId2
+          -- Dispatch the callback — should fire action2, not action1
+          dispatchEvent rs callbackId2
+          result <- readIORef ref
+          result @?= "action2"
+
+      , testCase "adding a child to container" $ do
+          rs <- newRenderState
+          let widget1 = Column
+                [ Text TextConfig { tcLabel = "first", tcFontConfig = Nothing } ]
+          renderWidget rs widget1
+          tree1 <- readIORef (rsRenderedTree rs)
+          existingChildId <- case tree1 of
+            Just node -> case childrenOf node of
+              [c0] -> pure (nodeIdOf c0)
+              _    -> assertFailure "expected 1 child" >> pure (-1)
+            Nothing -> assertFailure "expected rendered tree" >> pure (-1)
+          let widget2 = Column
+                [ Text TextConfig { tcLabel = "first", tcFontConfig = Nothing }
+                , Text TextConfig { tcLabel = "second", tcFontConfig = Nothing }
+                ]
+          renderWidget rs widget2
+          tree2 <- readIORef (rsRenderedTree rs)
+          case tree2 of
+            Just node -> case childrenOf node of
+              [c0, c1] -> do
+                -- First child retained
+                nodeIdOf c0 @?= existingChildId
+                -- Second child is new (different ID)
+                assertBool "new child should have different ID"
+                  (nodeIdOf c1 /= existingChildId)
+              _ -> assertFailure "expected 2 children"
+            Nothing -> assertFailure "expected rendered tree"
+
+      , testCase "removing a child from container" $ do
+          rs <- newRenderState
+          let widget1 = Column
+                [ Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }
+                , Text TextConfig { tcLabel = "b", tcFontConfig = Nothing }
+                ]
+          renderWidget rs widget1
+          let widget2 = Column
+                [ Text TextConfig { tcLabel = "a", tcFontConfig = Nothing } ]
+          renderWidget rs widget2
+          tree2 <- readIORef (rsRenderedTree rs)
+          let children2 = childrenOf (maybe (error "no tree") id tree2)
+          length children2 @?= 1
+
+      , testCase "root type change triggers new root node" $ do
+          rs <- newRenderState
+          let widget1 = Text TextConfig { tcLabel = "text", tcFontConfig = Nothing }
+          renderWidget rs widget1
+          tree1 <- readIORef (rsRenderedTree rs)
+          let nodeId1 = case tree1 of
+                Just node -> nodeIdOf node
+                Nothing -> -1
+          let widget2 = Button ButtonConfig
+                { bcLabel = "button", bcAction = pure (), bcFontConfig = Nothing }
+          renderWidget rs widget2
+          tree2 <- readIORef (rsRenderedTree rs)
+          let nodeId2 = case tree2 of
+                Just node -> nodeIdOf node
+                Nothing -> -2
+          assertBool "different widget type should produce new node ID"
+            (nodeId1 /= nodeId2)
+
+      , testCase "styled unchanged keeps same node ID" $ do
+          rs <- newRenderState
+          let style = WidgetStyle (Just 10.0) Nothing Nothing Nothing
+              widget = Styled style (Text TextConfig { tcLabel = "styled", tcFontConfig = Nothing })
+          renderWidget rs widget
+          tree1 <- readIORef (rsRenderedTree rs)
+          let nodeId1 = case tree1 of
+                Just node -> nodeIdOf node
+                Nothing -> -1
+          renderWidget rs widget
+          tree2 <- readIORef (rsRenderedTree rs)
+          let nodeId2 = case tree2 of
+                Just node -> nodeIdOf node
+                Nothing -> -2
+          nodeId1 @?= nodeId2
+
+      , testCase "styled child change updates child, keeps style" $ do
+          rs <- newRenderState
+          let style = WidgetStyle (Just 10.0) Nothing Nothing Nothing
+              widget1 = Styled style (Text TextConfig { tcLabel = "before", tcFontConfig = Nothing })
+          renderWidget rs widget1
+          tree1 <- readIORef (rsRenderedTree rs)
+          let nodeId1 = case tree1 of
+                Just node -> nodeIdOf node
+                Nothing -> -1
+          let widget2 = Styled style (Text TextConfig { tcLabel = "after", tcFontConfig = Nothing })
+          renderWidget rs widget2
+          tree2 <- readIORef (rsRenderedTree rs)
+          let nodeId2 = case tree2 of
+                Just node -> nodeIdOf node
+                Nothing -> -2
+          -- Child changed, so node should be different
+          assertBool "changed styled child should get new node"
+            (nodeId1 /= nodeId2)
+      ]
   ]

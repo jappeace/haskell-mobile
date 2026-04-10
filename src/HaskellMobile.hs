@@ -1,7 +1,10 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE OverloadedStrings #-}
 module HaskellMobile
-  ( MobileApp(..)
+  ( -- * Widget phase types (re-exported from Widget)
+    User
+    -- * Core types
+  , MobileApp(..)
   , UserState(..)
   , startMobileApp
   -- FFI exports
@@ -189,7 +192,7 @@ import HaskellMobile.SecureStorage
   , dispatchSecureStorageResult
   )
 import HaskellMobile.Types (MobileApp(..), UserState(..))
-import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), TextConfig(..), Widget(..))
+import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), TextConfig(..), User, Widget(..))
 
 -- | Create an 'AppContext' from a 'MobileApp' and return it as a typed
 -- pointer suitable for the C FFI. This is the user-facing API: the user's
@@ -250,7 +253,7 @@ renderView ctxPtr = do
 
 -- | A widget that displays an error message with a dismiss button.
 -- The dismiss button restores the original view via a closure.
-errorWidget :: Ptr AppContext -> (UserState -> IO Widget) -> SomeException -> Widget
+errorWidget :: Ptr AppContext -> (UserState -> IO (Widget User)) -> SomeException -> Widget User
 errorWidget ctxPtr originalView exc = Column
   [ Text TextConfig
       { tcLabel      = "An error occurred"

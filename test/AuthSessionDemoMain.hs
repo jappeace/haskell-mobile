@@ -20,6 +20,7 @@ import HaskellMobile
 import HaskellMobile.Widget
   ( ButtonConfig(..)
   , TextConfig(..)
+  , User
   , Widget(..)
   )
 
@@ -37,7 +38,7 @@ authSessionDemoApp = MobileApp
 
 -- | Builds a Column with a label and a "Start Login" button.
 -- The button starts an auth session with a demo URL.
-authSessionDemoView :: UserState -> IO Widget
+authSessionDemoView :: UserState -> IO (Widget User)
 authSessionDemoView userState = do
   pure $ Column
     [ Text TextConfig { tcLabel = "AuthSession Demo", tcFontConfig = Nothing }

@@ -20,6 +20,7 @@ import HaskellMobile.Widget
   ( ButtonConfig(..)
   , TextConfig(..)
   , WebViewConfig(..)
+  , User
   , Widget(..)
   )
 
@@ -38,7 +39,7 @@ webViewDemoApp urlRef = MobileApp
   }
 
 -- | Builds a Column with a WebView, a status label, and a URL-switch button.
-webViewDemoView :: IORef String -> UserState -> IO Widget
+webViewDemoView :: IORef String -> UserState -> IO (Widget User)
 webViewDemoView urlRef _userState = do
   currentUrl <- readIORef urlRef
   pure $ Column

@@ -18,7 +18,7 @@ import HaskellMobile
   , showBottomSheet
   , loggingMobileContext
   )
-import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
+import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), User, Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do
@@ -35,7 +35,7 @@ bottomSheetDemoApp = MobileApp
   }
 
 -- | Builds a Column with a label and a "Show Actions" button.
-bottomSheetDemoView :: UserState -> IO Widget
+bottomSheetDemoView :: UserState -> IO (Widget User)
 bottomSheetDemoView userState = pure $ Column
   [ Text TextConfig { tcLabel = "BottomSheet Demo", tcFontConfig = Nothing }
   , Button ButtonConfig

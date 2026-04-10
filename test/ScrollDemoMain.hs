@@ -8,7 +8,7 @@ module Main where
 import Data.Text qualified as Text
 import Foreign.Ptr (Ptr)
 import HaskellMobile (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext)
-import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
+import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), User, Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do
@@ -25,7 +25,7 @@ scrollDemoApp = MobileApp
 
 -- | Builds a ScrollView containing 20 text items followed by a button.
 -- The button's callback ID is 0 (first registered), matching the --autotest dispatch.
-scrollDemoView :: IO Widget
+scrollDemoView :: IO (Widget User)
 scrollDemoView = pure $ ScrollView
   [ Column
     ( map (\itemNumber -> Text TextConfig

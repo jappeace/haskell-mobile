@@ -18,7 +18,7 @@ import HaskellMobile
   , secureStorageRead
   , loggingMobileContext
   )
-import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
+import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), User, Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do
@@ -35,7 +35,7 @@ secureStorageDemoApp = MobileApp
   }
 
 -- | Builds a Column with a label, a "Store Token" button, and a "Read Token" button.
-secureStorageDemoView :: UserState -> IO Widget
+secureStorageDemoView :: UserState -> IO (Widget User)
 secureStorageDemoView userState = pure $ Column
   [ Text TextConfig { tcLabel = "SecureStorage Demo", tcFontConfig = Nothing }
   , Button ButtonConfig

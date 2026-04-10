@@ -8,7 +8,7 @@ module Main where
 import Data.ByteString qualified as BS
 import Foreign.Ptr (Ptr)
 import HaskellMobile (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext)
-import HaskellMobile.Widget (ImageConfig(..), ImageSource(..), ResourceName(..), ScaleType(..), TextConfig(..), Widget(..))
+import HaskellMobile.Widget (ImageConfig(..), ImageSource(..), ResourceName(..), ScaleType(..), TextConfig(..), User, Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do
@@ -24,7 +24,7 @@ imageDemoApp = MobileApp
   }
 
 -- | Builds a Column with a label and three Image widgets (resource, data, file).
-imageDemoView :: IO Widget
+imageDemoView :: IO (Widget User)
 imageDemoView = pure $ Column
   [ Text TextConfig { tcLabel = "Image Demo", tcFontConfig = Nothing }
   , Image ImageConfig

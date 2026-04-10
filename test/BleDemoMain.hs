@@ -22,7 +22,7 @@ import HaskellMobile
   , loggingMobileContext
   , AppContext
   )
-import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
+import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), User, Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do
@@ -40,7 +40,7 @@ bleDemoApp = MobileApp
 -- | Builds a Column with a label, adapter check button, and scan buttons.
 -- The view itself is pure — all BLE FFI calls happen in button callbacks
 -- to avoid JNI reentrancy issues during rendering.
-bleDemoView :: UserState -> IO Widget
+bleDemoView :: UserState -> IO (Widget User)
 bleDemoView userState = pure $ Column
   [ Text TextConfig { tcLabel = "BLE Demo", tcFontConfig = Nothing }
   , Button ButtonConfig

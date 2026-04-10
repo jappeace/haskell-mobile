@@ -87,7 +87,7 @@ in {
     , extraGhcIncludeDirs ? []
     , crossDeps ? null          # output of cross-deps.nix (lib/, hi/, pkgdb/)
     , maxNodes ? 256            # static pool size (ignored when dynamicNodePool=true)
-    , dynamicNodePool ? false   # use malloc/realloc instead of fixed array
+    , dynamicNodePool ? true    # use malloc/realloc instead of fixed array
     , soMaxSizeMB ? 200         # fail build if .so exceeds this (MB), catches whole-archive bloat
     }:
     let
@@ -645,7 +645,7 @@ in {
     , iosSrc
     , name ? "simulator-app"
     , maxNodes ? 256            # static pool size (ignored when dynamicNodePool=true)
-    , dynamicNodePool ? false   # use malloc/realloc instead of fixed array
+    , dynamicNodePool ? true    # use malloc/realloc instead of fixed array
     }:
     let
       nodePoolCFlags =

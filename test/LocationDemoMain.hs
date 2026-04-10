@@ -22,7 +22,7 @@ import HaskellMobile
   , AppContext
   )
 import HaskellMobile.Location (LocationData(..))
-import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
+import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), User, Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do
@@ -40,7 +40,7 @@ locationDemoApp = MobileApp
 -- | Builds a Column with a label and start/stop location buttons.
 -- The view itself is pure — all location FFI calls happen in button
 -- callbacks to avoid JNI reentrancy issues during rendering.
-locationDemoView :: UserState -> IO Widget
+locationDemoView :: UserState -> IO (Widget User)
 locationDemoView userState = pure $ Column
   [ Text TextConfig { tcLabel = "Location Demo", tcFontConfig = Nothing }
   , Button ButtonConfig

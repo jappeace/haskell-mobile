@@ -18,7 +18,7 @@ import HaskellMobile
   , loggingMobileContext
   , AppContext
   )
-import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
+import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), User, Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do
@@ -35,7 +35,7 @@ permissionDemoApp = MobileApp
 
 -- | Builds a Column with a label and a "Request Camera" button.
 -- The button's callback ID is 0 (first registered), matching --autotest dispatch.
-permissionDemoView :: UserState -> IO Widget
+permissionDemoView :: UserState -> IO (Widget User)
 permissionDemoView userState = pure $ Column
   [ Text TextConfig { tcLabel = "Permission Demo", tcFontConfig = Nothing }
   , Button ButtonConfig

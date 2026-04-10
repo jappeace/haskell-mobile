@@ -10,10 +10,10 @@ import Data.Text (pack)
 import Foreign.Ptr (Ptr)
 import HaskellMobile (MobileApp(..), UserState(..), startMobileApp, AppContext)
 import HaskellMobile.Lifecycle (loggingMobileContext)
-import HaskellMobile.Widget (TextConfig(..), Widget(..))
+import HaskellMobile.Widget (TextConfig(..), User, Widget(..))
 
 -- | Render 300 nodes: 1 Column parent + 299 Text children.
-nodePoolTestView :: UserState -> IO Widget
+nodePoolTestView :: UserState -> IO (Widget User)
 nodePoolTestView _userState = pure $ Column $
   map (\itemNumber -> Text TextConfig
     { tcLabel = "Item " <> pack (show (itemNumber :: Int))

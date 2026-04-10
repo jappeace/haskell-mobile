@@ -18,7 +18,7 @@ import HaskellMobile
   , showDialog
   , loggingMobileContext
   )
-import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
+import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), User, Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do
@@ -35,7 +35,7 @@ dialogDemoApp = MobileApp
   }
 
 -- | Builds a Column with a label, a "Show Alert" button, and a "Show Confirm" button.
-dialogDemoView :: UserState -> IO Widget
+dialogDemoView :: UserState -> IO (Widget User)
 dialogDemoView userState = pure $ Column
   [ Text TextConfig { tcLabel = "Dialog Demo", tcFontConfig = Nothing }
   , Button ButtonConfig

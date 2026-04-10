@@ -7,7 +7,7 @@ module Main where
 
 import Foreign.Ptr (Ptr)
 import HaskellMobile (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext)
-import HaskellMobile.Widget (InputType(..), TextConfig(..), TextInputConfig(..), Widget(..))
+import HaskellMobile.Widget (InputType(..), TextConfig(..), TextInputConfig(..), User, Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do
@@ -23,7 +23,7 @@ textInputDemoApp = MobileApp
   }
 
 -- | Builds a Column with a label and two TextInputs of different InputType.
-textInputDemoView :: IO Widget
+textInputDemoView :: IO (Widget User)
 textInputDemoView = pure $ Column
   [ Text TextConfig { tcLabel = "TextInput Demo", tcFontConfig = Nothing }
   , TextInput TextInputConfig

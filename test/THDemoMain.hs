@@ -11,7 +11,7 @@ import Data.Text (pack)
 import Foreign.Ptr (Ptr)
 import THConsumer (thGreeting)
 import HaskellMobile (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext)
-import HaskellMobile.Widget (TextConfig(..), Widget(..))
+import HaskellMobile.Widget (TextConfig(..), User, Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do

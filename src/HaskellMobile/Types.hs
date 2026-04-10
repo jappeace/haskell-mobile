@@ -17,7 +17,7 @@ import HaskellMobile.Lifecycle (MobileContext)
 import HaskellMobile.Location (LocationState)
 import HaskellMobile.Permission (PermissionState)
 import HaskellMobile.SecureStorage (SecureStorageState)
-import HaskellMobile.Widget (Widget)
+import HaskellMobile.Widget (User, Widget)
 
 -- | State made available to the view function by the framework.
 -- Contains handles to platform subsystems that the user's UI code
@@ -38,5 +38,5 @@ data UserState = UserState
 -- and pass it to 'startMobileApp'.
 data MobileApp = MobileApp
   { maContext :: MobileContext
-  , maView    :: UserState -> IO Widget
+  , maView    :: UserState -> IO (Widget User)
   }
