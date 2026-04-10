@@ -334,18 +334,161 @@ and always re-register callbacks from the new tree.
 
 ---
 
-## Comparison Matrix
+## Approach F: Opaque Action Handles with ActionM Barrier
 
-| Concern | A: TTG | B: Keys | C: Dirty | D: Stable IDs | E: Manual Eq |
-|---|---|---|---|---|---|
-| Compiler-verified | Yes (derived Eq) | N/A | N/A | Yes (derived Eq) | No |
-| Type signature changes | Yes (`Widget User`) | No | No | Yes (`CallbackId`) | No |
-| User API change | Minimal (signatures only) | Keys on dynamic lists | State management | Major (ID assignment) | None |
-| Callback atomicity | Gap exists | N/A (always re-register) | N/A | No gap | N/A (always re-register) |
-| Property-level patching | No (binary equal/not) | Yes | Yes | Yes | Yes |
-| GC pressure per render | O(n) toUnit allocation | Low | O(dirty) | Low | Low |
-| Missed-field risk | None | None | N/A | None | High |
-| Familiar to React/Flutter devs | No | Yes | Somewhat | No | No |
+### Mechanism
+
+Replace `IO ()` callbacks in config types with opaque newtypes that wrap an
+Int (the callback ID). Provide a restricted monad `ActionM` with a hidden
+constructor for creating actions. The only way to run `ActionM` is via
+`setupAction`, which the documentation tells users to call at initialisation.
+
+```haskell
+-- Opaque: hidden constructors, only carry the registered callback ID.
+-- Derive Eq, Ord — they're just numbers.
+newtype Action   = Action   { actionId   :: Int } deriving (Eq, Ord)
+newtype OnChange = OnChange { onChangeId :: Int } deriving (Eq, Ord)
+
+-- Config types carry handles, not closures.
+data ButtonConfig = ButtonConfig
+  { bcLabel      :: Text
+  , bcAction     :: Action
+  , bcFontConfig :: Maybe FontConfig
+  } deriving (Eq)
+
+data TextInputConfig = TextInputConfig
+  { tiInputType  :: InputType
+  , tiHint       :: Text
+  , tiValue      :: Text
+  , tiOnChange   :: OnChange
+  , tiFontConfig :: Maybe FontConfig
+  } deriving (Eq)
+
+-- Restricted monad: hidden constructor, can't be used inside the view function
+-- without going through setupAction.
+newtype ActionM a = ActionM { unActionM :: IO a }
+  deriving (Functor, Applicative, Monad)
+
+-- The only operations available in ActionM.
+createAction   :: IO ()           -> ActionM Action
+createOnChange :: (Text -> IO ()) -> ActionM OnChange
+
+-- The only way to escape ActionM. Documentation says: call at init time.
+setupAction :: RenderState -> ActionM a -> IO a
+```
+
+Usage:
+
+```haskell
+myApp :: IO MobileApp
+myApp = do
+  counter <- newIORef 0
+  rs <- newRenderState
+  (onIncrement, onDecrement) <- setupAction rs $ do
+    inc <- createAction (modifyIORef' counter (+ 1))
+    dec <- createAction (modifyIORef' counter (subtract 1))
+    pure (inc, dec)
+
+  pure MobileApp
+    { maView = \state -> pure $ Column    -- no ActionM here
+        [ Text (TextConfig (pack $ show (count state)) Nothing)
+        , Button (ButtonConfig "+" onIncrement Nothing)
+        , Button (ButtonConfig "-" onDecrement Nothing)
+        ]
+    }
+```
+
+### How diffing works
+
+Since `Action` and `OnChange` are just Ints, `ButtonConfig`, `TextInputConfig`,
+and `Widget` all derive `Eq` naturally — no TTG, no `toUnit`, no phase parameter.
+
+The retained tree stores the previous `Widget` and its native node IDs.
+On re-render:
+
+1. Compare `oldWidget == newWidget` (derived `Eq`, comparing Action Ints).
+2. If equal → skip, native node stays as-is, callback IntMap unchanged.
+3. If different → diff properties, emit targeted bridge calls.
+
+Callback IntMaps are **never cleared**. Actions registered at init time stay
+valid for the lifetime of the app. The renderer never touches the callback
+registry — it only reads Action IDs from the widget tree and passes them to
+`Bridge.setHandler`.
+
+### Callback lifecycle
+
+Actions close over `IORef`s / `MVar`s. The closure is stable — registered once,
+fires many times. Each firing reads current state from the ref:
+
+```haskell
+-- Registered once, but reads counter's current value each time it fires.
+onIncrement <- createAction (modifyIORef' counter (+ 1))
+```
+
+This covers the common case. For the rare case where the closure body itself
+must change (not just the state it reads), `updateAction` could be provided:
+
+```haskell
+updateAction :: RenderState -> Action -> IO () -> IO ()
+```
+
+But the need for this should be rare — closing over an IORef and branching
+inside the closure handles most dynamic behaviour.
+
+### Strengths
+
+- **Widget derives `Eq` naturally.** No TTG, no `toUnit`, no phase parameter.
+  `ButtonConfig`, `TextInputConfig`, `WebViewConfig`, `Widget` all get derived
+  `Eq` and `Show` with no special machinery.
+- **No callback atomicity gap.** IntMaps are populated at init and never cleared.
+  Events can fire at any time — the closure is always there.
+- **No per-render allocation.** No `toUnit` mirror tree, no fresh callback IDs
+  per render. The widget tree is diffed directly.
+- **Type system guides correct usage.** `ActionM` is opaque — you can't call
+  `createAction` inside the view function without explicitly calling `setupAction`,
+  which the documentation warns against doing per-render. The type doesn't prevent
+  misuse, but it makes it visible and deliberate.
+- **Property-level patching is natural.** Since you're comparing real `Eq` on
+  config types, you can also compare individual fields and emit targeted
+  `setStrProp` / `setNumProp` for just the changed property.
+- **No type signature pollution.** `Widget` stays `Widget`, not `Widget User`.
+  No downstream changes to demo apps or consumer code.
+- **Familiar pattern.** Similar to resource acquisition (`bracket`, `withFile`).
+  Register resources at startup, use handles thereafter.
+
+### Weaknesses
+
+- **API change for callback construction.** Users must switch from inline
+  `bcAction = modifyIORef' ref (+1)` to a two-step register-then-reference
+  pattern. This is a real ergonomic cost.
+- **Upfront registration.** All callbacks must be created before the first
+  render. Dynamic lists of widgets (e.g., a todo list where each item has a
+  delete button) require either pre-allocating a pool of Actions or calling
+  `setupAction` when items are added, which blurs the init-time boundary.
+- **Social contract, not enforcement.** `ActionM` discourages per-render
+  creation but doesn't prevent it — a user can call `setupAction rs $ createAction ...`
+  inside their view function. The consequence (fresh IDs each render, defeating
+  Eq) is non-obvious.
+- **Stale closure risk.** If the user's closure captures a value directly (not
+  via IORef), the closure is frozen at registration time. Subsequent state
+  changes won't be reflected. This is a footgun for users coming from
+  React-style "inline closures that capture current state by value."
+- **Dynamic callback escape hatch needed.** For widgets whose callback body
+  truly changes (not just the state it reads), `updateAction` is needed. This
+  complicates the "register once" model.
+
+---
+
+| Concern | A: TTG | B: Keys | C: Dirty | D: Stable IDs | E: Manual Eq | F: ActionM |
+|---|---|---|---|---|---|---|
+| Compiler-verified | Yes (derived Eq) | N/A | N/A | Yes (derived Eq) | No | Yes (derived Eq) |
+| Type signature changes | Yes (`Widget User`) | No | No | Yes (`CallbackId`) | No | No |
+| User API change | Minimal (signatures only) | Keys on dynamic lists | State management | Major (ID assignment) | None | Moderate (register + use) |
+| Callback atomicity | Gap exists | N/A (always re-register) | N/A | No gap | N/A (always re-register) | No gap |
+| Property-level patching | No (binary equal/not) | Yes | Yes | Yes | Yes | Yes |
+| GC pressure per render | O(n) toUnit allocation | Low | O(dirty) | Low | Low | Low |
+| Missed-field risk | None | None | N/A | None | High | None |
+| Familiar to React/Flutter devs | No | Yes | Somewhat | No | No | Somewhat (resource handles) |
 
 ## Bridge API Constraints
 
@@ -383,32 +526,42 @@ All approaches share a tension between two requirements:
    Android/iOS sends the callback ID back to Haskell. The Haskell side looks
    up the ID in an IntMap to find the closure.
 
-The safest lifecycle is:
+For approaches A–E (where callbacks live inside the widget tree), the safest
+lifecycle is:
 - Build the new callback IntMap during the diff walk
 - Swap the new IntMap into the RenderState atomically after the walk completes
 - Never clear + rebuild with a gap in between
 
-This eliminates the atomicity gap from Approach A and applies to any approach.
+Approach F sidesteps this tension entirely: callbacks are registered at init
+time into a persistent IntMap that is never cleared or rebuilt. The widget tree
+carries only opaque integer handles, so there is no callback lifecycle to
+manage during rendering at all.
 
 ## Recommendation
 
 No single approach is clearly superior. Key considerations:
 
-- If **type safety** is the priority (can't forget a field), Approach A (TTG)
-  or D (Stable IDs) provide compiler verification. A is less invasive to user
-  code.
+- If **type safety** is the priority (can't forget a field), Approaches A (TTG),
+  D (Stable IDs), and F (ActionM) all provide compiler-verified `Eq`. F
+  achieves this without type parameter pollution.
 - If **minimal API churn** is the priority, Approach E (manual structuralEq)
-  or B (keys) avoid type parameter changes entirely.
+  or B (keys) avoid type changes entirely, but E risks silent field omission.
 - If **performance** is the priority (minimal work per render), Approach C
   (dirty flagging) does the least work but requires the most invasive changes
-  to the programming model.
-- Approach A's atomicity gap should be fixed regardless — building new IntMaps
-  and swapping at the end is strictly better than clear-then-rebuild.
+  to the programming model. Approach F also has low per-render cost since
+  callbacks are pre-registered.
+- If **callback safety** is the priority, Approach F eliminates the problem
+  entirely — callbacks live in a persistent registry that is never cleared
+  during rendering. Approaches A–E all require some form of callback lifecycle
+  management during the render pass.
 - Property-level patching (`setStrProp` on the existing node instead of
   destroy+create) gives the biggest real-world performance win and is
-  independent of which diffing strategy is chosen.
+  independent of which diffing strategy is chosen. Approaches B, D, E, and F
+  support this naturally. Approach A would need additional per-field comparison.
 
-A pragmatic path forward might combine elements: use TTG for the type-safe
-comparison foundation (Approach A), add property-level patching to avoid
-unnecessary destroy/create, and fix the callback atomicity gap by building
-new maps during the walk and swapping at the end.
+Approach F (ActionM handles) is the current front-runner. It gives derived `Eq`
+with no type parameter changes, eliminates the callback atomicity problem, and
+nudges users toward stable callbacks via the restricted `ActionM` monad. The
+main open question is ergonomics for dynamic widget lists (e.g., a todo list
+where each item gets its own delete action) — this may require a pool pattern
+or a controlled escape hatch via `setupAction`.
