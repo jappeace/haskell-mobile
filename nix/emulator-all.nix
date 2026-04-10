@@ -160,6 +160,17 @@ let
     name = "haskell-mobile-authsession-apk";
   };
 
+  cameraAndroid = import ./android.nix {
+    inherit sources androidArch;
+    mainModule = ../test/CameraDemoMain.hs;
+  };
+  cameraApk = lib.mkApk {
+    sharedLibs = [{ lib = cameraAndroid; inherit abiDir; }];
+    androidSrc = ../android;
+    apkName = "haskell-mobile-camera.apk";
+    name = "haskell-mobile-camera-apk";
+  };
+
   androidComposition = pkgs.androidenv.composeAndroidPackages {
     platformVersions = [ emulatorApiLevel ];
     includeEmulator = true;

@@ -144,6 +144,17 @@ let
     name = "haskell-mobile-authsession-simulator-app";
   };
 
+  cameraIos = import ./ios.nix {
+    inherit sources;
+    mainModule = ../test/CameraDemoMain.hs;
+    simulator = true;
+  };
+  cameraSimApp = lib.mkSimulatorApp {
+    iosLib = cameraIos;
+    iosSrc = ../ios;
+    name = "haskell-mobile-camera-simulator-app";
+  };
+
   xcodegen = pkgs.xcodegen;
 
   testScripts = builtins.path { path = ../test; name = "test-scripts"; };
@@ -692,6 +703,7 @@ cp "$CAMERA_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/camera/include/"
 cp "$CAMERA_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/camera/include/"
 cp "$CAMERA_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/camera/include/"
 cp "$CAMERA_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/camera/include/"
+cp "$CAMERA_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/camera/include/"
 cp "$CAMERA_SHARE_DIR/include/CameraBridge.h" "$WORK_DIR/camera/include/"
 cp -r "$CAMERA_SHARE_DIR/HaskellMobile" "$WORK_DIR/camera/"
 cp "$CAMERA_SHARE_DIR/project.yml" "$WORK_DIR/camera/"
@@ -733,6 +745,7 @@ cp "$AUTH_SESSION_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/authsession/include/
 cp "$AUTH_SESSION_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/authsession/include/"
 cp "$AUTH_SESSION_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/authsession/include/"
 cp "$AUTH_SESSION_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/authsession/include/"
+cp "$AUTH_SESSION_SHARE_DIR/include/CameraBridge.h" "$WORK_DIR/authsession/include/"
 cp -r "$AUTH_SESSION_SHARE_DIR/HaskellMobile" "$WORK_DIR/authsession/"
 cp "$AUTH_SESSION_SHARE_DIR/project.yml" "$WORK_DIR/authsession/"
 chmod -R u+w "$WORK_DIR/authsession"
@@ -760,6 +773,30 @@ if [ -z "$AUTH_SESSION_APP" ]; then
     exit 1
 fi
 echo "AuthSession app: $AUTH_SESSION_APP"
+
+echo "=== Generating camera Xcode project ==="
+cd "$WORK_DIR/camera"
+${xcodegen}/bin/xcodegen generate
+
+echo "=== Building camera demo app for simulator ==="
+xcodebuild build \
+    -project HaskellMobile.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk iphonesimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/camera-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+CAMERA_APP=$(find "$WORK_DIR/camera-build" -name "*.app" -type d | head -1)
+if [ -z "$CAMERA_APP" ]; then
+    echo "ERROR: Could not find camera .app bundle"
+    exit 1
+fi
+echo "Camera app: $CAMERA_APP"
 
 # --- Discover latest iOS runtime ---
 echo "=== Discovering iOS runtime ==="
