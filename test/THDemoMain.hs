@@ -10,10 +10,17 @@ module Main where
 import Data.Text (pack)
 import Foreign.Ptr (Ptr)
 import THConsumer (thGreeting)
-import HaskellMobile (startMobileApp, platformLog, AppContext)
-import HaskellMobile.App (mobileApp)
+import HaskellMobile (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext)
+import HaskellMobile.Widget (TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do
   platformLog ("TH test app: " <> pack thGreeting)
-  startMobileApp mobileApp
+  startMobileApp thDemoApp
+
+-- | Minimal app for Template Haskell cross-compilation verification.
+thDemoApp :: MobileApp
+thDemoApp = MobileApp
+  { maContext = loggingMobileContext
+  , maView    = \_userState -> pure (Text TextConfig { tcLabel = "th-demo", tcFontConfig = Nothing })
+  }

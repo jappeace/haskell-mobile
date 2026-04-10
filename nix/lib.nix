@@ -237,11 +237,6 @@ in {
         cp ${haskellMobileSrc}/src/HaskellMobile/AppContext.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile.hs .
 
-        # Default App.hs — only copy if not already present (consumer may override)
-        if [ ! -f HaskellMobile/App.hs ]; then
-          cp ${haskellMobileSrc}/src/HaskellMobile/App.hs HaskellMobile/
-        fi
-
         # Extra module copies (consumer overrides, additional modules)
         ${extraModuleCopy}
 
@@ -560,11 +555,6 @@ in {
         cp ${haskellMobileSrc}/src/HaskellMobile/AppContext.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile.hs .
 
-        # Default App.hs — only copy if not already present
-        if [ ! -f HaskellMobile/App.hs ]; then
-          cp ${haskellMobileSrc}/src/HaskellMobile/App.hs HaskellMobile/
-        fi
-
         # Extra module copies
         ${extraModuleCopy}
 
@@ -757,11 +747,6 @@ open(sys.argv[1], "w").write(yml)
         cp ${haskellMobileSrc}/src/HaskellMobile/BottomSheet.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/AppContext.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile.hs .
-
-        # Default App.hs — only copy if not already present
-        if [ ! -f HaskellMobile/App.hs ]; then
-          cp ${haskellMobileSrc}/src/HaskellMobile/App.hs HaskellMobile/
-        fi
 
         # Extra module copies
         ${extraModuleCopy}

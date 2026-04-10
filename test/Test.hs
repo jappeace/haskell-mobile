@@ -41,7 +41,6 @@ import HaskellMobile.I18n
   , TranslateFailure(..)
   , translate
   )
-import HaskellMobile.App (mobileApp)
 import HaskellMobile.Lifecycle
   ( LifecycleEvent(..)
   , MobileContext(..)
@@ -141,7 +140,7 @@ main = do
   -- Create a single FFI context for permission round-trip tests.
   -- The C desktop stub uses a process-wide g_permission_ctx, so only
   -- one context can be active for FFI permission dispatch.
-  ffiCtxPtr <- startMobileApp mobileApp
+  ffiCtxPtr <- startMobileApp testApp
   ffiAppCtx <- derefAppContext ffiCtxPtr
   defaultMain (tests (acPermissionState ffiAppCtx) (acSecureStorageState ffiAppCtx) (acDialogState ffiAppCtx) (acAuthSessionState ffiAppCtx) (acBottomSheetState ffiAppCtx))
 
@@ -205,6 +204,14 @@ withContext callback action = withAppContext dummyApp action
       , maView    = \_userState -> pure (Text TextConfig { tcLabel = "dummy", tcFontConfig = Nothing })
       }
 
+-- | Trivial test app with loggingMobileContext and a simple Text view.
+-- Replaces the old App.mobileApp that used unsafePerformIO global state.
+testApp :: MobileApp
+testApp = MobileApp
+  { maContext = loggingMobileContext
+  , maView    = \_userState -> pure (Text TextConfig { tcLabel = "test", tcFontConfig = Nothing })
+  }
+
 allEvents :: [LifecycleEvent]
 allEvents = [Create, Start, Resume, Pause, Stop, Destroy, LowMemory]
 
@@ -241,8 +248,8 @@ lifecycleTests = testGroup "Lifecycle"
       received @?= allEvents
   , testCase "loggingMobileContext handles all events without throwing" $
       mapM_ (onLifecycle loggingMobileContext) allEvents
-  , testCase "mobileApp context handles all events without throwing" $
-      mapM_ (onLifecycle (maContext mobileApp)) allEvents
+  , testCase "testApp context handles all events without throwing" $
+      mapM_ (onLifecycle (maContext testApp)) allEvents
   ]
 
 uiTests :: TestTree
@@ -321,7 +328,7 @@ uiTests = testGroup "UI"
       -- Should not throw — exercises all node types
       renderWidget rs widget
 
-  , testCase "mobileApp view returns a widget" $ do
+  , testCase "testApp view returns a widget" $ do
       dummyPermState <- newPermissionState
       dummySecureStorageState <- newSecureStorageState
       dummyBleState  <- newBleState
@@ -340,18 +347,18 @@ uiTests = testGroup "UI"
             , userCameraState        = dummyCameraState
             , userBottomSheetState   = dummyBottomSheetState
             }
-      widget <- maView mobileApp dummyUserState
-      -- mobileApp is the counter demo; verify it's a column
+      widget <- maView testApp dummyUserState
+      -- testApp returns a Text widget
       case widget of
-        Column _        -> pure ()
-        Text _          -> assertFailure "expected Column, got Text"
-        Button _        -> assertFailure "expected Column, got Button"
-        TextInput _     -> assertFailure "expected Column, got TextInput"
-        Image _         -> assertFailure "expected Column, got Image"
-        WebView _       -> assertFailure "expected Column, got WebView"
-        Row _           -> assertFailure "expected Column, got Row"
-        ScrollView _    -> assertFailure "expected Column, got ScrollView"
-        Styled _ _      -> assertFailure "expected Column, got Styled"
+        Text _          -> pure ()
+        Column _        -> assertFailure "expected Text, got Column"
+        Button _        -> assertFailure "expected Text, got Button"
+        TextInput _     -> assertFailure "expected Text, got TextInput"
+        Image _         -> assertFailure "expected Text, got Image"
+        WebView _       -> assertFailure "expected Text, got WebView"
+        Row _           -> assertFailure "expected Text, got Row"
+        ScrollView _    -> assertFailure "expected Text, got ScrollView"
+        Styled _ _      -> assertFailure "expected Text, got Styled"
   ]
 
 -- | Tests for the ScrollView widget binding.
@@ -756,7 +763,7 @@ colorTests = testGroup "Colors"
 registrationTests :: TestTree
 registrationTests = testGroup "Registration"
   [ testCase "startMobileApp returns working context" $ do
-      ctxPtr <- startMobileApp mobileApp
+      ctxPtr <- startMobileApp testApp
       appCtx <- derefAppContext ctxPtr
       -- Verify the context has a working lifecycle callback
       mapM_ (onLifecycle (acMobileContext appCtx)) [Create, Destroy]

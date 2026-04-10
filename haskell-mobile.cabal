@@ -63,7 +63,6 @@ library
       HaskellMobile
       HaskellMobile.AppContext
       HaskellMobile.Types
-      HaskellMobile.App
       HaskellMobile.Lifecycle
       HaskellMobile.Widget
       HaskellMobile.UIBridge
@@ -99,15 +98,6 @@ library
       cbits/bottom_sheet_bridge.c
   include-dirs:
       include
-
-executable exe
-  import: common-options
-  main-is: Main.hs
-  hs-source-dirs:
-      app
-  build-depends:
-      haskell-mobile
-  ghc-options: -Wno-unused-packages -threaded -rtsopts "-with-rtsopts=-N -M7G -T -Iw10"
 
 test-suite unit
   import: common-options
