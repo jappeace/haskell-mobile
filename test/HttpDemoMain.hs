@@ -57,7 +57,7 @@ httpDemoView userState = do
               }
             (\result -> case result of
               Right response ->
-                platformLog ("HTTP response: " <> pack (show (hrStatus response)))
+                platformLog ("HTTP response: " <> pack (show (hrStatusCode response)))
               Left (HttpNetworkError errorMsg) ->
                 platformLog ("HTTP error: " <> errorMsg)
               Left HttpTimeout ->
