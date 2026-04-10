@@ -5,6 +5,11 @@
 #   $out/lib/*.a       — static archives
 #   $out/pkgdb/        — GHC package database (.conf + cache)
 #
+# On aarch64, includes Template Haskell cross-compilation support:
+# static iserv-proxy, native libdl, mmap wrapper, QEMU guest_base
+# overlay, and package DB patching.  These are no-ops when TH isn't
+# used, so they're always enabled for aarch64.
+#
 # Consumers supply their own dependencies via consumerCabalFile (IFD),
 # consumerCabal2Nix (pre-generated), or hpkgs overrides.
 { sources
@@ -27,20 +32,155 @@ let
     inherit androidArch;
   };
 
-  pkgs = import nixpkgsSrc {
+  # QEMU overlay for aarch64 TH cross-compilation.
+  # Without -B, QEMU uses guest_base=0: guest addresses map directly to
+  # host addresses.  The guest binary loads at ~0x200000 where QEMU's own
+  # code resides, so mmap hints from GHC's RTS linker are ignored.
+  # Loaded .o code lands far from the binary's symbols, exceeding the
+  # +-4 GiB range of aarch64 ADRP relocations.
+  # -B 0x4000000000 shifts the guest address space by 256 GiB.
+  qemuOverlay = final: prev: {
+    qemu-user = prev.symlinkJoin {
+      name = "qemu-user-with-guest-base";
+      paths = [ prev.qemu-user ];
+      postBuild = ''
+        rm $out/bin/qemu-aarch64
+        cat > $out/bin/qemu-aarch64 <<'WRAPPER'
+#!/bin/sh
+exec ${prev.qemu-user}/bin/qemu-aarch64 -B 0x4000000000 "$@"
+WRAPPER
+        chmod +x $out/bin/qemu-aarch64
+      '';
+    };
+  };
+
+  pkgs = import nixpkgsSrc ({
     config.allowUnfree = true;
     config.android_sdk.accept_license = true;
-  };
+  } // (if androidArch == "aarch64"
+        then { overlays = [ qemuOverlay ]; }
+        else {}));
 
   # Cross-compilation toolchain
   androidPkgs = pkgs.pkgsCross.${archConfig.crossAttr};
 
-  # Default overrides needed for cross-compilation:
-  # - vector: test suite uses GHC plugins (inspection-testing), incompatible
-  #   with cross-compilation's external interpreter.
-  defaultOverrides = self: super: {
+  # --- aarch64 TH support: static C libraries ---
+  # Static versions of C libraries so iserv-proxy-interpreter can be
+  # linked statically.  A static binary does not need /system/bin/linker64,
+  # which lets QEMU run it on the build host during TH evaluation.
+  gmpStatic = androidPkgs.gmp.overrideAttrs (old: {
+    dontDisableStatic = true;
+  });
+  libffiStatic = androidPkgs.libffi.overrideAttrs (old: {
+    dontDisableStatic = true;
+  });
+  numactlStatic = androidPkgs.numactl.overrideAttrs (old: {
+    dontDisableStatic = true;
+  });
+
+  # Android NDK ships libdl.a as LLVM bitcode with stub implementations
+  # where dlerror() returns "libdl.a is a stub --- use libdl.so instead".
+  # GHC's RTS linker can't parse LLVM bitcode as ELF.
+  #
+  # Fix: provide a native-ELF libdl.a that implements dlopen/dlsym by
+  # searching the process's own dynamic symbol table.  Combined with
+  # --export-dynamic on iserv-proxy-interpreter, this lets the RTS
+  # linker resolve symbols (strlen, ghc-prim, etc.) from the static binary.
+  libdlNative = pkgs.runCommand "libdl-native-android" {
+    nativeBuildInputs = [ androidPkgs.stdenv.cc ];
+  } ''
+    ${androidPkgs.stdenv.cc.targetPrefix}clang -c -fPIC -o dl_impl.o ${./th-support/dl_impl.c}
+    ${androidPkgs.stdenv.cc.targetPrefix}clang -c -fPIC -o mmap_wrapper.o ${./th-support/mmap_wrapper.c}
+    mkdir -p $out/lib
+    ${androidPkgs.stdenv.cc.targetPrefix}ar rcs $out/lib/libdl.a dl_impl.o
+    ${androidPkgs.stdenv.cc.targetPrefix}ar rcs $out/lib/libmmap_wrapper.a mmap_wrapper.o
+  '';
+
+  # --- Haskell package overrides ---
+
+  # vector: test suite uses GHC plugins (inspection-testing), incompatible
+  # with cross-compilation's external interpreter.
+  vectorOverride = self: super: {
     vector = pkgs.haskell.lib.dontBenchmark (pkgs.haskell.lib.dontCheck super.vector);
   };
+
+  # Template Haskell cross-compilation overrides (aarch64 only).
+  #
+  # Overrides mkDerivation to fix TH evaluation: copies GHC's global
+  # package DB entries into the local DB, resolves ${pkgroot} to absolute
+  # paths, and clears dynamic-library-dirs to force LoadArchive.
+  #
+  # Builds iserv-proxy as a static binary with --export-dynamic so our
+  # dlsym can find symbols, --hash-style=sysv for DT_HASH, and
+  # --wrap=mmap to intercept NULL-hint mmaps from GHC's RTS linker.
+  thOverrides = self: super: {
+    mkDerivation = args:
+      let isIservProxy = (args.pname or "") == "iserv-proxy";
+      in super.mkDerivation (args // {
+        preConfigure = (args.preConfigure or "") +
+          (if isIservProxy then "" else ''
+            # --- TH cross-compilation fix ---
+            # Copy GHC's global package DB entries (rts, base, ghc-prim,
+            # etc.) into the local package DB so we can patch them.
+            # The local DB shadows the global one.
+            _ghcLibDir=$(${self.ghc}/bin/${self.ghc.targetPrefix}ghc --print-libdir)
+            _globalConfDir="$_ghcLibDir/package.conf.d"
+            if [ -d "$_globalConfDir" ] && [ -d "$packageConfDir" ]; then
+              echo "TH-fix: copying global package DB from $_globalConfDir"
+              for _conf in "$_globalConfDir"/*.conf; do
+                _name=$(basename "$_conf")
+                if [ ! -e "$packageConfDir/$_name" ]; then
+                  cp "$_conf" "$packageConfDir/$_name"
+                fi
+              done
+              # Patch ALL conf files:
+              # 1. Resolve ''${pkgroot} to absolute paths (relative refs
+              #    break when boot packages are copied to the local DB)
+              # 2. Clear dynamic-library-dirs (forces LoadArchive over
+              #    LoadDLL for Haskell .a files)
+              # extra-libraries are kept: our dlsym resolves C symbols
+              # from the static iserv-proxy-interpreter binary.
+              for _conf in "$packageConfDir"/*.conf; do
+                ${pkgs.gawk}/bin/awk -v pkgroot="$_ghcLibDir" '
+                  { gsub(/\$\{pkgroot\}/, pkgroot) }
+                  /^dynamic-library-dirs:/ { print "dynamic-library-dirs:"; skip=1; next }
+                  skip && /^[[:space:]]/ { next }
+                  { skip=0; print }
+                ' "$_conf" > "$_conf.tmp" && mv "$_conf.tmp" "$_conf"
+              done
+              echo "TH-fix: patched package DB, recaching"
+              ${self.ghc}/bin/${self.ghc.targetPrefix}ghc-pkg --package-db="$packageConfDir" recache
+              echo "TH-fix: rts include-dirs after patch:"
+              grep -A3 "include-dirs" "$packageConfDir"/rts-*.conf || true
+            fi
+          '');
+      });
+    # Build iserv-proxy-interpreter as a static binary so QEMU can
+    # run it without Android's /system/bin/linker64.
+    # --export-dynamic populates .dynsym so our dlsym can find symbols.
+    # --hash-style=sysv provides DT_HASH (needed by our dlsym impl).
+    # --wrap=mmap intercepts NULL-hint mmaps from GHC's RTS linker
+    # (which uses mmap(NULL,...) on aarch64 due to linkerAlwaysPic=true)
+    # and provides hints near the binary so allocations stay within
+    # the +-4 GiB ADRP relocation range.
+    iserv-proxy = pkgs.haskell.lib.appendConfigureFlags super.iserv-proxy [
+      "--ghc-option=-optl-static"
+      "--ghc-option=-optl-pie"
+      "--ghc-option=-optl-Wl,--export-dynamic"
+      "--ghc-option=-optl-Wl,--hash-style=sysv"
+      "--ghc-option=-optl-Wl,--wrap=mmap"
+      "--ghc-option=-optl-lmmap_wrapper"
+      "--extra-lib-dirs=${gmpStatic}/lib"
+      "--extra-lib-dirs=${libffiStatic}/lib"
+      "--extra-lib-dirs=${numactlStatic}/lib"
+      "--extra-lib-dirs=${libdlNative}/lib"
+    ];
+  };
+
+  defaultOverrides =
+    if androidArch == "aarch64"
+    then pkgs.lib.composeExtensions vectorOverride thOverrides
+    else vectorOverride;
 
   # armv7a: disable profiling — LLVM ARM backend crashes in
   # ARMAsmPrinter::emitXXStructor when compiling profiled libraries.
