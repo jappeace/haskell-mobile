@@ -8,10 +8,7 @@ source "$(dirname "$0")/helpers.sh"
 
 EXIT_CODE=0
 
-install_apk "$COUNTER_APK" || { echo "FAIL: install_apk"; exit 1; }
-
-"$ADB" -s "$EMULATOR_SERIAL" logcat -c
-"$ADB" -s "$EMULATOR_SERIAL" shell am start -n "$PACKAGE/$ACTIVITY"
+start_app "$COUNTER_APK" "lifecycle"
 
 wait_for_logcat "Android UI bridge initialized" 60
 WAIT_RC=$?
@@ -22,8 +19,7 @@ if [ $WAIT_RC -eq 2 ]; then
 fi
 
 # Dump final logcat for assertions
-LOGCAT_FILE="$WORK_DIR/lifecycle_logcat.txt"
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1 || true
+collect_logcat "lifecycle"
 
 assert_logcat "$LOGCAT_FILE" "Lifecycle: Create" "Lifecycle: Create"
 assert_logcat "$LOGCAT_FILE" "Lifecycle: Resume" "Lifecycle: Resume"

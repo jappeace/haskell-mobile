@@ -168,6 +168,43 @@ assert_logcat() {
         echo "PASS: $label"
     else
         echo "FAIL: $label"
+        # shellcheck disable=SC2034  # set for caller
         EXIT_CODE=1
     fi
+}
+
+# start_app APK_PATH LABEL [EXTRAS...]
+# Installs APK, clears logcat, starts activity with optional intent extras.
+start_app() {
+    local apk_path="$1"
+    local label="$2"
+    shift 2
+
+    install_apk "$apk_path" || { echo "FAIL: install_apk"; exit 1; }
+
+    "$ADB" -s "$EMULATOR_SERIAL" logcat -c
+    "$ADB" -s "$EMULATOR_SERIAL" shell am start -n "$PACKAGE/$ACTIVITY" "$@"
+}
+
+# wait_for_render LABEL
+# Waits for "setRoot" (120s). Aborts on fatal crash.
+wait_for_render() {
+    local label="$1"
+
+    wait_for_logcat "setRoot" 120
+    local wait_rc=$?
+    if [ $wait_rc -eq 2 ]; then
+        dump_logcat "$label"
+        echo "FATAL: Native library failed to load — aborting"
+        exit 1
+    fi
+}
+
+# collect_logcat LABEL
+# Dumps logcat to file. Sets: LOGCAT_FILE.
+collect_logcat() {
+    local label="$1"
+
+    LOGCAT_FILE="$WORK_DIR/${label}_logcat.txt"
+    "$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1 || true
 }

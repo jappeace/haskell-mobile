@@ -33,6 +33,8 @@ let
     };
   } else {});
 
+  testScripts = builtins.path { path = ../test; name = "test-scripts"; };
+
 in
   buildTargets // testRunners // {
     # Meta-target: builds every compilation/link-test target.
@@ -44,5 +46,22 @@ in
         builtins.map (name: "ln -s ${buildTargets.${name}} $out/${name}")
           (builtins.attrNames buildTargets)
       )}
+    '';
+
+    # Lint all test shell scripts with shellcheck.
+    shellcheck = pkgs.runCommand "ci-shellcheck" {
+      nativeBuildInputs = [ pkgs.shellcheck ];
+    } ''
+      shellcheck -x \
+        --source-path=${testScripts}/android \
+        ${testScripts}/android/*.sh
+      shellcheck -x \
+        --source-path=${testScripts}/ios \
+        ${testScripts}/ios/*.sh
+      shellcheck -x \
+        --source-path=${testScripts}/watchos \
+        ${testScripts}/watchos/*.sh
+      echo "All shell scripts passed shellcheck."
+      touch $out
     '';
   }

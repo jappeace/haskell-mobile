@@ -9,10 +9,7 @@ source "$(dirname "$0")/helpers.sh"
 
 EXIT_CODE=0
 
-install_apk "$BOTTOM_SHEET_APK" || { echo "FAIL: install_apk"; exit 1; }
-
-"$ADB" -s "$EMULATOR_SERIAL" logcat -c
-"$ADB" -s "$EMULATOR_SERIAL" shell am start -n "$PACKAGE/$ACTIVITY"
+start_app "$BOTTOM_SHEET_APK" "bottomsheet"
 
 wait_for_logcat "setRoot" 120 || true
 sleep 5
@@ -25,8 +22,7 @@ sleep 3
 tap_button "Edit" || { echo "FAIL: could not tap Edit"; EXIT_CODE=1; }
 sleep 3
 
-LOGCAT_FILE="$WORK_DIR/bottomsheet_logcat.txt"
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1
+collect_logcat "bottomsheet"
 
 assert_logcat "$LOGCAT_FILE" "BottomSheet result: BottomSheetItemSelected 0" "bottom sheet callback fires with BottomSheetItemSelected 0"
 

@@ -9,10 +9,7 @@ source "$(dirname "$0")/helpers.sh"
 
 EXIT_CODE=0
 
-install_apk "$SECURE_STORAGE_APK" || { echo "FAIL: install_apk"; exit 1; }
-
-"$ADB" -s "$EMULATOR_SERIAL" logcat -c
-"$ADB" -s "$EMULATOR_SERIAL" shell am start -n "$PACKAGE/$ACTIVITY"
+start_app "$SECURE_STORAGE_APK" "securestorage"
 
 wait_for_logcat "setRoot" 120 || true
 sleep 5
@@ -25,8 +22,7 @@ sleep 3
 tap_button "Read Token" || { echo "FAIL: could not tap Read Token"; EXIT_CODE=1; }
 sleep 3
 
-LOGCAT_FILE="$WORK_DIR/securestorage_logcat.txt"
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1
+collect_logcat "securestorage"
 
 assert_logcat "$LOGCAT_FILE" "SecureStorage write result: StorageSuccess" "write callback fires with StorageSuccess"
 assert_logcat "$LOGCAT_FILE" "SecureStorage read result: StorageSuccess" "read callback fires with StorageSuccess"

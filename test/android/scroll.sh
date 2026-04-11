@@ -8,22 +8,10 @@ source "$(dirname "$0")/helpers.sh"
 
 EXIT_CODE=0
 
-install_apk "$SCROLL_APK" || { echo "FAIL: install_apk"; exit 1; }
-
-"$ADB" -s "$EMULATOR_SERIAL" logcat -c
-"$ADB" -s "$EMULATOR_SERIAL" shell am start -n "$PACKAGE/$ACTIVITY"
-
-wait_for_logcat "setRoot" 120
-WAIT_RC=$?
-if [ $WAIT_RC -eq 2 ]; then
-    dump_logcat "scroll"
-    echo "FATAL: Native library failed to load — aborting"
-    exit 1
-fi
+start_app "$SCROLL_APK" "scroll"
+wait_for_render "scroll"
 sleep 5
-
-LOGCAT_FILE="$WORK_DIR/scroll_logcat.txt"
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1 || true
+collect_logcat "scroll"
 
 assert_logcat "$LOGCAT_FILE" "createNode.*type=5" "createNode(type=5) scroll view"
 
@@ -93,7 +81,7 @@ if [ $tap_done -eq 0 ]; then
 fi
 sleep 5
 
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1 || true
+collect_logcat "scroll"
 assert_logcat "$LOGCAT_FILE" "Click dispatched" "Click dispatched after Reached Bottom tap"
 
 "$ADB" -s "$EMULATOR_SERIAL" uninstall "$PACKAGE" 2>/dev/null || true

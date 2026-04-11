@@ -8,43 +8,18 @@ source "$(dirname "$0")/helpers.sh"
 
 EXIT_CODE=0
 
-xcrun simctl install "$SIM_UDID" "$COUNTER_APP"
-echo "Counter app installed."
-
-BUTTONS_START=$(date "+%Y-%m-%d %H:%M:%S")
-
-LOG_FILE="$WORK_DIR/buttons_log.txt"
-> "$LOG_FILE"
-xcrun simctl spawn "$SIM_UDID" log stream \
-    --level info \
-    --predicate "process == \"HaskellMobile\"" \
-    --style compact \
-    > "$LOG_FILE" 2>&1 &
-LOG_STREAM_PID=$!
-sleep 2
-
-xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID" --autotest-buttons
+start_app "$COUNTER_APP" "buttons" --autotest-buttons
 
 # Wait for final value Counter: -1
-wait_for_log "$LOG_FILE" "setStrProp.*Counter: -1" 60
+wait_for_log "$STREAM_LOG" "setStrProp.*Counter: -1" 60
 WAIT_RC=$?
 if [ $WAIT_RC -eq 2 ]; then
-    dump_ios_log "$LOG_FILE" "buttons"
+    dump_ios_log "$STREAM_LOG" "buttons"
     echo "FATAL: Native library failed to load — aborting"
     exit 1
 fi
 
-kill "$LOG_STREAM_PID" 2>/dev/null || true
-sleep 1
-
-# Retrieve full log for reliable assertion; fall back to stream log if empty
-FULL_LOG="$WORK_DIR/buttons_full.txt"
-get_full_log "$BUTTONS_START" "$FULL_LOG"
-
-if ! grep -q "setStrProp" "$FULL_LOG" 2>/dev/null; then
-    echo "  'log show' empty, using stream log"
-    FULL_LOG="$LOG_FILE"
-fi
+collect_logs "buttons"
 
 assert_log "$FULL_LOG" "setStrProp.*Counter: 0" "Counter: 0 in sequence"
 assert_log "$FULL_LOG" "setStrProp.*Counter: 1" "Counter: 1 in sequence"
@@ -66,6 +41,6 @@ else
     echo "WARN: Counter: 0 seen $count_0 time(s), expected 2 (log may deduplicate)"
 fi
 
-xcrun simctl uninstall "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
+cleanup_app
 
 exit $EXIT_CODE

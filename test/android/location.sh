@@ -2,8 +2,6 @@
 # Android location test: install location APK, launch app, verify GPS
 # updates flow through the bridge.
 #
-# On emulator, GPS is simulated via `geo fix` command.
-#
 # Required env vars (set by emulator-all.nix harness):
 #   ADB, EMULATOR_SERIAL, LOCATION_APK, PACKAGE, ACTIVITY, WORK_DIR
 set -euo pipefail
@@ -11,10 +9,7 @@ source "$(dirname "$0")/helpers.sh"
 
 EXIT_CODE=0
 
-install_apk "$LOCATION_APK" || { echo "FAIL: install_apk"; exit 1; }
-
-"$ADB" -s "$EMULATOR_SERIAL" logcat -c
-"$ADB" -s "$EMULATOR_SERIAL" shell am start -n "$PACKAGE/$ACTIVITY"
+start_app "$LOCATION_APK" "location"
 
 wait_for_logcat "setRoot" 120 || true
 sleep 5
@@ -31,8 +26,7 @@ sleep 3
 sleep 5
 
 # Re-dump logcat to capture location update
-LOGCAT_FILE="$WORK_DIR/location_logcat.txt"
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1 || true
+collect_logcat "location"
 assert_logcat "$LOGCAT_FILE" "Location:.*52.3" "Latitude appears in log"
 assert_logcat "$LOGCAT_FILE" "Location:.*4.9" "Longitude appears in log"
 

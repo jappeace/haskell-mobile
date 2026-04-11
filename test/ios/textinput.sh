@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 # iOS textinput test: install textinput app, launch, assert it renders without crashing.
 #
-# TextInput is not yet fully implemented on iOS, so this is a smoke test:
-# verify that the app starts and createNode is called.
-#
 # Required env vars (set by simulator-all.nix harness):
 #   SIM_UDID, BUNDLE_ID, TEXTINPUT_APP, WORK_DIR
 set -euo pipefail
@@ -11,62 +8,16 @@ source "$(dirname "$0")/helpers.sh"
 
 EXIT_CODE=0
 
-xcrun simctl install "$SIM_UDID" "$TEXTINPUT_APP"
-echo "TextInput app installed."
-
-TEXTINPUT_START=$(date "+%Y-%m-%d %H:%M:%S")
-
-STREAM_LOG="$WORK_DIR/textinput_stream.txt"
-> "$STREAM_LOG"
-xcrun simctl spawn "$SIM_UDID" log stream \
-    --level info \
-    --predicate "subsystem == \"$BUNDLE_ID\"" \
-    --style compact \
-    > "$STREAM_LOG" 2>&1 &
-LOG_STREAM_PID=$!
+start_app "$TEXTINPUT_APP" "textinput"
+wait_for_render "textinput"
 sleep 5
-
-xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID"
-
-render_done=0
-wait_for_log "$STREAM_LOG" "setRoot" 60
-WAIT_RC=$?
-if [ $WAIT_RC -eq 2 ]; then
-    dump_ios_log "$STREAM_LOG" "textinput"
-    echo "FATAL: Native library failed to load — aborting"
-    exit 1
-fi
-if [ $WAIT_RC -eq 0 ]; then
-    render_done=1
-fi
-
-if [ $render_done -eq 0 ]; then
-    echo "WARNING: setRoot not found — retrying with relaunch"
-    xcrun simctl terminate "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
-    sleep 3
-    > "$STREAM_LOG"
-    xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID"
-    wait_for_log "$STREAM_LOG" "setRoot" 60 || true
-fi
-
-sleep 5
-
-kill "$LOG_STREAM_PID" 2>/dev/null || true
-sleep 1
-
-FULL_LOG="$WORK_DIR/textinput_full.txt"
-get_full_log "$TEXTINPUT_START" "$FULL_LOG"
-
-if ! grep -q "setRoot" "$FULL_LOG" 2>/dev/null; then
-    echo "  'log show' empty/incomplete, using stream log"
-    FULL_LOG="$STREAM_LOG"
-fi
+collect_logs "textinput"
 
 assert_log "$FULL_LOG" "createNode" "createNode called (app renders without crashing)"
 assert_log "$FULL_LOG" "createNode\(type=4\)" "createNode(type=4) — UITextField created"
 assert_log "$FULL_LOG" "setHandler.*textChange" "setHandler with textChange — onChange registered"
 assert_log "$FULL_LOG" "setRoot" "setRoot"
 
-xcrun simctl uninstall "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
+cleanup_app
 
 exit $EXIT_CODE

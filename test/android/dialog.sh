@@ -9,10 +9,7 @@ source "$(dirname "$0")/helpers.sh"
 
 EXIT_CODE=0
 
-install_apk "$DIALOG_APK" || { echo "FAIL: install_apk"; exit 1; }
-
-"$ADB" -s "$EMULATOR_SERIAL" logcat -c
-"$ADB" -s "$EMULATOR_SERIAL" shell am start -n "$PACKAGE/$ACTIVITY"
+start_app "$DIALOG_APK" "dialog"
 
 wait_for_logcat "setRoot" 120 || true
 sleep 5
@@ -25,8 +22,7 @@ sleep 3
 tap_button "OK" || { echo "FAIL: could not tap OK"; EXIT_CODE=1; }
 sleep 3
 
-LOGCAT_FILE="$WORK_DIR/dialog_logcat.txt"
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1
+collect_logcat "dialog"
 
 assert_logcat "$LOGCAT_FILE" "Dialog alert result: DialogButton1" "alert callback fires with DialogButton1"
 

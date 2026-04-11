@@ -8,22 +8,10 @@ source "$(dirname "$0")/helpers.sh"
 
 EXIT_CODE=0
 
-install_apk "$WEBVIEW_APK" || { echo "FAIL: install_apk"; exit 1; }
-
-"$ADB" -s "$EMULATOR_SERIAL" logcat -c
-"$ADB" -s "$EMULATOR_SERIAL" shell am start -n "$PACKAGE/$ACTIVITY"
-
-wait_for_logcat "setRoot" 120
-WAIT_RC=$?
-if [ $WAIT_RC -eq 2 ]; then
-    dump_logcat "webview"
-    echo "FATAL: Native library failed to load — aborting"
-    exit 1
-fi
+start_app "$WEBVIEW_APK" "webview"
+wait_for_render "webview"
 sleep 5
-
-LOGCAT_FILE="$WORK_DIR/webview_logcat.txt"
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1 || true
+collect_logcat "webview"
 
 # WebView node created (type=8)
 assert_logcat "$LOGCAT_FILE" "createNode.*type=8" "createNode(type=8) WebView node"

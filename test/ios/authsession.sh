@@ -9,65 +9,15 @@ source "$(dirname "$0")/helpers.sh"
 
 EXIT_CODE=0
 
-xcrun simctl install "$SIM_UDID" "$AUTH_SESSION_APP"
-echo "AuthSession app installed."
-
-AUTH_START=$(date "+%Y-%m-%d %H:%M:%S")
-
-STREAM_LOG="$WORK_DIR/authsession_stream.txt"
-> "$STREAM_LOG"
-xcrun simctl spawn "$SIM_UDID" log stream \
-    --level info \
-    --predicate "subsystem == \"$BUNDLE_ID\"" \
-    --style compact \
-    > "$STREAM_LOG" 2>&1 &
-LOG_STREAM_PID=$!
+start_app "$AUTH_SESSION_APP" "authsession" --autotest-buttons
+wait_for_render "authsession" --autotest-buttons
 sleep 5
-
-xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID" --autotest-buttons
-
-render_done=0
-wait_for_log "$STREAM_LOG" "setRoot" 60
-WAIT_RC=$?
-if [ $WAIT_RC -eq 2 ]; then
-    dump_ios_log "$STREAM_LOG" "authsession"
-    echo "FATAL: Native library failed to load — aborting"
-    exit 1
-fi
-if [ $WAIT_RC -eq 0 ]; then
-    render_done=1
-fi
-
-if [ $render_done -eq 0 ]; then
-    echo "WARNING: setRoot not found — retrying with relaunch"
-    xcrun simctl terminate "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
-    sleep 3
-    > "$STREAM_LOG"
-    xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID" --autotest-buttons
-    wait_for_log "$STREAM_LOG" "setRoot" 60 || true
-fi
-
-sleep 5
-
-kill "$LOG_STREAM_PID" 2>/dev/null || true
-sleep 1
-
-FULL_LOG="$WORK_DIR/authsession_full.txt"
-get_full_log "$AUTH_START" "$FULL_LOG"
-
-if ! grep -q "setRoot" "$FULL_LOG" 2>/dev/null; then
-    echo "  'log show' empty/incomplete, using stream log"
-    FULL_LOG="$STREAM_LOG"
-fi
+collect_logs "authsession"
 
 assert_log "$FULL_LOG" "setRoot" "setRoot"
-
-# Demo app registered
 assert_log "$FULL_LOG" "AuthSession demo app registered" "demo app registered"
-
-# Auth session success via autotest stub
 assert_log "$FULL_LOG" "AuthSession success:" "AuthSession success logged"
 
-xcrun simctl uninstall "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
+cleanup_app
 
 exit $EXIT_CODE

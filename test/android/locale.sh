@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 # Android locale test: launch counter app, assert locale detection logs.
 #
-# haskellLogLocale is called from JNI_OnLoad, logging:
-#   "Locale raw: <tag>"
-#   "Locale parsed: <tag>"
-#
 # Required env vars (set by emulator-all.nix harness):
 #   ADB, EMULATOR_SERIAL, COUNTER_APK, PACKAGE, ACTIVITY, WORK_DIR
 set -euo pipefail
@@ -12,10 +8,7 @@ source "$(dirname "$0")/helpers.sh"
 
 EXIT_CODE=0
 
-install_apk "$COUNTER_APK" || { echo "FAIL: install_apk"; exit 1; }
-
-"$ADB" -s "$EMULATOR_SERIAL" logcat -c
-"$ADB" -s "$EMULATOR_SERIAL" shell am start -n "$PACKAGE/$ACTIVITY"
+start_app "$COUNTER_APK" "locale"
 
 wait_for_logcat "Locale parsed:" 60
 WAIT_RC=$?
@@ -25,8 +18,7 @@ if [ $WAIT_RC -eq 2 ]; then
     exit 1
 fi
 
-LOGCAT_FILE="$WORK_DIR/locale_logcat.txt"
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1 || true
+collect_logcat "locale"
 
 assert_logcat "$LOGCAT_FILE" "Locale raw:" "Locale raw tag logged"
 assert_logcat "$LOGCAT_FILE" "Locale parsed:" "Locale parsed tag logged"

@@ -2,11 +2,6 @@
 # Android BLE test: install BLE APK, launch app, verify adapter check
 # runs and start/stop scan don't crash.
 #
-# On emulator, BLE is typically unsupported, so we verify:
-#   - App boots and renders without crashing
-#   - Adapter status check runs (logged as "BLE adapter: ...")
-#   - Start/stop scan don't crash even on unsupported adapter
-#
 # Required env vars (set by emulator-all.nix harness):
 #   ADB, EMULATOR_SERIAL, BLE_APK, PACKAGE, ACTIVITY, WORK_DIR
 set -euo pipefail
@@ -14,17 +9,13 @@ source "$(dirname "$0")/helpers.sh"
 
 EXIT_CODE=0
 
-install_apk "$BLE_APK" || { echo "FAIL: install_apk"; exit 1; }
-
-"$ADB" -s "$EMULATOR_SERIAL" logcat -c
-"$ADB" -s "$EMULATOR_SERIAL" shell am start -n "$PACKAGE/$ACTIVITY"
+start_app "$BLE_APK" "ble"
 
 wait_for_logcat "setRoot" 120 || true
 sleep 5
 
 # Verify app rendered (setRoot logged)
-LOGCAT_FILE="$WORK_DIR/ble_logcat.txt"
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1 || true
+collect_logcat "ble"
 
 assert_logcat "$LOGCAT_FILE" "BLE bridge\|BleBridge" "BLE bridge log present"
 

@@ -8,28 +8,13 @@ source "$(dirname "$0")/helpers.sh"
 
 EXIT_CODE=0
 
-xcrun simctl install "$SIM_UDID" "$COUNTER_APP"
-echo "Counter app installed."
+start_app "$COUNTER_APP" "locale"
 
-LOG_FILE="$WORK_DIR/locale_log.txt"
-> "$LOG_FILE"
-xcrun simctl spawn "$SIM_UDID" log stream \
-    --level info \
-    --predicate "subsystem == \"$LOG_SUBSYSTEM\"" \
-    --style compact \
-    > "$LOG_FILE" 2>&1 &
-LOG_STREAM_PID=$!
-sleep 5
+wait_for_log "$STREAM_LOG" "Locale parsed:" 60 || true
 
-xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID"
+assert_log "$STREAM_LOG" "Locale raw:" "Locale raw tag logged"
+assert_log "$STREAM_LOG" "Locale parsed:" "Locale parsed tag logged"
 
-wait_for_log "$LOG_FILE" "Locale parsed:" 60 || true
-
-assert_log "$LOG_FILE" "Locale raw:" "Locale raw tag logged"
-assert_log "$LOG_FILE" "Locale parsed:" "Locale parsed tag logged"
-
-xcrun simctl terminate "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
-kill "$LOG_STREAM_PID" 2>/dev/null || true
-xcrun simctl uninstall "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
+cleanup_app
 
 exit $EXIT_CODE

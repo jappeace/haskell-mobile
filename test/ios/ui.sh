@@ -8,26 +8,13 @@ source "$(dirname "$0")/helpers.sh"
 
 EXIT_CODE=0
 
-xcrun simctl install "$SIM_UDID" "$COUNTER_APP"
-echo "Counter app installed."
-
-LOG_FILE="$WORK_DIR/ui_log.txt"
-> "$LOG_FILE"
-xcrun simctl spawn "$SIM_UDID" log stream \
-    --level info \
-    --predicate "subsystem == \"$BUNDLE_ID\"" \
-    --style compact \
-    > "$LOG_FILE" 2>&1 &
-LOG_STREAM_PID=$!
-sleep 5
-
-xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID" --autotest
+start_app "$COUNTER_APP" "ui" --autotest
 
 ui_done=0
-wait_for_log "$LOG_FILE" "setStrProp.*Counter: 1" 60
+wait_for_log "$STREAM_LOG" "setStrProp.*Counter: 1" 60
 WAIT_RC=$?
 if [ $WAIT_RC -eq 2 ]; then
-    dump_ios_log "$LOG_FILE" "ui"
+    dump_ios_log "$STREAM_LOG" "ui"
     echo "FATAL: Native library failed to load — aborting"
     exit 1
 fi
@@ -39,15 +26,13 @@ if [ $ui_done -eq 0 ]; then
     echo "WARNING: Counter: 1 not found — retrying with relaunch"
     xcrun simctl terminate "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
     sleep 3
-    > "$LOG_FILE"
+    : > "$STREAM_LOG"
     xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID" --autotest
-    wait_for_log "$LOG_FILE" "setStrProp.*Counter: 1" 60 || true
+    wait_for_log "$STREAM_LOG" "setStrProp.*Counter: 1" 60 || true
 fi
 
-assert_log "$LOG_FILE" "setStrProp.*Counter: 1" "Counter: 1 after --autotest tap"
+assert_log "$STREAM_LOG" "setStrProp.*Counter: 1" "Counter: 1 after --autotest tap"
 
-xcrun simctl terminate "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
-kill "$LOG_STREAM_PID" 2>/dev/null || true
-xcrun simctl uninstall "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
+cleanup_app
 
 exit $EXIT_CODE

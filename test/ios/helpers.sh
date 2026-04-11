@@ -83,6 +83,7 @@ assert_log() {
         echo "PASS: $label"
     else
         echo "FAIL: $label"
+        # shellcheck disable=SC2034  # set for caller
         EXIT_CODE=1
     fi
 }
@@ -98,4 +99,85 @@ get_full_log() {
         --style compact \
         --info \
         > "$outfile" 2>&1 || true
+}
+
+# start_app APP_PATH LABEL [LAUNCH_ARGS...]
+# Installs app, starts log stream, launches.
+# Sets: APP_START_TIME, STREAM_LOG, LOG_STREAM_PID.
+start_app() {
+    local app_path="$1"
+    local label="$2"
+    shift 2
+
+    xcrun simctl install "$SIM_UDID" "$app_path"
+    echo "App installed ($label)."
+
+    APP_START_TIME=$(date "+%Y-%m-%d %H:%M:%S")
+
+    STREAM_LOG="$WORK_DIR/${label}_stream.txt"
+    : > "$STREAM_LOG"
+    xcrun simctl spawn "$SIM_UDID" log stream \
+        --level info \
+        --predicate "subsystem == \"$BUNDLE_ID\"" \
+        --style compact \
+        > "$STREAM_LOG" 2>&1 &
+    LOG_STREAM_PID=$!
+    sleep 5
+
+    xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID" "$@"
+}
+
+# wait_for_render LABEL [LAUNCH_ARGS...]
+# Waits for "setRoot" with retry+relaunch. Aborts on fatal crash.
+# Uses STREAM_LOG set by start_app.
+wait_for_render() {
+    local label="$1"
+    shift
+
+    local render_done=0
+    wait_for_log "$STREAM_LOG" "setRoot" 60
+    local wait_rc=$?
+    if [ $wait_rc -eq 2 ]; then
+        dump_ios_log "$STREAM_LOG" "$label"
+        echo "FATAL: Native library failed to load — aborting"
+        exit 1
+    fi
+    if [ $wait_rc -eq 0 ]; then
+        render_done=1
+    fi
+
+    if [ $render_done -eq 0 ]; then
+        echo "WARNING: setRoot not found — retrying with relaunch"
+        xcrun simctl terminate "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
+        sleep 3
+        : > "$STREAM_LOG"
+        xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID" "$@"
+        wait_for_log "$STREAM_LOG" "setRoot" 60 || true
+    fi
+}
+
+# collect_logs LABEL
+# Kills log stream, retrieves persistent log with fallback to stream log.
+# Sets: FULL_LOG.
+collect_logs() {
+    local label="$1"
+
+    kill "$LOG_STREAM_PID" 2>/dev/null || true
+    sleep 1
+
+    FULL_LOG="$WORK_DIR/${label}_full.txt"
+    get_full_log "$APP_START_TIME" "$FULL_LOG"
+
+    if ! grep -q "setRoot" "$FULL_LOG" 2>/dev/null; then
+        echo "  'log show' empty/incomplete, using stream log"
+        FULL_LOG="$STREAM_LOG"
+    fi
+}
+
+# cleanup_app
+# Terminates app, kills log stream, uninstalls.
+cleanup_app() {
+    xcrun simctl terminate "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
+    kill "$LOG_STREAM_PID" 2>/dev/null || true
+    xcrun simctl uninstall "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
 }

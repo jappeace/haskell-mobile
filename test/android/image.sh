@@ -8,22 +8,10 @@ source "$(dirname "$0")/helpers.sh"
 
 EXIT_CODE=0
 
-install_apk "$IMAGE_APK" || { echo "FAIL: install_apk"; exit 1; }
-
-"$ADB" -s "$EMULATOR_SERIAL" logcat -c
-"$ADB" -s "$EMULATOR_SERIAL" shell am start -n "$PACKAGE/$ACTIVITY"
-
-wait_for_logcat "setRoot" 120
-WAIT_RC=$?
-if [ $WAIT_RC -eq 2 ]; then
-    dump_logcat "image"
-    echo "FATAL: Native library failed to load — aborting"
-    exit 1
-fi
+start_app "$IMAGE_APK" "image"
+wait_for_render "image"
 sleep 5
-
-LOGCAT_FILE="$WORK_DIR/image_logcat.txt"
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:I' > "$LOGCAT_FILE" 2>&1 || true
+collect_logcat "image"
 
 # All 3 Image nodes created (type=6)
 assert_logcat "$LOGCAT_FILE" "createNode.*type=6" "createNode(type=6) Image node"
