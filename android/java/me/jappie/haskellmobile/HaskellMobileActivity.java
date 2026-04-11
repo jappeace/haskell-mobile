@@ -578,12 +578,23 @@ public class HaskellMobileActivity extends Activity implements View.OnClickListe
                     } else {
                         transport = 4; /* NETWORK_TRANSPORT_OTHER */
                     }
-                    onNetworkStatusChange(1, transport);
+                    final int t = transport;
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            onNetworkStatusChange(1, t);
+                        }
+                    });
                 }
 
                 @Override
                 public void onLost(Network network) {
-                    onNetworkStatusChange(0, 0); /* disconnected, NETWORK_TRANSPORT_NONE */
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            onNetworkStatusChange(0, 0); /* disconnected, NETWORK_TRANSPORT_NONE */
+                        }
+                    });
                 }
             };
 
