@@ -207,6 +207,17 @@ let
     name = "haskell-mobile-networkstatus-apk";
   };
 
+  mapviewAndroid = import ./android.nix {
+    inherit sources androidArch;
+    mainModule = ../test/MapViewDemoMain.hs;
+  };
+  mapviewApk = lib.mkApk {
+    sharedLibs = [{ lib = mapviewAndroid; inherit abiDir; }];
+    androidSrc = ../android;
+    apkName = "haskell-mobile-mapview.apk";
+    name = "haskell-mobile-mapview-apk";
+  };
+
   androidComposition = pkgs.androidenv.composeAndroidPackages {
     platformVersions = [ emulatorApiLevel ];
     includeEmulator = true;
@@ -261,6 +272,7 @@ CAMERA_APK="${cameraApk}/haskell-mobile-camera.apk"
 BOTTOM_SHEET_APK="${bottomSheetApk}/haskell-mobile-bottomsheet.apk"
 HTTP_APK="${httpApk}/haskell-mobile-http.apk"
 NETWORK_STATUS_APK="${networkStatusApk}/haskell-mobile-networkstatus.apk"
+MAPVIEW_APK="${mapviewApk}/haskell-mobile-mapview.apk"
 PACKAGE="me.jappie.haskellmobile"
 ACTIVITY=".MainActivity"
 DEVICE_NAME="test_all"
@@ -286,7 +298,8 @@ for so_path in \
     "${cameraAndroid}/lib/${abiDir}/libhaskellmobile.so" \
     "${bottomSheetAndroid}/lib/${abiDir}/libhaskellmobile.so" \
     "${httpAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${networkStatusAndroid}/lib/${abiDir}/libhaskellmobile.so"; do
+    "${networkStatusAndroid}/lib/${abiDir}/libhaskellmobile.so" \
+    "${mapviewAndroid}/lib/${abiDir}/libhaskellmobile.so"; do
     SO_BYTES=$(stat -c %s "$so_path")
     SO_MB=$((SO_BYTES / 1048576))
     SO_LABEL=$(echo "$so_path" | grep -oP '[^/]+(?=/lib/)')
@@ -468,7 +481,7 @@ sleep 30
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK PACKAGE ACTIVITY WORK_DIR
+export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK PACKAGE ACTIVITY WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -544,6 +557,8 @@ echo "--- location ---"
 run_with_retry "location" bash "$TEST_SCRIPTS/android/location.sh" || PHASE7_EXIT=1
 echo "--- webview ---"
 run_with_retry "webview" bash "$TEST_SCRIPTS/android/webview.sh" || PHASE9_EXIT=1
+echo "--- mapview ---"
+run_with_retry "mapview" bash "$TEST_SCRIPTS/android/mapview.sh" || PHASE9_EXIT=1
 echo "--- authsession ---"
 run_with_retry "authsession" bash "$TEST_SCRIPTS/android/authsession.sh" || PHASE10_EXIT=1
 echo "--- camera ---"

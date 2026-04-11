@@ -176,6 +176,17 @@ let
     name = "haskell-mobile-watchos-networkstatus-simulator-app";
   };
 
+  mapviewWatchos = import ./watchos.nix {
+    inherit sources;
+    mainModule = ../test/MapViewDemoMain.hs;
+    simulator = true;
+  };
+  mapviewSimApp = lib.mkWatchOSSimulatorApp {
+    watchosLib = mapviewWatchos;
+    watchosSrc = ../watchos;
+    name = "haskell-mobile-watchos-mapview-simulator-app";
+  };
+
   xcodegen = pkgs.xcodegen;
 
   testScripts = builtins.path { path = ../test; name = "test-scripts"; };
@@ -210,6 +221,7 @@ AUTH_SESSION_SHARE_DIR="${authSessionSimApp}/share/watchos"
 CAMERA_SHARE_DIR="${cameraSimApp}/share/watchos"
 BOTTOM_SHEET_SHARE_DIR="${bottomSheetSimApp}/share/watchos"
 NETWORK_STATUS_SHARE_DIR="${networkStatusSimApp}/share/watchos"
+MAPVIEW_SHARE_DIR="${mapviewSimApp}/share/watchos"
 TEST_SCRIPTS="${testScripts}"
 
 # --- Temp working directory ---
@@ -265,7 +277,8 @@ for share_dir in \
     "$AUTH_SESSION_SHARE_DIR" \
     "$CAMERA_SHARE_DIR" \
     "$BOTTOM_SHEET_SHARE_DIR" \
-    "$NETWORK_STATUS_SHARE_DIR"; do
+    "$NETWORK_STATUS_SHARE_DIR" \
+    "$MAPVIEW_SHARE_DIR"; do
     a_path="$share_dir/lib/libHaskellMobile.a"
     A_BYTES=$(stat -f %z "$a_path" 2>/dev/null || stat -c %s "$a_path" 2>/dev/null || echo 0)
     A_MB=$((A_BYTES / 1048576))
@@ -893,6 +906,49 @@ if [ -z "$NETWORK_STATUS_APP" ]; then
 fi
 echo "NetworkStatus app: $NETWORK_STATUS_APP"
 
+# --- Stage and build mapview demo app ---
+echo "=== Staging mapview demo app ==="
+mkdir -p "$WORK_DIR/mapview/lib" "$WORK_DIR/mapview/include"
+cp "$MAPVIEW_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/mapview/lib/"
+cp "$MAPVIEW_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/CameraBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/mapview/include/"
+cp -r "$MAPVIEW_SHARE_DIR/HaskellMobile" "$WORK_DIR/mapview/"
+cp "$MAPVIEW_SHARE_DIR/project.yml" "$WORK_DIR/mapview/"
+chmod -R u+w "$WORK_DIR/mapview"
+
+echo "=== Generating mapview Xcode project ==="
+cd "$WORK_DIR/mapview"
+${xcodegen}/bin/xcodegen generate
+
+echo "=== Building mapview demo app for watchOS simulator ==="
+xcodebuild build \
+    -project HaskellMobile.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk watchsimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/mapview-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+MAPVIEW_APP=$(find "$WORK_DIR/mapview-build" -name "*.app" -type d | head -1)
+if [ -z "$MAPVIEW_APP" ]; then
+    echo "ERROR: Could not find mapview .app bundle"
+    exit 1
+fi
+echo "MapView app: $MAPVIEW_APP"
+
 # --- Discover latest watchOS runtime ---
 echo "=== Discovering watchOS runtime ==="
 RUNTIME=$(xcrun simctl list runtimes -j \
@@ -956,7 +1012,7 @@ sleep 5
 # ===========================================================================
 # Log subsystem differs from bundle ID for watchOS (bundle ID has .watchkitapp suffix)
 LOG_SUBSYSTEM="me.jappie.haskellmobile"
-export SIM_UDID BUNDLE_ID LOG_SUBSYSTEM COUNTER_APP SCROLL_APP TEXTINPUT_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP CAMERA_APP BOTTOM_SHEET_APP NETWORK_STATUS_APP WORK_DIR
+export SIM_UDID BUNDLE_ID LOG_SUBSYSTEM COUNTER_APP SCROLL_APP TEXTINPUT_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP CAMERA_APP BOTTOM_SHEET_APP NETWORK_STATUS_APP MAPVIEW_APP WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -970,6 +1026,7 @@ PHASE9_EXIT=0
 PHASE10_EXIT=0
 PHASE11_EXIT=0
 PHASE12_EXIT=0
+PHASE13_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -1031,6 +1088,8 @@ echo "--- bottomsheet ---"
 run_with_retry "bottomsheet" bash "$TEST_SCRIPTS/watchos/bottomsheet.sh" || PHASE11_EXIT=1
 echo "--- networkstatus ---"
 run_with_retry "networkstatus" bash "$TEST_SCRIPTS/watchos/network_status.sh" || PHASE12_EXIT=1
+echo "--- mapview ---"
+run_with_retry "mapview" bash "$TEST_SCRIPTS/watchos/mapview.sh" || PHASE13_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -1151,6 +1210,16 @@ else
     echo "PHASE 12 FAILED"
 fi
 
+if [ $PHASE13_EXIT -eq 0 ]; then
+    PHASE13_OK=1
+    echo ""
+    echo "PHASE 13 PASSED"
+else
+    PHASE13_OK=0
+    echo ""
+    echo "PHASE 13 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -1242,6 +1311,13 @@ if [ $PHASE12_OK -eq 1 ]; then
     echo "PASS  Phase 12 — NetworkStatus demo app"
 else
     echo "FAIL  Phase 12 — NetworkStatus demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE13_OK -eq 1 ]; then
+    echo "PASS  Phase 13 — MapView demo app"
+else
+    echo "FAIL  Phase 13 — MapView demo app"
     FINAL_EXIT=1
 fi
 

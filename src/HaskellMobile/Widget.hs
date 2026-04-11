@@ -20,6 +20,7 @@ module HaskellMobile.Widget
   , ImageSource(..)
   , ImageConfig(..)
   , WebViewConfig(..)
+  , MapViewConfig(..)
   , Widget(..)
   , WidgetStyle(..)
   , TextAlignment(..)
@@ -188,6 +189,22 @@ data WebViewConfig = WebViewConfig
     -- ^ Optional handle for a callback fired when a page finishes loading.
   } deriving (Show, Eq)
 
+-- | Configuration for an embedded map view.
+-- Uses native MapKit on iOS, placeholder on Android/watchOS.
+data MapViewConfig = MapViewConfig
+  { mvLatitude         :: Double
+    -- ^ Center latitude.
+  , mvLongitude        :: Double
+    -- ^ Center longitude.
+  , mvZoom             :: Double
+    -- ^ Zoom level (1–20).
+  , mvShowUserLocation :: Bool
+    -- ^ Whether to show the user's current location.
+  , mvOnRegionChange   :: Maybe OnChange
+    -- ^ Optional callback fired when the user pans\/zooms.
+    -- Receives @\"lat,lon,zoom\"@ text encoding the new center and zoom.
+  } deriving (Show, Eq)
+
 -- | A declarative description of a UI element.
 data Widget
   = Text TextConfig
@@ -206,6 +223,8 @@ data Widget
     -- ^ An image widget displaying resource, file, or raw data.
   | WebView WebViewConfig
     -- ^ An embedded web view loading a URL.
+  | MapView MapViewConfig
+    -- ^ An embedded map view (native MapKit on iOS, placeholder elsewhere).
   | Styled WidgetStyle Widget
     -- ^ Apply visual style overrides to a child widget.
   deriving (Show, Eq)

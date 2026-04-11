@@ -11,6 +11,7 @@
 #define UI_NODE_TEXT_INPUT  4
 #define UI_NODE_SCROLL_VIEW 5
 #define UI_NODE_IMAGE       6
+#define UI_NODE_MAP_VIEW    7
 #define UI_NODE_WEBVIEW     8
 
 /* Property IDs for string properties */
@@ -27,7 +28,11 @@
 #define UI_PROP_PADDING     1
 #define UI_PROP_INPUT_TYPE  2
 #define UI_PROP_GRAVITY     3
-#define UI_PROP_SCALE_TYPE  4
+#define UI_PROP_SCALE_TYPE          4
+#define UI_PROP_MAP_LAT             5
+#define UI_PROP_MAP_LON             6
+#define UI_PROP_MAP_ZOOM            7
+#define UI_PROP_MAP_SHOW_USER_LOC   8
 
 /* Event types */
 #define UI_EVENT_CLICK       0

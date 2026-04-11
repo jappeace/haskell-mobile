@@ -6,6 +6,7 @@ module Test.WidgetTests
   , textInputTests
   , imageTests
   , webViewTests
+  , mapViewTests
   , styledTests
   , textAlignTests
   , colorTests
@@ -31,6 +32,7 @@ import HaskellMobile.Widget
   , ImageConfig(..)
   , ImageSource(..)
   , InputType(..)
+  , MapViewConfig(..)
   , ResourceName(..)
   , ScaleType(..)
   , TextAlignment(..)
@@ -169,6 +171,7 @@ uiTests = testGroup "UI"
         TextInput _     -> assertFailure "expected Text, got TextInput"
         Image _         -> assertFailure "expected Text, got Image"
         WebView _       -> assertFailure "expected Text, got WebView"
+        MapView _       -> assertFailure "expected Text, got MapView"
         Row _           -> assertFailure "expected Text, got Row"
         ScrollView _    -> assertFailure "expected Text, got ScrollView"
         Styled _ _      -> assertFailure "expected Text, got Styled"
@@ -576,4 +579,65 @@ colorTests = testGroup "Colors"
   , testCase "colorToHex roundtrips through colorFromText" $ do
       let color = Color 255 128 0 255
       colorFromText (colorToHex color) @?= Just color
+  ]
+
+-- | Tests for the MapView widget.
+mapViewTests :: TestTree
+mapViewTests = testGroup "MapView"
+  [ testCase "MapView renders without error" $ do
+      ((), rs) <- withActions (pure ())
+      renderWidget rs $ MapView MapViewConfig
+        { mvLatitude = 52.3676, mvLongitude = 4.9041
+        , mvZoom = 12.0, mvShowUserLocation = False
+        , mvOnRegionChange = Nothing
+        }
+
+  , testCase "region change callback registered and fires via dispatchTextEvent" $ do
+      ref <- newIORef ("" :: String)
+      (changeHandle, rs) <- withActions $
+        createOnChange (\t -> modifyIORef' ref (const (show t)))
+      renderWidget rs $ MapView MapViewConfig
+        { mvLatitude = 52.3676, mvLongitude = 4.9041
+        , mvZoom = 12.0, mvShowUserLocation = False
+        , mvOnRegionChange = Just changeHandle
+        }
+      dispatchTextEvent rs (onChangeId changeHandle) "51.5074,-0.1278,10.0"
+      val <- readIORef ref
+      val @?= show ("51.5074,-0.1278,10.0" :: String)
+
+  , testCase "MapView without callback renders cleanly" $ do
+      ((), rs) <- withActions (pure ())
+      renderWidget rs $ MapView MapViewConfig
+        { mvLatitude = 0.0, mvLongitude = 0.0
+        , mvZoom = 1.0, mvShowUserLocation = True
+        , mvOnRegionChange = Nothing
+        }
+      -- Dispatching unknown ID should not crash
+      dispatchTextEvent rs 999 "ignored"
+
+  , testCase "MapView inside Column renders" $ do
+      ((), rs) <- withActions (pure ())
+      renderWidget rs $ Column
+        [ Text TextConfig { tcLabel = "header", tcFontConfig = Nothing }
+        , MapView MapViewConfig
+            { mvLatitude = 52.3676, mvLongitude = 4.9041
+            , mvZoom = 12.0, mvShowUserLocation = False
+            , mvOnRegionChange = Nothing
+            }
+        ]
+
+  , testCase "re-render preserves region change callback" $ do
+      ref <- newIORef ("" :: String)
+      (changeHandle, rs) <- withActions $
+        createOnChange (\t -> modifyIORef' ref (const (show t)))
+      let config = MapViewConfig
+            { mvLatitude = 52.3676, mvLongitude = 4.9041
+            , mvZoom = 12.0, mvShowUserLocation = False
+            , mvOnRegionChange = Just changeHandle
+            }
+      renderWidget rs $ MapView config
+      renderWidget rs $ MapView config { mvZoom = 14.0 }
+      dispatchTextEvent rs (onChangeId changeHandle) "52.3676,4.9041,14.0"
+      val <- readIORef ref
+      val @?= show ("52.3676,4.9041,14.0" :: String)
   ]

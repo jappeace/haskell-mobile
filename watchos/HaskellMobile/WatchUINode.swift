@@ -19,6 +19,9 @@ class WatchUINode: ObservableObject, Identifiable {
     @Published var imageFile: String?
     @Published var imageData: Data?
     @Published var scaleType: Int32 = 0
+    @Published var mapLatitude: Double?
+    @Published var mapLongitude: Double?
+    @Published var mapZoom: Double?
     @Published var children: [WatchUINode] = []
 
     init(id: Int32, nodeType: Int32) {
