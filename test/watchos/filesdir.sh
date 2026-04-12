@@ -22,7 +22,7 @@ xcrun simctl spawn "$SIM_UDID" log stream \
     --level info \
     --predicate "subsystem == \"$LOG_SUBSYSTEM\"" \
     --style compact \
-    true > "$STREAM_LOG" 2>&1 &
+    > "$STREAM_LOG" 2>&1 &
 LOG_STREAM_PID=$!
 sleep 5
 
