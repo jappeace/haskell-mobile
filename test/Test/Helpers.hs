@@ -29,6 +29,7 @@ import HaskellMobile.Lifecycle
   , defaultMobileContext
   , loggingMobileContext
   )
+import HaskellMobile.Animation (newAnimationState)
 import HaskellMobile.Widget (TextConfig(..), Widget(..))
 import HaskellMobile.Render (RenderState, newRenderState)
 
@@ -39,7 +40,8 @@ withActions :: ActionM a -> IO (a, RenderState)
 withActions actionM = do
   actionState <- newActionState
   result <- runActionM actionState actionM
-  rs <- newRenderState actionState
+  animState <- newAnimationState
+  rs <- newRenderState actionState animState
   pure (result, rs)
 
 -- | Helper: create an 'AppContext' from a 'MobileApp',
@@ -108,6 +110,7 @@ viewIsErrorWidget ctxPtr = do
         , userBottomSheetState   = acBottomSheetState appCtx
         , userHttpState          = acHttpState appCtx
         , userNetworkStatusState = acNetworkStatusState appCtx
+        , userAnimationState     = acAnimationState appCtx
         }
   widget <- viewFn userState
   case widget of
@@ -122,3 +125,4 @@ viewIsErrorWidget ctxPtr = do
     Row _                    -> pure False
     ScrollView _             -> pure False
     Styled _ _               -> pure False
+    Animated _ _             -> pure False

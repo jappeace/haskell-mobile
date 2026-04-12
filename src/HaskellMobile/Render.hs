@@ -24,7 +24,8 @@ import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Int (Int32)
 import Data.Text (Text, pack)
 import HaskellMobile.Action (Action(..), ActionState, OnChange(..), lookupAction, lookupTextAction)
-import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), MapViewConfig(..), ResourceName(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), WebViewConfig(..), Widget(..), WidgetStyle(..), colorToHex)
+import HaskellMobile.Animation (AnimationState, registerTween)
+import HaskellMobile.Widget (AnimatedConfig(..), ButtonConfig(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), MapViewConfig(..), ResourceName(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), WebViewConfig(..), Widget(..), WidgetStyle(..), colorToHex, normalizeAnimated)
 import HaskellMobile.UIBridge qualified as Bridge
 import System.IO (hPutStrLn, stderr)
 
@@ -46,6 +47,9 @@ data RenderedNode
       Widget         -- ^ Widget value (Styled wrapper).
       WidgetStyle    -- ^ Applied style (for change detection).
       RenderedNode   -- ^ Child (Styled doesn't own a native node).
+  | RenderedAnimated
+      Widget         -- ^ Full Animated widget (Animated config child) for Eq comparison.
+      RenderedNode   -- ^ Child's rendered node (owns native node IDs).
 
 -- | Get the native node ID for a rendered node.
 -- 'RenderedStyled' follows through to its child's node ID.
@@ -53,12 +57,14 @@ renderedNodeId :: RenderedNode -> Int32
 renderedNodeId (RenderedLeaf _ nodeId)         = nodeId
 renderedNodeId (RenderedContainer _ nodeId _)  = nodeId
 renderedNodeId (RenderedStyled _ _ child)      = renderedNodeId child
+renderedNodeId (RenderedAnimated _ child)      = renderedNodeId child
 
 -- | Get the widget value for a rendered node.
 renderedWidget :: RenderedNode -> Widget
 renderedWidget (RenderedLeaf widget _)        = widget
 renderedWidget (RenderedContainer widget _ _) = widget
 renderedWidget (RenderedStyled widget _ _)    = widget
+renderedWidget (RenderedAnimated widget _)    = widget
 
 -- ---------------------------------------------------------------------------
 -- Render state
@@ -68,19 +74,23 @@ renderedWidget (RenderedStyled widget _ _)    = widget
 -- Holds a reference to the shared 'ActionState' callback registry
 -- and the previously rendered tree for incremental diffing.
 data RenderState = RenderState
-  { rsActionState  :: ActionState
+  { rsActionState    :: ActionState
     -- ^ Shared callback registry (never cleared during rendering).
-  , rsRenderedTree :: IORef (Maybe RenderedNode)
+  , rsRenderedTree   :: IORef (Maybe RenderedNode)
     -- ^ The previously rendered tree, or 'Nothing' for the first render.
+  , rsAnimationState :: AnimationState
+    -- ^ Mutable animation tween registry.
   }
 
--- | Create a fresh 'RenderState' wrapping the given 'ActionState'.
-newRenderState :: ActionState -> IO RenderState
-newRenderState actionState = do
+-- | Create a fresh 'RenderState' wrapping the given 'ActionState'
+-- and 'AnimationState'.
+newRenderState :: ActionState -> AnimationState -> IO RenderState
+newRenderState actionState animState = do
   renderedTree <- newIORef Nothing
   pure RenderState
-    { rsActionState  = actionState
-    , rsRenderedTree = renderedTree
+    { rsActionState    = actionState
+    , rsRenderedTree   = renderedTree
+    , rsAnimationState = animState
     }
 
 -- ---------------------------------------------------------------------------
@@ -133,19 +143,19 @@ applyStyle nodeId style = do
 
 -- | Create a native node from a 'Widget', returning a 'RenderedNode'
 -- snapshot. Used for fresh creation (no old node to diff against).
-createRenderedNode :: Widget -> IO RenderedNode
-createRenderedNode widget@(Text config) = do
+createRenderedNode :: AnimationState -> Widget -> IO RenderedNode
+createRenderedNode _animState widget@(Text config) = do
   nodeId <- Bridge.createNode Bridge.NodeText
   Bridge.setStrProp nodeId Bridge.PropText (tcLabel config)
   applyFontConfig nodeId (tcFontConfig config)
   pure (RenderedLeaf widget nodeId)
-createRenderedNode widget@(Button config) = do
+createRenderedNode _animState widget@(Button config) = do
   nodeId <- Bridge.createNode Bridge.NodeButton
   Bridge.setStrProp nodeId Bridge.PropText (bcLabel config)
   Bridge.setHandler nodeId Bridge.EventClick (actionId (bcAction config))
   applyFontConfig nodeId (bcFontConfig config)
   pure (RenderedLeaf widget nodeId)
-createRenderedNode widget@(TextInput config) = do
+createRenderedNode _animState widget@(TextInput config) = do
   nodeId <- Bridge.createNode Bridge.NodeTextInput
   Bridge.setStrProp nodeId Bridge.PropText (tiValue config)
   Bridge.setStrProp nodeId Bridge.PropHint (tiHint config)
@@ -153,31 +163,31 @@ createRenderedNode widget@(TextInput config) = do
   Bridge.setHandler nodeId Bridge.EventTextChange (onChangeId (tiOnChange config))
   applyFontConfig nodeId (tiFontConfig config)
   pure (RenderedLeaf widget nodeId)
-createRenderedNode widget@(Column children) = do
+createRenderedNode animState widget@(Column children) = do
   nodeId <- Bridge.createNode Bridge.NodeColumn
   childNodes <- mapM (\child -> do
-    childNode <- createRenderedNode child
+    childNode <- createRenderedNode animState child
     Bridge.addChild nodeId (renderedNodeId childNode)
     pure childNode
     ) children
   pure (RenderedContainer widget nodeId childNodes)
-createRenderedNode widget@(Row children) = do
+createRenderedNode animState widget@(Row children) = do
   nodeId <- Bridge.createNode Bridge.NodeRow
   childNodes <- mapM (\child -> do
-    childNode <- createRenderedNode child
+    childNode <- createRenderedNode animState child
     Bridge.addChild nodeId (renderedNodeId childNode)
     pure childNode
     ) children
   pure (RenderedContainer widget nodeId childNodes)
-createRenderedNode widget@(ScrollView children) = do
+createRenderedNode animState widget@(ScrollView children) = do
   nodeId <- Bridge.createNode Bridge.NodeScrollView
   childNodes <- mapM (\child -> do
-    childNode <- createRenderedNode child
+    childNode <- createRenderedNode animState child
     Bridge.addChild nodeId (renderedNodeId childNode)
     pure childNode
     ) children
   pure (RenderedContainer widget nodeId childNodes)
-createRenderedNode widget@(Image config) = do
+createRenderedNode _animState widget@(Image config) = do
   nodeId <- Bridge.createNode Bridge.NodeImage
   case icSource config of
     ImageResource (ResourceName name) -> Bridge.setStrProp nodeId Bridge.PropImageResource name
@@ -185,14 +195,14 @@ createRenderedNode widget@(Image config) = do
     ImageFile path                    -> Bridge.setStrProp nodeId Bridge.PropImageFile (pack path)
   Bridge.setNumProp nodeId Bridge.PropScaleType (scaleTypeToDouble (icScaleType config))
   pure (RenderedLeaf widget nodeId)
-createRenderedNode widget@(WebView config) = do
+createRenderedNode _animState widget@(WebView config) = do
   nodeId <- Bridge.createNode Bridge.NodeWebView
   Bridge.setStrProp nodeId Bridge.PropWebViewUrl (wvUrl config)
   case wvOnPageLoad config of
     Just action -> Bridge.setHandler nodeId Bridge.EventClick (actionId action)
     Nothing     -> pure ()
   pure (RenderedLeaf widget nodeId)
-createRenderedNode widget@(MapView config) = do
+createRenderedNode _animState widget@(MapView config) = do
   nodeId <- Bridge.createNode Bridge.NodeMapView
   Bridge.setNumProp nodeId Bridge.PropMapLat (mvLatitude config)
   Bridge.setNumProp nodeId Bridge.PropMapLon (mvLongitude config)
@@ -204,10 +214,23 @@ createRenderedNode widget@(MapView config) = do
                       (onChangeId onChange)
     Nothing      -> pure ()
   pure (RenderedLeaf widget nodeId)
-createRenderedNode widget@(Styled style child) = do
-  childNode <- createRenderedNode child
+createRenderedNode animState widget@(Styled style child) = do
+  childNode <- createRenderedNode animState child
   applyStyle (renderedNodeId childNode) style
   pure (RenderedStyled widget style childNode)
+createRenderedNode animState (Animated config child) = do
+  let normalized = normalizeAnimated config child
+  case normalized of
+    -- normalizeAnimated distributed into a container — render the container directly
+    -- (each child is now individually wrapped in Animated).
+    Column _     -> createRenderedNode animState normalized
+    Row _        -> createRenderedNode animState normalized
+    ScrollView _ -> createRenderedNode animState normalized
+    -- Everything else (Styled, leaves): wrap in RenderedAnimated for tween interpolation.
+    _            -> do
+      let finalWidget = Animated config normalized
+      childNode <- createRenderedNode animState normalized
+      pure (RenderedAnimated finalWidget childNode)
 
 -- ---------------------------------------------------------------------------
 -- Destroying rendered subtrees
@@ -221,6 +244,8 @@ destroyRenderedSubtree (RenderedContainer _ nodeId children) = do
   mapM_ destroyRenderedSubtree children
   Bridge.destroyNode nodeId
 destroyRenderedSubtree (RenderedStyled _ _ child) =
+  destroyRenderedSubtree child
+destroyRenderedSubtree (RenderedAnimated _ child) =
   destroyRenderedSubtree child
 
 -- ---------------------------------------------------------------------------
@@ -240,6 +265,7 @@ sameNodeType (Image _)       (Image _)       = True
 sameNodeType (WebView _)     (WebView _)     = True
 sameNodeType (MapView _)     (MapView _)     = True
 sameNodeType (Styled _ _)    (Styled _ _)    = True
+sameNodeType (Animated _ _)  (Animated _ _)  = True
 sameNodeType _               _               = False
 
 -- | Diff the old rendered tree against a new 'Widget' and produce
@@ -252,51 +278,80 @@ sameNodeType _               _               = False
 -- 4. Same Styled, diff child recursively, re-apply style if changed.
 -- 5. Same leaf type but properties differ -> destroy old, create new.
 -- 6. Different node type -> destroy old subtree, create new.
-diffRenderNode :: Maybe RenderedNode -> Widget -> IO RenderedNode
+diffRenderNode :: AnimationState -> Maybe RenderedNode -> Widget -> IO RenderedNode
 -- Case 1: No previous node — create from scratch.
-diffRenderNode Nothing newWidget =
-  createRenderedNode newWidget
+diffRenderNode animState Nothing newWidget =
+  createRenderedNode animState newWidget
 
 -- Case 2: Exact match — reuse native node entirely.
-diffRenderNode (Just oldNode) newWidget
+diffRenderNode _animState (Just oldNode) newWidget
   | newWidget == renderedWidget oldNode =
     pure oldNode
 
+-- Case: Animated wrapping a container — normalize (distribute to children) and recurse.
+diffRenderNode animState maybeOld (Animated config child@(Column _)) =
+  diffRenderNode animState maybeOld (normalizeAnimated config child)
+diffRenderNode animState maybeOld (Animated config child@(Row _)) =
+  diffRenderNode animState maybeOld (normalizeAnimated config child)
+diffRenderNode animState maybeOld (Animated config child@(ScrollView _)) =
+  diffRenderNode animState maybeOld (normalizeAnimated config child)
+-- Case: Nested Animated — inner config wins.
+diffRenderNode animState maybeOld (Animated _outerConfig child@(Animated _ _)) =
+  diffRenderNode animState maybeOld child
+
+-- Case: Both are Animated (leaf) — diff the child, possibly registering a tween.
+diffRenderNode animState (Just (RenderedAnimated _ oldChildNode)) (Animated newConfig newChild) = do
+  let oldChildWidget = renderedWidget oldChildNode
+  if sameNodeType oldChildWidget newChild
+    then do
+      -- Same child node type: keep native node, register tween if properties differ
+      if oldChildWidget /= newChild
+        then registerTween animState (renderedNodeId oldChildNode)
+               oldChildWidget newChild (anDuration newConfig) (anEasing newConfig)
+        else pure ()
+      -- Update the RenderedAnimated to reflect the new target
+      pure (RenderedAnimated (Animated newConfig newChild) oldChildNode)
+    else do
+      -- Different child type: can't animate, destroy+create
+      destroyRenderedSubtree oldChildNode
+      newChildNode <- createRenderedNode animState newChild
+      pure (RenderedAnimated (Animated newConfig newChild) newChildNode)
+
 -- Case 4: Both are Styled — diff child recursively.
-diffRenderNode (Just (RenderedStyled _ oldStyle oldChild)) (Styled newStyle newChild) = do
-  diffedChild <- diffRenderNode (Just oldChild) newChild
+diffRenderNode animState (Just (RenderedStyled _ oldStyle oldChild)) (Styled newStyle newChild) = do
+  diffedChild <- diffRenderNode animState (Just oldChild) newChild
   if newStyle /= oldStyle
     then applyStyle (renderedNodeId diffedChild) newStyle
     else pure ()
   pure (RenderedStyled (Styled newStyle newChild) newStyle diffedChild)
 
 -- Case 3: Same container type, children may differ — keep container, diff children.
-diffRenderNode (Just oldNode@(RenderedContainer _ containerNodeId oldChildren)) newWidget
+diffRenderNode animState (Just oldNode@(RenderedContainer _ containerNodeId oldChildren)) newWidget
   | sameNodeType (renderedWidget oldNode) newWidget =
     case newWidget of
-      Column newChildren     -> diffContainer containerNodeId oldChildren newChildren newWidget
-      Row newChildren        -> diffContainer containerNodeId oldChildren newChildren newWidget
-      ScrollView newChildren -> diffContainer containerNodeId oldChildren newChildren newWidget
+      Column newChildren     -> diffContainer animState containerNodeId oldChildren newChildren newWidget
+      Row newChildren        -> diffContainer animState containerNodeId oldChildren newChildren newWidget
+      ScrollView newChildren -> diffContainer animState containerNodeId oldChildren newChildren newWidget
       -- Non-container but same type at container level shouldn't happen,
       -- but fall through to destroy+create for safety.
-      _ -> replaceNode oldNode newWidget
+      _ -> replaceNode animState oldNode newWidget
 
 -- Case 5/6: Same leaf type with different properties, or completely different
 -- node types — destroy old and create new.
-diffRenderNode (Just oldNode) newWidget =
-  replaceNode oldNode newWidget
+diffRenderNode animState (Just oldNode) newWidget =
+  replaceNode animState oldNode newWidget
 
 -- | Diff container children: remove all children from parent, diff each
 -- individually, then re-add all in correct order.
-diffContainer :: Int32 -> [RenderedNode] -> [Widget]
+diffContainer :: AnimationState -> Int32 -> [RenderedNode] -> [Widget]
               -> Widget -> IO RenderedNode
-diffContainer containerNodeId oldChildren newChildren newWidget = do
+diffContainer animState containerNodeId oldChildren newChildren newWidget = do
   -- Remove all children from the container (order may change).
   mapM_ (\oldChild -> Bridge.removeChild containerNodeId (renderedNodeId oldChild)) oldChildren
   -- Diff each child position, pairing old children with new where available.
   let paired = zipPadded oldChildren newChildren
   diffedChildren <- mapM (\(maybeOld, newChild) ->
-    diffRenderNode maybeOld newChild
+    diffRenderNode animState maybeOld newChild
     ) paired
   -- Destroy any excess old children that weren't paired.
   let excessOld = drop (length newChildren) oldChildren
@@ -313,10 +368,10 @@ zipPadded _ []                  = []
 zipPadded (old:olds) (new:news) = (Just old, new) : zipPadded olds news
 
 -- | Destroy an old node and create a fresh replacement.
-replaceNode :: RenderedNode -> Widget -> IO RenderedNode
-replaceNode oldNode newWidget = do
+replaceNode :: AnimationState -> RenderedNode -> Widget -> IO RenderedNode
+replaceNode animState oldNode newWidget = do
   destroyRenderedSubtree oldNode
-  createRenderedNode newWidget
+  createRenderedNode animState newWidget
 
 -- ---------------------------------------------------------------------------
 -- Top-level render entry point
@@ -330,7 +385,7 @@ replaceNode oldNode newWidget = do
 renderWidget :: RenderState -> Widget -> IO ()
 renderWidget rs widget = do
   oldTree <- readIORef (rsRenderedTree rs)
-  newTree <- diffRenderNode oldTree widget
+  newTree <- diffRenderNode (rsAnimationState rs) oldTree widget
   -- Set root if this is the first render or the root node changed.
   case oldTree of
     Nothing -> Bridge.setRoot (renderedNodeId newTree)

@@ -62,6 +62,7 @@ library
   exposed-modules:
       HaskellMobile
       HaskellMobile.Action
+      HaskellMobile.Animation
       HaskellMobile.AppContext
       HaskellMobile.Types
       HaskellMobile.Lifecycle
@@ -102,6 +103,7 @@ library
       cbits/bottom_sheet_bridge.c
       cbits/http_bridge.c
       cbits/network_status_bridge.c
+      cbits/animation_bridge.c
   include-dirs:
       include
 
@@ -116,6 +118,7 @@ test-suite unit
       Test.PlatformTests
       Test.AppContextTests
       Test.ActionTests
+      Test.AnimationTests
   ghc-options: -Wno-unused-packages -threaded -rtsopts "-with-rtsopts=-N -M7G -T -Iw10"
   hs-source-dirs:
       test

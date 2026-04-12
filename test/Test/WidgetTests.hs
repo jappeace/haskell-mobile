@@ -55,6 +55,7 @@ import HaskellMobile.AuthSession (newAuthSessionState)
 import HaskellMobile.Camera (newCameraState)
 import HaskellMobile.BottomSheet (newBottomSheetState)
 import HaskellMobile.Http (newHttpState)
+import HaskellMobile.Animation (newAnimationState)
 import HaskellMobile.NetworkStatus (newNetworkStatusState)
 import Test.Helpers (withActions, testApp)
 
@@ -149,6 +150,7 @@ uiTests = testGroup "UI"
       dummyBottomSheetState <- newBottomSheetState
       dummyHttpState <- newHttpState
       dummyNetworkStatusState <- newNetworkStatusState
+      dummyAnimationState <- newAnimationState
       let dummyUserState = UserState
             { userPermissionState    = dummyPermState
             , userSecureStorageState = dummySecureStorageState
@@ -160,6 +162,7 @@ uiTests = testGroup "UI"
             , userBottomSheetState   = dummyBottomSheetState
             , userHttpState          = dummyHttpState
             , userNetworkStatusState = dummyNetworkStatusState
+            , userAnimationState     = dummyAnimationState
             }
       app <- testApp
       widget <- maView app dummyUserState
@@ -175,6 +178,7 @@ uiTests = testGroup "UI"
         Row _           -> assertFailure "expected Text, got Row"
         ScrollView _    -> assertFailure "expected Text, got ScrollView"
         Styled _ _      -> assertFailure "expected Text, got Styled"
+        Animated _ _    -> assertFailure "expected Text, got Animated"
   ]
 
 -- | Tests for the ScrollView widget binding.

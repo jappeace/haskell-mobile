@@ -113,12 +113,14 @@ nodeIdOf :: RenderedNode -> Int32
 nodeIdOf (RenderedLeaf _ nodeId)         = nodeId
 nodeIdOf (RenderedContainer _ nodeId _)  = nodeId
 nodeIdOf (RenderedStyled _ _ child)      = nodeIdOf child
+nodeIdOf (RenderedAnimated _ child)      = nodeIdOf child
 
 -- | Helper to extract children from a RenderedContainer.
 childrenOf :: RenderedNode -> [RenderedNode]
 childrenOf (RenderedContainer _ _ children) = children
 childrenOf (RenderedLeaf _ _)              = []
 childrenOf (RenderedStyled _ _ _)          = []
+childrenOf (RenderedAnimated _ _)          = []
 
 incrementalRenderTests :: TestTree
 incrementalRenderTests = testGroup "Incremental rendering"

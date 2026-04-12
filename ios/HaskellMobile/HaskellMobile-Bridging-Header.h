@@ -42,3 +42,7 @@ void setup_ios_http_bridge(void *haskellCtx);
 #include "NetworkStatusBridge.h"
 /* iOS network status bridge setup — called from Swift during initialisation */
 void setup_ios_network_status_bridge(void *haskellCtx);
+
+#include "AnimationBridge.h"
+/* iOS animation bridge setup — called from Swift during initialisation */
+void setup_ios_animation_bridge(void *haskellCtx);
