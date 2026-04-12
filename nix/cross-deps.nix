@@ -44,7 +44,24 @@ let
   # QEMU's host mappings.  Without this, the static iserv-proxy binary
   # (loaded at 0x10000) overlaps QEMU's JIT code cache, causing segfaults
   # when dlsym iterates the .dynsym table (issue #147).
-  qemuOverlay = final: prev: {
+  #
+  # armv7a personality shim: Android Bionic's 32-bit static binary
+  # startup calls personality(0xffffffff), which QEMU passes to the
+  # host kernel.  The Nix build sandbox blocks this syscall via seccomp,
+  # returning EPERM — Bionic treats this as fatal and aborts.  The shim
+  # is LD_PRELOADed into the *host-side* QEMU process to intercept
+  # the libc personality() call.  64-bit Bionic skips the personality
+  # call (#if !defined(__LP64__)), so aarch64 is unaffected.
+  qemuOverlay = final: prev:
+    let
+      personalityShim = prev.runCommand "personality-shim" {
+        nativeBuildInputs = [ prev.gcc ];
+      } ''
+        mkdir -p $out/lib
+        gcc -shared -fPIC -o $out/lib/personality_shim.so \
+          ${./th-support/personality_shim.c}
+      '';
+    in {
     qemu-user = prev.symlinkJoin {
       name = "qemu-user-with-guest-base";
       paths = [ prev.qemu-user ];
@@ -59,7 +76,7 @@ WRAPPER
         rm $out/bin/qemu-arm
         cat > $out/bin/qemu-arm <<'WRAPPER'
 #!/bin/sh
-exec ${prev.qemu-user}/bin/qemu-arm -B 0x10000000 "$@"
+exec env LD_PRELOAD=${personalityShim}/lib/personality_shim.so ${prev.qemu-user}/bin/qemu-arm -B 0x10000000 "$@"
 WRAPPER
         chmod +x $out/bin/qemu-arm
       '';
