@@ -10,29 +10,36 @@
 -- This lets 'Widget' derive 'Eq', enabling O(1) "skip if unchanged"
 -- in the render diff.
 module HaskellMobile.Widget
-  ( FontConfig(..)
-  , TextConfig(..)
-  , ButtonConfig(..)
-  , InputType(..)
-  , TextInputConfig(..)
-  , ScaleType(..)
-  , ResourceName(..)
-  , ImageSource(..)
-  , ImageConfig(..)
-  , WebViewConfig(..)
-  , MapViewConfig(..)
+  (
   , Widget(..)
+  -- ** configs
   , WidgetStyle(..)
+  , defaultStyle
+  , ButtonConfig(..)
+  , FontConfig(..)
+  , ImageConfig(..)
+  , ImageSource(..)
+  , InputType(..)
+  , MapViewConfig(..)
+  , ResourceName(..)
+  , ScaleType(..)
   , TextAlignment(..)
+  , TextConfig(..)
+  , TextInputConfig(..)
+  , WebViewConfig(..)
+  -- ** color
   , Color(..)
   , colorFromText
   , colorToHex
-  , defaultStyle
+  -- ** animation
   , Easing(..)
   , AnimatedConfig(..)
   , normalizeAnimated
   , interpolateColor
   , lerpWord8
+  -- ** smart constructors
+  , button
+  , text
   )
 where
 
@@ -286,7 +293,20 @@ data MapViewConfig = MapViewConfig
     -- Receives @\"lat,lon,zoom\"@ text encoding the new center and zoom.
   } deriving (Show, Eq)
 
+text :: Text -> Widget
+text txt = Text $ TextConfig { tcLabel =  txt, tcFontConfig = Nothing }
+
+button :: Text -> Action -> Widget
+button txt action = Button $ ButtonConfig { bcLabel = txt, bcAction = action, bcFontConfig = Nothing }
+
 -- | A declarative description of a UI element.
+--
+--  This can do tree diffing (equality).
+--  Therefore this doesn't contain any direct callbacks but actions instead.
+--  Loosely binds to underlying IOS or Android components.
+--
+--  Tree diffing seems a bit excessive at first but it saves battery and
+--  it also makes the animation mechanism possible.
 data Widget
   = Text TextConfig
     -- ^ A read-only text label.
