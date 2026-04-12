@@ -16,12 +16,12 @@ echo "FilesDir app installed."
 FD_START=$(date "+%Y-%m-%d %H:%M:%S")
 
 STREAM_LOG="$WORK_DIR/filesdir_stream.txt"
-> "$STREAM_LOG"
+true > "$STREAM_LOG"
 xcrun simctl spawn "$SIM_UDID" log stream \
     --level info \
     --predicate "subsystem == \"$BUNDLE_ID\"" \
     --style compact \
-    > "$STREAM_LOG" 2>&1 &
+    true > "$STREAM_LOG" 2>&1 &
 LOG_STREAM_PID=$!
 sleep 5
 
@@ -34,7 +34,7 @@ if [ $render_done -eq 0 ]; then
     echo "WARNING: setRoot not found — retrying with relaunch"
     xcrun simctl terminate "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
     sleep 3
-    > "$STREAM_LOG"
+    true > "$STREAM_LOG"
     xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID" --autotest
     wait_for_log "$STREAM_LOG" "setRoot" 60 || true
 fi
