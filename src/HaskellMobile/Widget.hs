@@ -28,6 +28,10 @@ module HaskellMobile.Widget
   , colorFromText
   , colorToHex
   , defaultStyle
+  , Easing(..)
+  , AnimatedConfig(..)
+  , interpolateColor
+  , lerpWord8
   )
 where
 
@@ -151,6 +155,36 @@ defaultStyle = WidgetStyle
   , wsBackgroundColor = Nothing
   }
 
+-- | Easing function for animations.
+data Easing
+  = Linear     -- ^ Constant speed.
+  | EaseIn     -- ^ Slow start, fast end.
+  | EaseOut    -- ^ Fast start, slow end.
+  | EaseInOut  -- ^ Slow start and end, fast middle.
+  deriving (Show, Eq)
+
+-- | Configuration for an 'Animated' widget wrapper.
+data AnimatedConfig = AnimatedConfig
+  { anDuration :: Double
+    -- ^ Animation duration in milliseconds.
+  , anEasing   :: Easing
+    -- ^ Easing function to apply.
+  } deriving (Show, Eq)
+
+-- | Linearly interpolate a single 'Word8' channel.
+lerpWord8 :: Word8 -> Word8 -> Double -> Word8
+lerpWord8 from to progress =
+  round (fromIntegral from + (fromIntegral to - fromIntegral from) * progress :: Double)
+
+-- | Interpolate between two colors by lerping each RGBA channel.
+interpolateColor :: Color -> Color -> Double -> Color
+interpolateColor (Color r1 g1 b1 a1) (Color r2 g2 b2 a2) progress = Color
+  { colorRed   = lerpWord8 r1 r2 progress
+  , colorGreen = lerpWord8 g1 g2 progress
+  , colorBlue  = lerpWord8 b1 b2 progress
+  , colorAlpha = lerpWord8 a1 a2 progress
+  }
+
 -- | How an image should be scaled within its bounds.
 data ScaleType
   = ScaleFit   -- ^ Scale to fit within bounds, preserving aspect ratio.
@@ -227,4 +261,6 @@ data Widget
     -- ^ An embedded map view (native MapKit on iOS, placeholder elsewhere).
   | Styled WidgetStyle Widget
     -- ^ Apply visual style overrides to a child widget.
+  | Animated AnimatedConfig Widget
+    -- ^ Animate property changes on the child widget over a duration.
   deriving (Show, Eq)

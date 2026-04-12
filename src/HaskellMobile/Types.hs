@@ -9,6 +9,7 @@ module HaskellMobile.Types
 where
 
 import HaskellMobile.Action (ActionState)
+import HaskellMobile.Animation (AnimationState)
 import HaskellMobile.AuthSession (AuthSessionState)
 import HaskellMobile.Ble (BleState)
 import HaskellMobile.Camera (CameraState)
@@ -37,6 +38,7 @@ data UserState = UserState
   , userBottomSheetState   :: BottomSheetState
   , userHttpState              :: HttpState
   , userNetworkStatusState    :: NetworkStatusState
+  , userAnimationState     :: AnimationState
   }
 
 -- | Application definition record. Downstream apps create one of these

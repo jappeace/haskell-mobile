@@ -23,6 +23,7 @@
 #include "BottomSheetBridge.h"
 #include "HttpBridge.h"
 #include "NetworkStatusBridge.h"
+#include "AnimationBridge.h"
 
 /* Runs the user's Haskell main via RTS API (cbits/run_main.c).
  * Returns the opaque AppContext pointer. */
@@ -60,6 +61,7 @@ extern void haskellOnHttpResult(void *ctx, int32_t requestId,
                                  const char *headers,
                                  const char *body, int32_t bodyLen);
 extern void haskellOnNetworkStatusChange(void *ctx, int connected, int transport);
+extern void haskellOnAnimationFrame(void *ctx, double timestampMs);
 
 /* Android UI bridge (from ui_bridge_android.c) */
 extern void setup_android_ui_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
@@ -94,6 +96,9 @@ extern void setup_android_http_bridge(JNIEnv *env, jobject activity, void *haske
 
 /* Android network status bridge (from network_status_android.c) */
 extern void setup_android_network_status_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
+
+/* Android animation bridge (from animation_bridge_android.c) */
+extern void setup_android_animation_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
 
 /* Lifecycle event codes (must match HaskellMobile.h) */
 #define LIFECYCLE_CREATE     0
@@ -175,6 +180,7 @@ JNI_METHOD(renderUI)(JNIEnv *env, jobject thiz)
     setup_android_bottom_sheet_bridge(env, thiz, g_haskell_ctx);
     setup_android_http_bridge(env, thiz, g_haskell_ctx);
     setup_android_network_status_bridge(env, thiz, g_haskell_ctx);
+    setup_android_animation_bridge(env, thiz, g_haskell_ctx);
     haskellRenderUI(g_haskell_ctx);
 }
 

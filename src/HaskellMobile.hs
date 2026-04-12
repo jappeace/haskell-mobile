@@ -28,6 +28,7 @@ module HaskellMobile
   , haskellOnBottomSheetResult
   , haskellOnHttpResult
   , haskellOnNetworkStatusChange
+  , haskellOnAnimationFrame
   -- Error handling
   , errorWidget
   -- Re-exports from Lifecycle
@@ -114,6 +115,10 @@ module HaskellMobile
   , HttpError(..)
   , HttpState(..)
   , performRequest
+  -- Re-exports from Animation
+  , AnimationState(..)
+  , Easing(..)
+  , AnimatedConfig(..)
   -- Re-exports from NetworkStatus
   , NetworkTransport(..)
   , NetworkStatus(..)
@@ -138,6 +143,10 @@ import HaskellMobile.Action
   , createOnChange
   , newActionState
   , runActionM
+  )
+import HaskellMobile.Animation
+  ( AnimationState(..)
+  , dispatchAnimationFrame
   )
 import HaskellMobile.AppContext (AppContext(..), newAppContext, freeAppContext, derefAppContext)
 import HaskellMobile.AuthSession
@@ -240,7 +249,7 @@ import HaskellMobile.SecureStorage
   , dispatchSecureStorageResult
   )
 import HaskellMobile.Types (MobileApp(..), UserState(..))
-import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), TextConfig(..), Widget(..))
+import HaskellMobile.Widget (AnimatedConfig(..), ButtonConfig(..), Easing(..), FontConfig(..), TextConfig(..), Widget(..))
 
 -- | Create an 'AppContext' from a 'MobileApp' and return it as a typed
 -- pointer suitable for the C FFI. This is the user-facing API: the user's
@@ -302,6 +311,7 @@ renderView ctxPtr = do
         , userBottomSheetState   = acBottomSheetState appCtx
         , userHttpState              = acHttpState appCtx
         , userNetworkStatusState    = acNetworkStatusState appCtx
+        , userAnimationState     = acAnimationState appCtx
         }
   widget <- viewFunction userState
   renderWidget (acRenderState appCtx) widget
@@ -537,6 +547,18 @@ haskellOnNetworkStatusChange ctxPtr cConnected cTransport =
     dispatchNetworkStatusChange (acNetworkStatusState appCtx) cConnected cTransport
 
 foreign export ccall haskellOnNetworkStatusChange :: Ptr AppContext -> CInt -> CInt -> IO ()
+
+-- | Handle an animation frame from native code.  Ticks all active tweens,
+-- applies interpolated properties, then re-renders the UI so that the
+-- user's view function can confirm the target (Eq match → no new tween).
+haskellOnAnimationFrame :: Ptr AppContext -> CDouble -> IO ()
+haskellOnAnimationFrame ctxPtr (CDouble timestampMs) =
+  withExceptionHandler ctxPtr $ do
+    appCtx <- derefAppContext ctxPtr
+    dispatchAnimationFrame (acAnimationState appCtx) timestampMs
+    renderView ctxPtr
+
+foreign export ccall haskellOnAnimationFrame :: Ptr AppContext -> CDouble -> IO ()
 
 -- | Peek an optional CString: returns 'Nothing' for null pointers,
 -- 'Just' with the decoded 'Text' otherwise.

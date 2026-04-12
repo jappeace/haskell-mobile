@@ -30,4 +30,4 @@ targets:
         SWIFT_OBJC_BRIDGING_HEADER: HaskellMobile/HaskellMobile-Bridging-Header.h
         LIBRARY_SEARCH_PATHS: ["$(inherited)", "$(PROJECT_DIR)/lib"]
         HEADER_SEARCH_PATHS: ["$(inherited)", "$(PROJECT_DIR)/include"]
-        OTHER_LDFLAGS: ["$(inherited)", "-lHaskellMobile", "-lz", "-liconv", "-lffi", "-lc++", "-framework", "AVFoundation", "-framework", "AuthenticationServices", "-framework", "Contacts", "-framework", "CoreLocation", "-framework", "CoreBluetooth", "-framework", "WebKit", "-framework", "MapKit"]
+        OTHER_LDFLAGS: ["$(inherited)", "-lHaskellMobile", "-lz", "-liconv", "-lffi", "-lc++", "-framework", "AVFoundation", "-framework", "AuthenticationServices", "-framework", "Contacts", "-framework", "CoreLocation", "-framework", "CoreBluetooth", "-framework", "WebKit", "-framework", "MapKit", "-framework", "QuartzCore"]

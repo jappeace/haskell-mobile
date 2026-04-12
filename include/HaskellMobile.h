@@ -191,4 +191,11 @@ void haskellOnHttpResult(void *ctx, int32_t requestId,
  * ctx must be a pointer returned by haskellRunMain(). */
 void haskellOnBottomSheetResult(void *ctx, int32_t requestId, int32_t actionCode);
 
+/* Dispatch an animation frame from native code back to Haskell.
+ * Ticks all active tweens, applies interpolated properties, then
+ * re-renders the UI.
+ * timestampMs: frame timestamp in milliseconds.
+ * ctx must be a pointer returned by haskellRunMain(). */
+void haskellOnAnimationFrame(void *ctx, double timestampMs);
+
 #endif /* HASKELL_MOBILE_H */

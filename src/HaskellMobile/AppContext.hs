@@ -15,6 +15,7 @@ import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Foreign.Ptr (Ptr, castPtr)
 import Foreign.StablePtr (StablePtr, castPtrToStablePtr, castStablePtrToPtr, newStablePtr, deRefStablePtr, freeStablePtr)
 import HaskellMobile.Action (Action, ActionState, runActionM, createAction)
+import HaskellMobile.Animation (AnimationState(..), newAnimationState)
 import HaskellMobile.AuthSession (AuthSessionState(..), newAuthSessionState)
 import HaskellMobile.Ble (BleState(..), newBleState)
 import HaskellMobile.Camera (CameraState(..), newCameraState)
@@ -47,6 +48,7 @@ data AppContext = AppContext
   , acBottomSheetState    :: BottomSheetState
   , acHttpState           :: HttpState
   , acNetworkStatusState  :: NetworkStatusState
+  , acAnimationState      :: AnimationState
   , acViewFunction        :: IORef (UserState -> IO Widget)
   , acDismissAction       :: Action
     -- ^ Pre-registered dismiss action for the error widget.
@@ -63,7 +65,8 @@ data AppContext = AppContext
 newAppContext :: MobileApp -> IO (Ptr AppContext)
 newAppContext mobileApp = do
   let actionState = maActionState mobileApp
-  renderState        <- newRenderState actionState
+  animationState     <- newAnimationState
+  renderState        <- newRenderState actionState animationState
   permissionState    <- newPermissionState
   secureStorageState <- newSecureStorageState
   bleState           <- newBleState
@@ -93,6 +96,7 @@ newAppContext mobileApp = do
         , acBottomSheetState   = bottomSheetState
         , acHttpState          = httpState
         , acNetworkStatusState = networkStatusState
+        , acAnimationState     = animationState
         , acViewFunction       = viewRef
         , acDismissAction      = dismissAction
         , acDismissRef         = dismissRef
@@ -110,6 +114,7 @@ newAppContext mobileApp = do
   writeIORef (bssContextPtr bottomSheetState) (castPtr ptr)
   writeIORef (hsContextPtr httpState) (castPtr ptr)
   writeIORef (nssContextPtr networkStatusState) (castPtr ptr)
+  writeIORef (ansContextPtr animationState) (castPtr ptr)
   pure ptr
 
 -- | Release a pointer previously created by 'newAppContext'.

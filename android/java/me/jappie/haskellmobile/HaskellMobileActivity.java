@@ -39,6 +39,7 @@ import android.text.TextWatcher;
 import android.view.View;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.view.Choreographer;
 import android.widget.EditText;
 
 /**
@@ -83,6 +84,7 @@ public class HaskellMobileActivity extends Activity implements View.OnClickListe
     private native void onHttpResult(int requestId, int resultCode, int httpStatus,
                                       String headers, byte[] body);
     private native void onNetworkStatusChange(int connected, int transport);
+    private native void onAnimationFrame(double timestampMs);
 
     private static final String SECURE_PREFS_NAME = "haskell_mobile_secure_storage";
 
@@ -106,6 +108,9 @@ public class HaskellMobileActivity extends Activity implements View.OnClickListe
     private Thread audioRecordThread;
     private volatile boolean audioRecording;
     private int videoRequestId;
+
+    private Choreographer.FrameCallback animationFrameCallback;
+    private boolean animationLoopRunning;
 
     /**
      * Map a permission code (from PermissionBridge.h) to an Android permission string.
@@ -1043,5 +1048,40 @@ public class HaskellMobileActivity extends Activity implements View.OnClickListe
     public void onLowMemory() {
         super.onLowMemory();
         onLifecycleLowMemory();
+    }
+
+    /**
+     * Start the Choreographer-based animation frame loop. Called from native code via JNI.
+     * Posts a FrameCallback that calls onAnimationFrame with the timestamp in milliseconds,
+     * then re-posts itself for the next vsync.
+     */
+    public void startAnimationLoop() {
+        if (animationLoopRunning) return;
+        animationLoopRunning = true;
+
+        animationFrameCallback = new Choreographer.FrameCallback() {
+            @Override
+            public void doFrame(long frameTimeNanos) {
+                if (!animationLoopRunning) return;
+                double timestampMs = frameTimeNanos / 1_000_000.0;
+                onAnimationFrame(timestampMs);
+                if (animationLoopRunning) {
+                    Choreographer.getInstance().postFrameCallback(this);
+                }
+            }
+        };
+
+        Choreographer.getInstance().postFrameCallback(animationFrameCallback);
+    }
+
+    /**
+     * Stop the Choreographer-based animation frame loop. Called from native code via JNI.
+     */
+    public void stopAnimationLoop() {
+        animationLoopRunning = false;
+        if (animationFrameCallback != null) {
+            Choreographer.getInstance().removeFrameCallback(animationFrameCallback);
+            animationFrameCallback = null;
+        }
     }
 }
