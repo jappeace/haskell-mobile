@@ -269,6 +269,8 @@ in {
         cp ${haskellMobileSrc}/src/HaskellMobile/Http.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/NetworkStatus.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/AppContext.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/Animation.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/FilesDir.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile.hs .
 
         # Extra module copies (consumer overrides, additional modules)
@@ -300,6 +302,7 @@ in {
         cp ${haskellMobileSrc}/cbits/http_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/network_status_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/animation_bridge.c cbits/
+        cp ${haskellMobileSrc}/cbits/files_dir.c cbits/
 
         echo "=== Compiling C bridge files with cross-GHC ==="
         for cfile in cbits/*.c; do
@@ -611,6 +614,8 @@ in {
         cp ${haskellMobileSrc}/src/HaskellMobile/Http.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/NetworkStatus.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/AppContext.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/Animation.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/FilesDir.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile.hs .
 
         # Extra module copies
@@ -635,6 +640,7 @@ in {
         cp ${haskellMobileSrc}/cbits/http_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/network_status_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/animation_bridge.c cbits/
+        cp ${haskellMobileSrc}/cbits/files_dir.c cbits/
 
         ghc -staticlib \
           -O2 \
@@ -675,6 +681,7 @@ in {
           cbits/http_bridge.c \
           cbits/network_status_bridge.c \
           cbits/animation_bridge.c \
+          cbits/files_dir.c \
           Main.hs \
           HaskellMobile.hs
       '';
@@ -820,6 +827,8 @@ open(sys.argv[1], "w").write(yml)
         cp ${haskellMobileSrc}/src/HaskellMobile/Http.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/NetworkStatus.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile/AppContext.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/Animation.hs HaskellMobile/
+        cp ${haskellMobileSrc}/src/HaskellMobile/FilesDir.hs HaskellMobile/
         cp ${haskellMobileSrc}/src/HaskellMobile.hs .
 
         # Extra module copies
@@ -844,6 +853,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${haskellMobileSrc}/cbits/http_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/network_status_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/animation_bridge.c cbits/
+        cp ${haskellMobileSrc}/cbits/files_dir.c cbits/
 
         ghc -staticlib \
           -O2 \
@@ -884,6 +894,7 @@ open(sys.argv[1], "w").write(yml)
           cbits/http_bridge.c \
           cbits/network_status_bridge.c \
           cbits/animation_bridge.c \
+          cbits/files_dir.c \
           Main.hs \
           HaskellMobile.hs
       '';
