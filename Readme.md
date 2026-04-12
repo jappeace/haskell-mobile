@@ -10,7 +10,7 @@ It's like flutter but instead of dart, haskell!
 Write native mobile apps in Haskell.
 This works similar to react native where we have
 tight bindings on the existing UI frameworks
-provided android and IOS.
+provided by android and IOS.
 
 This project cross-compiles a Haskell library to Android (APK) and iOS (static library / IPA),
 with a thin platform-native UI layer (Kotlin for Android, Swift for iOS).
@@ -25,14 +25,13 @@ Supports native:
 + IOS
 + WearOS (IOS on wearables)
 
-
 The library fully controls the UI.
 This is different from say Simplex chat where they call into the library to do Haskell from dirty java/swift code.
 This library should've written all swift/java code you'll ever need,
 so you can focus on your sweet Haskell.
 
 Haskell is a fantastic language for UI.
-Having strong type safety around callbacks and widget's 
+Having strong type safety around callbacks and widgets 
 makes it a lot easier to write them.
 I basically copied flutters' approach to encoding UI,
 but in flutter it's a fair bit of guess work, 
@@ -77,15 +76,8 @@ main = do
     , maView        = \_userState -> do
         n <- readIORef counter
         pure $ Column
-          [ Text TextConfig
-              { tcLabel = "Count: " <> Text.pack (show n)
-              , tcFontConfig = Nothing
-              }
-          , Button ButtonConfig
-              { bcLabel      = "+"
-              , bcAction     = increment
-              , bcFontConfig = Nothing
-              }
+          [ text "Count: " <> Text.pack (show n)
+          , button "+" increment
           ]
     , maActionState = actionState
     }
