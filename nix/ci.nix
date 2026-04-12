@@ -14,6 +14,7 @@ let
     consumer-link-test = import ./test-link-consumer.nix { inherit sources; };
     consumer-deps-test = import ./test-consumer-deps.nix { inherit sources; };
     th-test = import ./test-th.nix { inherit sources; };
+    readme-example = import ./test-readme-example.nix { inherit sources; };
   } // (if isDarwin then {
     ios-lib = import ./ios.nix { inherit sources; };
     watchos-lib = import ./watchos.nix { inherit sources; };
