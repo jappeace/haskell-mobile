@@ -77,7 +77,7 @@ main = do
         n <- readIORef counter
         pure $ Column
           [ text $ "Count: " <> Text.pack (show n)
-          , button $ "+" increment
+          , button "+" increment
           ]
     , maActionState = actionState
     }
