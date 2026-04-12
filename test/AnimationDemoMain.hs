@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 -- | Self-contained animation demo app.
 --
 -- A button toggles padding between 10 and 50, wrapped in
@@ -6,7 +7,8 @@
 -- tween interpolation path and logs progress to stderr.
 module Main where
 
-import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import Data.IORef (newIORef, readIORef, writeIORef)
+import Data.Text (pack)
 import HaskellMobile
   ( MobileApp(..)
   , UserState(..)
@@ -35,7 +37,7 @@ main = do
     currentPadding <- readIORef paddingRef
     let newPadding = if currentPadding < 30.0 then 50.0 else 10.0
     writeIORef paddingRef newPadding
-    platformLog ("Toggled padding to " <> show newPadding)
+    platformLog ("Toggled padding to " <> pack (show newPadding))
   let viewFn :: UserState -> IO Widget
       viewFn _userState = do
         currentPadding <- readIORef paddingRef

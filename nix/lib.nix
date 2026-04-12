@@ -213,6 +213,14 @@ in {
           -o network_status_android.o \
           ${haskellMobileSrc}/cbits/network_status_android.c
 
+        ${ndkCc} -c -fPIC \
+          -DJNI_PACKAGE=me_jappie_haskellmobile \
+          -I${sysroot}/usr/include \
+          -I$RTS_INCLUDE \
+          -I${haskellMobileSrc}/include \
+          -o animation_bridge_android.o \
+          ${haskellMobileSrc}/cbits/animation_bridge_android.c
+
         # Compile extra JNI bridge sources (consumer-specific JNI methods)
         ${builtins.concatStringsSep "\n" (builtins.genList (i:
           let src = builtins.elemAt extraJniBridge i;
@@ -358,6 +366,7 @@ in {
           -optl$(pwd)/bottom_sheet_android.o \
           -optl$(pwd)/http_bridge_android.o \
           -optl$(pwd)/network_status_android.o \
+          -optl$(pwd)/animation_bridge_android.o \
           ${builtins.concatStringsSep " " (builtins.genList (i: "-optl$(pwd)/extra_jni_${toString i}.o") (builtins.length extraJniBridge))} \
           ${builtins.concatStringsSep " " (map (o: "-optl${o}") extraLinkObjects)} \
           -optl-Wl,-u,haskellRunMain \
