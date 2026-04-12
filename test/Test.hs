@@ -16,6 +16,7 @@ import Test.PlatformTests (permissionTests, secureStorageTests, bleTests, dialog
 import Test.AppContextTests (registrationTests, appContextTests, exceptionHandlerTests)
 import Test.ActionTests (actionTests, widgetEqTests, incrementalRenderTests)
 import Test.AnimationTests (animationTests)
+import Test.FilesDirTests (filesDirTests)
 
 main :: IO ()
 main = do
@@ -66,4 +67,5 @@ tests ffiPermState ffiSecureStorageState ffiDialogState ffiAuthSessionState ffiB
     , widgetEqTests
     , incrementalRenderTests
     , animationTests
+    , filesDirTests
     ]

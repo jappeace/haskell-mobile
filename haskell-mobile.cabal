@@ -81,6 +81,7 @@ library
       HaskellMobile.BottomSheet
       HaskellMobile.Http
       HaskellMobile.NetworkStatus
+      HaskellMobile.FilesDir
   hs-source-dirs:
       src
   build-depends:
@@ -104,6 +105,7 @@ library
       cbits/http_bridge.c
       cbits/network_status_bridge.c
       cbits/animation_bridge.c
+      cbits/files_dir.c
   include-dirs:
       include
 
@@ -119,6 +121,7 @@ test-suite unit
       Test.AppContextTests
       Test.ActionTests
       Test.AnimationTests
+      Test.FilesDirTests
   ghc-options: -Wno-unused-packages -threaded -rtsopts "-with-rtsopts=-N -M7G -T -Iw10"
   hs-source-dirs:
       test
@@ -129,4 +132,6 @@ test-suite unit
       haskell-mobile,
       containers,
       text,
-      bytestring
+      bytestring,
+      directory,
+      filepath

@@ -54,6 +54,9 @@ extern void setSystemLocale(const char *locale);
 /* Log detected locale from Haskell (HaskellMobile.Locale) */
 extern void haskellLogLocale(void);
 
+/* App files directory (cbits/files_dir.c) */
+extern void setAppFilesDir(const char *path);
+
 /* ---- Global state (valid only on the main thread) ---- */
 static UIViewController *g_viewController = nil;
 
@@ -804,5 +807,18 @@ void setup_ios_ui_bridge(void *viewController, void *haskellCtx)
             : lang;
         setSystemLocale(strdup([tag UTF8String]));
         haskellLogLocale();
+    }
+
+    /* Cache the app files directory (Application Support) */
+    {
+        NSArray *paths = NSSearchPathForDirectoriesInDomains(
+            NSApplicationSupportDirectory, NSUserDomainMask, YES);
+        NSString *appSupport = [paths firstObject];
+        if (appSupport) {
+            /* Ensure the directory exists */
+            [[NSFileManager defaultManager] createDirectoryAtPath:appSupport
+                withIntermediateDirectories:YES attributes:nil error:nil];
+            setAppFilesDir(strdup([appSupport UTF8String]));
+        }
     }
 }

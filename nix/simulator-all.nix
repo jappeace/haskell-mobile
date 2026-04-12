@@ -219,6 +219,17 @@ let
     name = "haskell-mobile-animation-simulator-app";
   };
 
+  filesDirIos = import ./ios.nix {
+    inherit sources;
+    mainModule = ../test/FilesDirDemoMain.hs;
+    simulator = true;
+  };
+  filesDirSimApp = lib.mkSimulatorApp {
+    iosLib = filesDirIos;
+    iosSrc = ../ios;
+    name = "haskell-mobile-filesdir-simulator-app";
+  };
+
   xcodegen = pkgs.xcodegen;
 
   testScripts = builtins.path { path = ../test; name = "test-scripts"; };
@@ -257,6 +268,7 @@ HTTP_SHARE_DIR="${httpSimApp}/share/ios"
 NETWORK_STATUS_SHARE_DIR="${networkStatusSimApp}/share/ios"
 MAPVIEW_SHARE_DIR="${mapviewSimApp}/share/ios"
 ANIMATION_SHARE_DIR="${animationSimApp}/share/ios"
+FILES_DIR_SHARE_DIR="${filesDirSimApp}/share/ios"
 TEST_SCRIPTS="${testScripts}"
 
 # --- Temp working directory ---
@@ -277,6 +289,7 @@ PHASE10_OK=0
 PHASE11_OK=0
 PHASE12_OK=0
 PHASE13_OK=0
+PHASE14_OK=0
 
 cleanup() {
     echo ""
@@ -1153,6 +1166,51 @@ if [ -z "$ANIMATION_APP" ]; then
 fi
 echo "Animation app: $ANIMATION_APP"
 
+# --- Stage and build filesdir demo app ---
+echo "=== Staging filesdir demo app ==="
+mkdir -p "$WORK_DIR/filesdir/lib" "$WORK_DIR/filesdir/include"
+cp "$FILES_DIR_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/filesdir/lib/"
+cp "$FILES_DIR_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/CameraBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/filesdir/include/"
+cp -r "$FILES_DIR_SHARE_DIR/HaskellMobile" "$WORK_DIR/filesdir/"
+cp "$FILES_DIR_SHARE_DIR/project.yml" "$WORK_DIR/filesdir/"
+chmod -R u+w "$WORK_DIR/filesdir"
+
+echo "=== Generating filesdir Xcode project ==="
+cd "$WORK_DIR/filesdir"
+${xcodegen}/bin/xcodegen generate
+
+echo "=== Building filesdir demo app for simulator ==="
+xcodebuild build \
+    -project HaskellMobile.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk iphonesimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/filesdir-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+FILES_DIR_APP=$(find "$WORK_DIR/filesdir-build" -name "*.app" -type d | head -1)
+if [ -z "$FILES_DIR_APP" ]; then
+    echo "ERROR: Could not find filesdir .app bundle"
+    exit 1
+fi
+echo "FilesDir app: $FILES_DIR_APP"
+
 # --- Discover latest iOS runtime ---
 echo "=== Discovering iOS runtime ==="
 RUNTIME=$(xcrun simctl list runtimes -j \
@@ -1214,7 +1272,7 @@ sleep 5
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP CAMERA_APP BOTTOM_SHEET_APP HTTP_APP NETWORK_STATUS_APP MAPVIEW_APP ANIMATION_APP WORK_DIR
+export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP CAMERA_APP BOTTOM_SHEET_APP HTTP_APP NETWORK_STATUS_APP MAPVIEW_APP ANIMATION_APP FILES_DIR_APP WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -1229,6 +1287,7 @@ PHASE10_EXIT=0
 PHASE11_EXIT=0
 PHASE12_EXIT=0
 PHASE13_EXIT=0
+PHASE14_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -1305,6 +1364,8 @@ echo "--- networkstatus ---"
 run_with_retry "networkstatus" bash "$TEST_SCRIPTS/ios/network_status.sh" || PHASE7_EXIT=1
 echo "--- animation ---"
 run_with_retry "animation" bash "$TEST_SCRIPTS/ios/animation.sh" || PHASE13_EXIT=1
+echo "--- filesdir ---"
+run_with_retry "filesdir" bash "$TEST_SCRIPTS/ios/filesdir.sh" || PHASE14_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -1435,6 +1496,16 @@ else
     echo "PHASE 13 FAILED"
 fi
 
+if [ $PHASE14_EXIT -eq 0 ]; then
+    PHASE14_OK=1
+    echo ""
+    echo "PHASE 14 PASSED"
+else
+    PHASE14_OK=0
+    echo ""
+    echo "PHASE 14 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -1533,6 +1604,13 @@ if [ $PHASE13_OK -eq 1 ]; then
     echo "PASS  Phase 13 — Animation demo app"
 else
     echo "FAIL  Phase 13 — Animation demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE14_OK -eq 1 ]; then
+    echo "PASS  Phase 14 — FilesDir demo app"
+else
+    echo "FAIL  Phase 14 — FilesDir demo app"
     FINAL_EXIT=1
 fi
 

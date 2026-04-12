@@ -198,6 +198,17 @@ let
     name = "haskell-mobile-watchos-animation-simulator-app";
   };
 
+  filesDirWatchos = import ./watchos.nix {
+    inherit sources;
+    mainModule = ../test/FilesDirDemoMain.hs;
+    simulator = true;
+  };
+  filesDirSimApp = lib.mkWatchOSSimulatorApp {
+    watchosLib = filesDirWatchos;
+    watchosSrc = ../watchos;
+    name = "haskell-mobile-watchos-filesdir-simulator-app";
+  };
+
   xcodegen = pkgs.xcodegen;
 
   testScripts = builtins.path { path = ../test; name = "test-scripts"; };
@@ -234,6 +245,7 @@ BOTTOM_SHEET_SHARE_DIR="${bottomSheetSimApp}/share/watchos"
 NETWORK_STATUS_SHARE_DIR="${networkStatusSimApp}/share/watchos"
 MAPVIEW_SHARE_DIR="${mapviewSimApp}/share/watchos"
 ANIMATION_SHARE_DIR="${animationSimApp}/share/watchos"
+FILES_DIR_SHARE_DIR="${filesDirSimApp}/share/watchos"
 TEST_SCRIPTS="${testScripts}"
 
 # --- Temp working directory ---
@@ -254,6 +266,7 @@ PHASE10_OK=0
 PHASE11_OK=0
 PHASE12_OK=0
 PHASE14_OK=0
+PHASE15_OK=0
 
 cleanup() {
     echo ""
@@ -1021,6 +1034,50 @@ if [ -z "$ANIMATION_APP" ]; then
 fi
 echo "Animation app: $ANIMATION_APP"
 
+# --- Stage and build filesdir demo app ---
+echo "=== Staging filesdir demo app ==="
+mkdir -p "$WORK_DIR/filesdir/lib" "$WORK_DIR/filesdir/include"
+cp "$FILES_DIR_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/filesdir/lib/"
+cp "$FILES_DIR_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/CameraBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/filesdir/include/"
+cp -r "$FILES_DIR_SHARE_DIR/HaskellMobile" "$WORK_DIR/filesdir/"
+cp "$FILES_DIR_SHARE_DIR/project.yml" "$WORK_DIR/filesdir/"
+chmod -R u+w "$WORK_DIR/filesdir"
+
+echo "=== Generating filesdir Xcode project ==="
+cd "$WORK_DIR/filesdir"
+${xcodegen}/bin/xcodegen generate
+
+echo "=== Building filesdir demo app for simulator ==="
+xcodebuild build \
+    -project HaskellMobile.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk watchsimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/filesdir-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+FILES_DIR_APP=$(find "$WORK_DIR/filesdir-build" -name "*.app" -type d | head -1)
+if [ -z "$FILES_DIR_APP" ]; then
+    echo "ERROR: Could not find filesdir .app bundle"
+    exit 1
+fi
+echo "FilesDir app: $FILES_DIR_APP"
+
 # --- Discover latest watchOS runtime ---
 echo "=== Discovering watchOS runtime ==="
 RUNTIME=$(xcrun simctl list runtimes -j \
@@ -1084,7 +1141,7 @@ sleep 5
 # ===========================================================================
 # Log subsystem differs from bundle ID for watchOS (bundle ID has .watchkitapp suffix)
 LOG_SUBSYSTEM="me.jappie.haskellmobile"
-export SIM_UDID BUNDLE_ID LOG_SUBSYSTEM COUNTER_APP SCROLL_APP TEXTINPUT_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP CAMERA_APP BOTTOM_SHEET_APP NETWORK_STATUS_APP MAPVIEW_APP ANIMATION_APP WORK_DIR
+export SIM_UDID BUNDLE_ID LOG_SUBSYSTEM COUNTER_APP SCROLL_APP TEXTINPUT_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP CAMERA_APP BOTTOM_SHEET_APP NETWORK_STATUS_APP MAPVIEW_APP ANIMATION_APP FILES_DIR_APP WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -1100,6 +1157,7 @@ PHASE11_EXIT=0
 PHASE12_EXIT=0
 PHASE13_EXIT=0
 PHASE14_EXIT=0
+PHASE15_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -1165,6 +1223,8 @@ echo "--- mapview ---"
 run_with_retry "mapview" bash "$TEST_SCRIPTS/watchos/mapview.sh" || PHASE13_EXIT=1
 echo "--- animation ---"
 run_with_retry "animation" bash "$TEST_SCRIPTS/watchos/animation.sh" || PHASE14_EXIT=1
+echo "--- filesdir ---"
+run_with_retry "filesdir" bash "$TEST_SCRIPTS/watchos/filesdir.sh" || PHASE15_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -1305,6 +1365,16 @@ else
     echo "PHASE 14 FAILED"
 fi
 
+if [ $PHASE15_EXIT -eq 0 ]; then
+    PHASE15_OK=1
+    echo ""
+    echo "PHASE 15 PASSED"
+else
+    PHASE15_OK=0
+    echo ""
+    echo "PHASE 15 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -1410,6 +1480,13 @@ if [ $PHASE14_OK -eq 1 ]; then
     echo "PASS  Phase 14 — Animation demo app"
 else
     echo "FAIL  Phase 14 — Animation demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE15_OK -eq 1 ]; then
+    echo "PASS  Phase 15 — FilesDir demo app"
+else
+    echo "FAIL  Phase 15 — FilesDir demo app"
     FINAL_EXIT=1
 fi
 

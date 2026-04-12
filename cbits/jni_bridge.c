@@ -35,6 +35,9 @@ extern void setSystemLocale(const char *locale);
 /* Log detected locale from Haskell (HaskellMobile.Locale) */
 extern void haskellLogLocale(void);
 
+/* App files directory (cbits/files_dir.c) */
+extern void setAppFilesDir(const char *path);
+
 /* Haskell foreign exports */
 extern char* haskellGreet(const char* name);
 extern void haskellOnLifecycle(void *ctx, int eventType);
@@ -169,6 +172,24 @@ JNI_METHOD(greet)(JNIEnv *env, jobject thiz, jstring jname)
 JNIEXPORT void JNICALL
 JNI_METHOD(renderUI)(JNIEnv *env, jobject thiz)
 {
+    /* Cache the app files directory from Activity.getFilesDir() (once) */
+    {
+        static int files_dir_cached = 0;
+        if (!files_dir_cached) {
+            files_dir_cached = 1;
+            jclass contextClass = (*env)->FindClass(env, "android/content/Context");
+            jmethodID getFilesDir = (*env)->GetMethodID(env, contextClass,
+                "getFilesDir", "()Ljava/io/File;");
+            jobject filesDir = (*env)->CallObjectMethod(env, thiz, getFilesDir);
+            jclass fileClass = (*env)->FindClass(env, "java/io/File");
+            jmethodID getAbsolutePath = (*env)->GetMethodID(env, fileClass,
+                "getAbsolutePath", "()Ljava/lang/String;");
+            jstring jpath = (*env)->CallObjectMethod(env, filesDir, getAbsolutePath);
+            const char *cpath = (*env)->GetStringUTFChars(env, jpath, NULL);
+            setAppFilesDir(strdup(cpath));
+            (*env)->ReleaseStringUTFChars(env, jpath, cpath);
+        }
+    }
     setup_android_ui_bridge(env, thiz, g_haskell_ctx);
     setup_android_permission_bridge(env, thiz, g_haskell_ctx);
     setup_android_secure_storage_bridge(env, thiz, g_haskell_ctx);

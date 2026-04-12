@@ -53,6 +53,8 @@ module HaskellMobile
   , localeToText
   , languageToCode
   , languageFromCode
+  -- Re-exports from FilesDir
+  , getAppFilesDir
   -- Re-exports from I18n
   , Key(..)
   , TranslateFailure(..)
@@ -229,6 +231,7 @@ import HaskellMobile.Lifecycle
   , freeMobileContext
   , lifecycleFromInt
   )
+import HaskellMobile.FilesDir (getAppFilesDir)
 import HaskellMobile.I18n (Key(..), TranslateFailure(..), translate)
 import HaskellMobile.Locale (Language(..), Locale(..), LocaleFailure(..), getSystemLocale, parseLocale, localeToText, languageToCode, languageFromCode)
 import HaskellMobile.Permission
