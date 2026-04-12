@@ -9,6 +9,7 @@ module Main where
 
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Text (pack)
+import Foreign.Ptr (Ptr)
 import HaskellMobile
   ( MobileApp(..)
   , UserState(..)
@@ -21,6 +22,7 @@ import HaskellMobile
   , loggingMobileContext
   , platformLog
   )
+import HaskellMobile.AppContext (AppContext(..))
 import HaskellMobile.Widget
   ( Widget(..)
   , TextConfig(..)
@@ -29,7 +31,7 @@ import HaskellMobile.Widget
   , defaultStyle
   )
 
-main :: IO ()
+main :: IO (Ptr AppContext)
 main = do
   actionState <- newActionState
   paddingRef <- newIORef (10.0 :: Double)
@@ -59,5 +61,6 @@ main = do
         , maView        = viewFn
         , maActionState = actionState
         }
-  _ctxPtr <- startMobileApp app
+  ctxPtr <- startMobileApp app
   platformLog "AnimationDemoMain started"
+  pure ctxPtr
