@@ -288,6 +288,7 @@ in {
         cp ${haskellMobileSrc}/cbits/bottom_sheet_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/http_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/network_status_bridge.c cbits/
+        cp ${haskellMobileSrc}/cbits/animation_bridge.c cbits/
 
         # Step 4: Compile Haskell to shared library with cross-GHC.
         # Discover library paths dynamically — hash suffixes vary across nixpkgs.
@@ -349,6 +350,7 @@ in {
           cbits/bottom_sheet_bridge.c \
           cbits/http_bridge.c \
           cbits/network_status_bridge.c \
+          cbits/animation_bridge.c \
           -optl-L${androidPkgs.gmp}/lib \
           -optl-L${androidPkgs.libffi}/lib \
           -optl-lffi \
@@ -613,6 +615,7 @@ in {
         cp ${haskellMobileSrc}/cbits/bottom_sheet_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/http_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/network_status_bridge.c cbits/
+        cp ${haskellMobileSrc}/cbits/animation_bridge.c cbits/
 
         ghc -staticlib \
           -O2 \
@@ -652,6 +655,7 @@ in {
           cbits/bottom_sheet_bridge.c \
           cbits/http_bridge.c \
           cbits/network_status_bridge.c \
+          cbits/animation_bridge.c \
           Main.hs \
           HaskellMobile.hs
       '';
@@ -679,6 +683,7 @@ in {
         cp ${haskellMobileSrc}/include/BottomSheetBridge.h $out/include/BottomSheetBridge.h
         cp ${haskellMobileSrc}/include/HttpBridge.h $out/include/HttpBridge.h
         cp ${haskellMobileSrc}/include/NetworkStatusBridge.h $out/include/NetworkStatusBridge.h
+        cp ${haskellMobileSrc}/include/AnimationBridge.h $out/include/AnimationBridge.h
       '';
     };
 
@@ -739,6 +744,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${iosLib}/include/BottomSheetBridge.h $out/share/ios/include/
         cp ${iosLib}/include/HttpBridge.h $out/share/ios/include/
         cp ${iosLib}/include/NetworkStatusBridge.h $out/share/ios/include/
+        cp ${iosLib}/include/AnimationBridge.h $out/share/ios/include/
         ${patchProjectYml}
       '';
 
@@ -818,6 +824,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${haskellMobileSrc}/cbits/bottom_sheet_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/http_bridge.c cbits/
         cp ${haskellMobileSrc}/cbits/network_status_bridge.c cbits/
+        cp ${haskellMobileSrc}/cbits/animation_bridge.c cbits/
 
         ghc -staticlib \
           -O2 \
@@ -857,6 +864,7 @@ open(sys.argv[1], "w").write(yml)
           cbits/bottom_sheet_bridge.c \
           cbits/http_bridge.c \
           cbits/network_status_bridge.c \
+          cbits/animation_bridge.c \
           Main.hs \
           HaskellMobile.hs
       '';
@@ -884,6 +892,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${haskellMobileSrc}/include/BottomSheetBridge.h $out/include/BottomSheetBridge.h
         cp ${haskellMobileSrc}/include/HttpBridge.h $out/include/HttpBridge.h
         cp ${haskellMobileSrc}/include/NetworkStatusBridge.h $out/include/NetworkStatusBridge.h
+        cp ${haskellMobileSrc}/include/AnimationBridge.h $out/include/AnimationBridge.h
       '';
     };
 
@@ -919,6 +928,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${watchosLib}/include/BottomSheetBridge.h $out/share/watchos/include/
         cp ${watchosLib}/include/HttpBridge.h $out/share/watchos/include/
         cp ${watchosLib}/include/NetworkStatusBridge.h $out/share/watchos/include/
+        cp ${watchosLib}/include/AnimationBridge.h $out/share/watchos/include/
       '';
 
       installPhase = "true";
