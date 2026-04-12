@@ -118,6 +118,7 @@ viewIsErrorWidget ctxPtr = do
     TextInput _              -> pure False
     Image _                  -> pure False
     WebView _                -> pure False
+    MapView _                -> pure False
     Row _                    -> pure False
     ScrollView _             -> pure False
     Styled _ _               -> pure False

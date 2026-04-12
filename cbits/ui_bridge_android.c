@@ -55,6 +55,7 @@ static jclass   g_class_LinearLayout;
 static jclass   g_class_ScrollView;
 static jclass   g_class_ImageView;
 static jclass   g_class_WebView;
+static jclass   g_class_FrameLayout;
 static jclass   g_class_BitmapFactory;
 static jclass   g_class_ViewGroup;
 static jclass   g_class_ViewGroup_LayoutParams;
@@ -67,6 +68,7 @@ static jmethodID g_ctor_LinearLayout;
 static jmethodID g_ctor_ScrollView;
 static jmethodID g_ctor_ImageView;
 static jmethodID g_ctor_WebView;
+static jmethodID g_ctor_FrameLayout;
 static jmethodID g_ctor_ViewGroup_LayoutParams;
 static jmethodID g_ctor_Integer;
 
@@ -162,6 +164,10 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     if (!cls) return -1;
     g_class_WebView = (*env)->NewGlobalRef(env, cls);
 
+    cls = (*env)->FindClass(env, "android/widget/FrameLayout");
+    if (!cls) return -1;
+    g_class_FrameLayout = (*env)->NewGlobalRef(env, cls);
+
     cls = (*env)->FindClass(env, "android/graphics/BitmapFactory");
     if (!cls) return -1;
     g_class_BitmapFactory = (*env)->NewGlobalRef(env, cls);
@@ -192,6 +198,8 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     g_ctor_ImageView = (*env)->GetMethodID(env, g_class_ImageView,
         "<init>", "(Landroid/content/Context;)V");
     g_ctor_WebView = (*env)->GetMethodID(env, g_class_WebView,
+        "<init>", "(Landroid/content/Context;)V");
+    g_ctor_FrameLayout = (*env)->GetMethodID(env, g_class_FrameLayout,
         "<init>", "(Landroid/content/Context;)V");
     g_ctor_ViewGroup_LayoutParams = (*env)->GetMethodID(env,
         g_class_ViewGroup_LayoutParams, "<init>", "(II)V");
@@ -432,6 +440,20 @@ static int32_t android_create_node(int32_t nodeType)
     case UI_NODE_IMAGE:
         view = (*env)->NewObject(env, g_class_ImageView, g_ctor_ImageView, g_activity);
         break;
+    case UI_NODE_MAP_VIEW: {
+        /* Placeholder: FrameLayout containing a TextView showing coordinates.
+         * A real map (osmdroid or Google Maps) can replace this once the build
+         * pipeline supports AAR dependencies. */
+        jobject frame = (*env)->NewObject(env, g_class_FrameLayout, g_ctor_FrameLayout, g_activity);
+        jobject label = (*env)->NewObject(env, g_class_TextView, g_ctor_TextView, g_activity);
+        jstring text = (*env)->NewStringUTF(env, "Map placeholder (0.0, 0.0) z1.0");
+        (*env)->CallVoidMethod(env, label, g_method_setText, text);
+        (*env)->DeleteLocalRef(env, text);
+        (*env)->CallVoidMethod(env, frame, g_method_addView, label);
+        (*env)->DeleteLocalRef(env, label);
+        view = frame;
+        break;
+    }
     case UI_NODE_WEBVIEW: {
         view = (*env)->NewObject(env, g_class_WebView, g_ctor_WebView, g_activity);
         if (view && g_method_getSettings && g_method_setJavaScriptEnabled) {
@@ -648,6 +670,32 @@ static void android_set_num_prop(int32_t nodeId, int32_t propId, double value)
         LOGI("setNumProp(node=%d, scaleType=%d)", nodeId, (int)value);
         break;
     }
+    case UI_PROP_MAP_LAT:
+    case UI_PROP_MAP_LON:
+    case UI_PROP_MAP_ZOOM: {
+        /* Update placeholder label inside the FrameLayout with new coordinates.
+         * The FrameLayout's first child is the placeholder TextView. */
+        if ((*env)->IsInstanceOf(env, view, g_class_FrameLayout)) {
+            jmethodID getChildAt = (*env)->GetMethodID(env, g_class_ViewGroup,
+                "getChildAt", "(I)Landroid/view/View;");
+            jobject child = (*env)->CallObjectMethod(env, view, getChildAt, (jint)0);
+            if (child && (*env)->IsInstanceOf(env, child, g_class_TextView)) {
+                char buf[128];
+                snprintf(buf, sizeof(buf), "Map placeholder (%.4f, %.4f) z%.1f",
+                         value, value, value);
+                jstring jtext = (*env)->NewStringUTF(env, buf);
+                (*env)->CallVoidMethod(env, child, g_method_setText, jtext);
+                (*env)->DeleteLocalRef(env, jtext);
+            }
+            if (child) (*env)->DeleteLocalRef(env, child);
+        }
+        LOGI("setNumProp(node=%d, mapProp=%d, value=%.4f)", nodeId, propId, value);
+        break;
+    }
+    case UI_PROP_MAP_SHOW_USER_LOC:
+        /* No-op for placeholder — real map would toggle location layer */
+        LOGI("setNumProp(node=%d, showUserLoc=%.0f)", nodeId, value);
+        break;
     default:
         LOGI("setNumProp: unknown propId %d", propId);
         break;
@@ -707,8 +755,11 @@ static void android_set_handler(int32_t nodeId, int32_t eventType, int32_t callb
         LOGI("setHandler(node=%d, click, callback=%d)", nodeId, callbackId);
         break;
     case UI_EVENT_TEXT_CHANGE:
-        /* Register a TextWatcher via our Java helper */
-        if (g_method_registerTextWatcher) {
+        if ((*env)->IsInstanceOf(env, view, g_class_FrameLayout)) {
+            /* MapView placeholder: callbackId stored in tag, no TextWatcher needed */
+            LOGI("setHandler(node=%d, mapRegionChange, callback=%d)", nodeId, callbackId);
+        } else if (g_method_registerTextWatcher) {
+            /* Register a TextWatcher via our Java helper */
             (*env)->CallVoidMethod(env, g_activity, g_method_registerTextWatcher, view);
             LOGI("setHandler(node=%d, textChange, callback=%d)", nodeId, callbackId);
         } else {

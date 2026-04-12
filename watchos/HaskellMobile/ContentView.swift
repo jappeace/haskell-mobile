@@ -54,6 +54,17 @@ struct NodeView: View {
             }
         case 6: // UI_NODE_IMAGE
             ImageNodeView(node: node)
+        case 7: // UI_NODE_MAP_VIEW
+            VStack {
+                Text("Map")
+                    .font(.caption2)
+                Text(String(format: "%.4f, %.4f z%.1f",
+                            node.mapLatitude ?? 0.0,
+                            node.mapLongitude ?? 0.0,
+                            node.mapZoom ?? 1.0))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
         case 8: // UI_NODE_WEBVIEW
             Text("WebView not available")
                 .foregroundColor(.secondary)

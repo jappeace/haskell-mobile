@@ -197,6 +197,17 @@ let
     name = "haskell-mobile-networkstatus-simulator-app";
   };
 
+  mapviewIos = import ./ios.nix {
+    inherit sources;
+    mainModule = ../test/MapViewDemoMain.hs;
+    simulator = true;
+  };
+  mapviewSimApp = lib.mkSimulatorApp {
+    iosLib = mapviewIos;
+    iosSrc = ../ios;
+    name = "haskell-mobile-mapview-simulator-app";
+  };
+
   xcodegen = pkgs.xcodegen;
 
   testScripts = builtins.path { path = ../test; name = "test-scripts"; };
@@ -233,6 +244,7 @@ CAMERA_SHARE_DIR="${cameraSimApp}/share/ios"
 BOTTOM_SHEET_SHARE_DIR="${bottomSheetSimApp}/share/ios"
 HTTP_SHARE_DIR="${httpSimApp}/share/ios"
 NETWORK_STATUS_SHARE_DIR="${networkStatusSimApp}/share/ios"
+MAPVIEW_SHARE_DIR="${mapviewSimApp}/share/ios"
 TEST_SCRIPTS="${testScripts}"
 
 # --- Temp working directory ---
@@ -290,7 +302,8 @@ for share_dir in \
     "$AUTH_SESSION_SHARE_DIR" \
     "$CAMERA_SHARE_DIR" \
     "$BOTTOM_SHEET_SHARE_DIR" \
-    "$HTTP_SHARE_DIR"; do
+    "$HTTP_SHARE_DIR" \
+    "$MAPVIEW_SHARE_DIR"; do
     a_path="$share_dir/lib/libHaskellMobile.a"
     A_BYTES=$(stat -f %z "$a_path" 2>/dev/null || stat -c %s "$a_path" 2>/dev/null || echo 0)
     A_MB=$((A_BYTES / 1048576))
@@ -1021,6 +1034,50 @@ if [ -z "$NETWORK_STATUS_APP" ]; then
 fi
 echo "Network status app: $NETWORK_STATUS_APP"
 
+# --- Stage and build mapview demo app ---
+echo "=== Staging mapview demo app ==="
+mkdir -p "$WORK_DIR/mapview/lib" "$WORK_DIR/mapview/include"
+cp "$MAPVIEW_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/mapview/lib/"
+cp "$MAPVIEW_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/CameraBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/mapview/include/"
+cp -r "$MAPVIEW_SHARE_DIR/HaskellMobile" "$WORK_DIR/mapview/"
+cp "$MAPVIEW_SHARE_DIR/project.yml" "$WORK_DIR/mapview/"
+chmod -R u+w "$WORK_DIR/mapview"
+
+echo "=== Generating mapview Xcode project ==="
+cd "$WORK_DIR/mapview"
+${xcodegen}/bin/xcodegen generate
+
+echo "=== Building mapview demo app for simulator ==="
+xcodebuild build \
+    -project HaskellMobile.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk iphonesimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/mapview-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+MAPVIEW_APP=$(find "$WORK_DIR/mapview-build" -name "*.app" -type d | head -1)
+if [ -z "$MAPVIEW_APP" ]; then
+    echo "ERROR: Could not find mapview .app bundle"
+    exit 1
+fi
+echo "MapView app: $MAPVIEW_APP"
+
 # --- Discover latest iOS runtime ---
 echo "=== Discovering iOS runtime ==="
 RUNTIME=$(xcrun simctl list runtimes -j \
@@ -1082,7 +1139,7 @@ sleep 5
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP CAMERA_APP BOTTOM_SHEET_APP HTTP_APP NETWORK_STATUS_APP WORK_DIR
+export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP CAMERA_APP BOTTOM_SHEET_APP HTTP_APP NETWORK_STATUS_APP MAPVIEW_APP WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -1158,6 +1215,8 @@ echo "--- location ---"
 run_with_retry "location" bash "$TEST_SCRIPTS/ios/location.sh" || PHASE7_EXIT=1
 echo "--- webview ---"
 run_with_retry "webview" bash "$TEST_SCRIPTS/ios/webview.sh" || PHASE9_EXIT=1
+echo "--- mapview ---"
+run_with_retry "mapview" bash "$TEST_SCRIPTS/ios/mapview.sh" || PHASE9_EXIT=1
 echo "--- authsession ---"
 run_with_retry "authsession" bash "$TEST_SCRIPTS/ios/authsession.sh" || PHASE10_EXIT=1
 echo "--- camera ---"

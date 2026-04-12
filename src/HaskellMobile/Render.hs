@@ -24,7 +24,7 @@ import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Int (Int32)
 import Data.Text (Text, pack)
 import HaskellMobile.Action (Action(..), ActionState, OnChange(..), lookupAction, lookupTextAction)
-import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), ResourceName(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), WebViewConfig(..), Widget(..), WidgetStyle(..), colorToHex)
+import HaskellMobile.Widget (ButtonConfig(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), MapViewConfig(..), ResourceName(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), WebViewConfig(..), Widget(..), WidgetStyle(..), colorToHex)
 import HaskellMobile.UIBridge qualified as Bridge
 import System.IO (hPutStrLn, stderr)
 
@@ -192,6 +192,18 @@ createRenderedNode widget@(WebView config) = do
     Just action -> Bridge.setHandler nodeId Bridge.EventClick (actionId action)
     Nothing     -> pure ()
   pure (RenderedLeaf widget nodeId)
+createRenderedNode widget@(MapView config) = do
+  nodeId <- Bridge.createNode Bridge.NodeMapView
+  Bridge.setNumProp nodeId Bridge.PropMapLat (mvLatitude config)
+  Bridge.setNumProp nodeId Bridge.PropMapLon (mvLongitude config)
+  Bridge.setNumProp nodeId Bridge.PropMapZoom (mvZoom config)
+  Bridge.setNumProp nodeId Bridge.PropMapShowUserLoc
+    (if mvShowUserLocation config then 1.0 else 0.0)
+  case mvOnRegionChange config of
+    Just onChange -> Bridge.setHandler nodeId Bridge.EventTextChange
+                      (onChangeId onChange)
+    Nothing      -> pure ()
+  pure (RenderedLeaf widget nodeId)
 createRenderedNode widget@(Styled style child) = do
   childNode <- createRenderedNode child
   applyStyle (renderedNodeId childNode) style
@@ -226,6 +238,7 @@ sameNodeType (Row _)         (Row _)         = True
 sameNodeType (ScrollView _)  (ScrollView _)  = True
 sameNodeType (Image _)       (Image _)       = True
 sameNodeType (WebView _)     (WebView _)     = True
+sameNodeType (MapView _)     (MapView _)     = True
 sameNodeType (Styled _ _)    (Styled _ _)    = True
 sameNodeType _               _               = False
 

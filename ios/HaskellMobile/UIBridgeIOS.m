@@ -10,6 +10,7 @@
 
 #import <UIKit/UIKit.h>
 #import <WebKit/WebKit.h>
+#import <MapKit/MapKit.h>
 #import <os/log.h>
 #import <objc/runtime.h>
 #include <stdlib.h>
@@ -100,6 +101,29 @@ static UIViewController *g_viewController = nil;
 - (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
     LOGI("WebView page loaded: callbackId=%d", self.callbackId);
     haskellOnUIEvent([IOSBridgeHandler shared].haskellCtx, self.callbackId);
+}
+
+@end
+
+/* ---- MKMapView delegate for region-change callbacks ---- */
+@interface HMMapViewDelegate : NSObject <MKMapViewDelegate>
+@property (nonatomic, assign) int32_t callbackId;
+@end
+
+@implementation HMMapViewDelegate
+
+- (void)mapView:(MKMapView *)mapView regionDidChangeAnimated:(BOOL)animated {
+    CLLocationCoordinate2D center = mapView.region.center;
+    double longitudeSpan = mapView.region.span.longitudeDelta;
+    double zoom = log2(360.0 / longitudeSpan);
+    if (zoom < 1.0) zoom = 1.0;
+    if (zoom > 20.0) zoom = 20.0;
+    NSString *text = [NSString stringWithFormat:@"%.6f,%.6f,%.1f",
+                      center.latitude, center.longitude, zoom];
+    LOGI("MapView region changed: callbackId=%d text=\"%{public}s\"",
+         self.callbackId, [text UTF8String]);
+    haskellOnUITextChange([IOSBridgeHandler shared].haskellCtx,
+                          self.callbackId, [text UTF8String]);
 }
 
 @end
@@ -287,6 +311,12 @@ static int32_t ios_create_node(int32_t nodeType)
         imageView.contentMode = UIViewContentModeScaleAspectFit;
         imageView.translatesAutoresizingMaskIntoConstraints = NO;
         view = imageView;
+        break;
+    }
+    case UI_NODE_MAP_VIEW: {
+        MKMapView *mapView = [[MKMapView alloc] init];
+        mapView.translatesAutoresizingMaskIntoConstraints = NO;
+        view = mapView;
         break;
     }
     case UI_NODE_WEBVIEW: {
@@ -523,6 +553,44 @@ static void ios_set_num_prop(int32_t nodeId, int32_t propId, double value)
         LOGI("setNumProp(node=%d, gravity=%d)", nodeId, gravity);
         break;
     }
+    case UI_PROP_MAP_LAT: {
+        if ([view isKindOfClass:[MKMapView class]]) {
+            MKMapView *mapView = (MKMapView *)view;
+            MKCoordinateRegion region = mapView.region;
+            region.center.latitude = value;
+            [mapView setRegion:region animated:NO];
+        }
+        LOGI("setNumProp(node=%d, mapLat=%.6f)", nodeId, value);
+        break;
+    }
+    case UI_PROP_MAP_LON: {
+        if ([view isKindOfClass:[MKMapView class]]) {
+            MKMapView *mapView = (MKMapView *)view;
+            MKCoordinateRegion region = mapView.region;
+            region.center.longitude = value;
+            [mapView setRegion:region animated:NO];
+        }
+        LOGI("setNumProp(node=%d, mapLon=%.6f)", nodeId, value);
+        break;
+    }
+    case UI_PROP_MAP_ZOOM: {
+        if ([view isKindOfClass:[MKMapView class]]) {
+            MKMapView *mapView = (MKMapView *)view;
+            MKCoordinateRegion region = mapView.region;
+            double span = 360.0 / pow(2.0, value);
+            region.span = MKCoordinateSpanMake(span, span);
+            [mapView setRegion:region animated:NO];
+        }
+        LOGI("setNumProp(node=%d, mapZoom=%.1f)", nodeId, value);
+        break;
+    }
+    case UI_PROP_MAP_SHOW_USER_LOC: {
+        if ([view isKindOfClass:[MKMapView class]]) {
+            ((MKMapView *)view).showsUserLocation = (value > 0.5);
+        }
+        LOGI("setNumProp(node=%d, showUserLoc=%.0f)", nodeId, value);
+        break;
+    }
     default:
         LOGI("setNumProp: unknown propId %d", propId);
         break;
@@ -568,12 +636,21 @@ static void ios_set_handler(int32_t nodeId, int32_t eventType, int32_t callbackI
         break;
     case UI_EVENT_TEXT_CHANGE:
         view.tag = callbackId;
-        if ([view isKindOfClass:[UITextField class]]) {
+        if ([view isKindOfClass:[MKMapView class]]) {
+            HMMapViewDelegate *mapDelegate = [[HMMapViewDelegate alloc] init];
+            mapDelegate.callbackId = callbackId;
+            ((MKMapView *)view).delegate = mapDelegate;
+            objc_setAssociatedObject(view, "HMMapViewDelegate", mapDelegate,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            LOGI("setHandler(node=%d, mapRegionChange, callback=%d)", nodeId, callbackId);
+        } else if ([view isKindOfClass:[UITextField class]]) {
             [(UITextField *)view addTarget:[IOSBridgeHandler shared]
                                     action:@selector(handleTextChange:)
                           forControlEvents:UIControlEventEditingChanged];
+            LOGI("setHandler(node=%d, textChange, callback=%d)", nodeId, callbackId);
+        } else {
+            LOGI("setHandler(node=%d, textChange, callback=%d)", nodeId, callbackId);
         }
-        LOGI("setHandler(node=%d, textChange, callback=%d)", nodeId, callbackId);
         break;
     default:
         LOGI("setHandler: unknown eventType %d", eventType);
