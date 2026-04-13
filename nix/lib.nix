@@ -78,7 +78,6 @@ in {
     { hatterSrc
     , mainModule
     , pname ? "hatter-android"
-    , soName ? "libhatter.so"
     , javaPackageName ? "me.jappie.hatter"
     , extraJniBridge ? []
     , extraNdkCompile ? (_: _: "")
@@ -92,6 +91,10 @@ in {
     , soMaxSizeMB ? 200         # fail build if .so exceeds this (MB), catches whole-archive bloat
     }:
     let
+      # Must match HatterActivity.java's System.loadLibrary("hatter").
+      # Not configurable — any other name guarantees UnsatisfiedLinkError.
+      soName = "libhatter.so";
+
       jniPackageMacro = builtins.replaceStrings ["."] ["_"] javaPackageName;
 
       # Template Haskell support for consumer code: when crossDeps includes
