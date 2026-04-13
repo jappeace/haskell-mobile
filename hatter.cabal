@@ -45,7 +45,6 @@ build-type:     Simple
 extra-source-files:
     Readme.md
     LICENSE
-    cbits/*.h
     cbits/*.c
     include/*.h
 extra-doc-files:
