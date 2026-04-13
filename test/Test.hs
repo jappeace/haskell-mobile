@@ -2,7 +2,8 @@ module Main where
 
 import Test.Tasty
 
-import Hatter (startMobileApp, derefAppContext, AppContext(..))
+import Hatter (startMobileApp)
+import Hatter.AppContext (AppContext(..), derefAppContext)
 import Hatter.Permission (PermissionState)
 import Hatter.SecureStorage (SecureStorageState)
 import Hatter.Dialog (DialogState)

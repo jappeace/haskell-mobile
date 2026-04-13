@@ -11,19 +11,15 @@ import Foreign.Ptr (Ptr)
 import Hatter
   ( MobileApp(..)
   , Action
-  , SecureStorageState(..)
-  , AppContext
   , startMobileApp
-  , derefAppContext
   , platformLog
-  , secureStorageWrite
-  , secureStorageRead
   , loggingMobileContext
   , newActionState
   , runActionM
   , createAction
   )
-import Hatter.AppContext (AppContext(..))
+import Hatter.AppContext (AppContext(..), derefAppContext)
+import Hatter.SecureStorage (SecureStorageState(..), secureStorageWrite, secureStorageRead)
 import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)

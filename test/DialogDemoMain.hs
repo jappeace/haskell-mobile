@@ -11,20 +11,15 @@ import Foreign.Ptr (Ptr)
 import Hatter
   ( MobileApp(..)
   , Action
-  , DialogAction(..)
-  , DialogConfig(..)
-  , DialogState(..)
-  , AppContext
   , startMobileApp
-  , derefAppContext
   , platformLog
-  , showDialog
   , loggingMobileContext
   , newActionState
   , runActionM
   , createAction
   )
-import Hatter.AppContext (AppContext(..))
+import Hatter.AppContext (AppContext(..), derefAppContext)
+import Hatter.Dialog (DialogAction(..), DialogConfig(..), DialogState(..), showDialog)
 import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)

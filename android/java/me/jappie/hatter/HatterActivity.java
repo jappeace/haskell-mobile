@@ -58,7 +58,6 @@ public class HatterActivity extends Activity implements View.OnClickListener {
         System.loadLibrary("hatter");
     }
 
-    private native String greet(String name);
     private native void renderUI();
     private native void onButtonClick(View view);
     private native void onTextChange(View view, String text);

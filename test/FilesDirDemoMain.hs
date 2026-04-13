@@ -13,13 +13,13 @@ import Foreign.Ptr (Ptr)
 import System.FilePath ((</>))
 import Hatter
   ( MobileApp(..)
-  , AppContext
   , startMobileApp
   , platformLog
-  , getAppFilesDir
   , loggingMobileContext
   , newActionState
   )
+import Hatter.AppContext (AppContext)
+import Hatter.FilesDir (getAppFilesDir)
 import Hatter.Widget (TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)

@@ -23,7 +23,7 @@ import Data.Text qualified as Text
 import Foreign.C.String (newCString)
 import Foreign.Marshal.Alloc (free)
 import Foreign.Ptr (nullPtr)
-import Hatter (freeAppContext, derefAppContext, AppContext(..))
+import Hatter.AppContext (AppContext(..), freeAppContext, derefAppContext)
 import Hatter.AppContext (newAppContext)
 import Hatter.Widget (TextConfig(..), Widget(..))
 import Hatter.Permission

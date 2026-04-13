@@ -14,11 +14,11 @@ import Hatter
   , startMobileApp
   , platformLog
   , loggingMobileContext
-  , AppContext
   , newActionState
   , runActionM
   , createOnChange
   )
+import Hatter.AppContext (AppContext)
 import Hatter.Widget
   ( MapViewConfig(..)
   , TextConfig(..)

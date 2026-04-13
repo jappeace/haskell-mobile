@@ -11,19 +11,15 @@ import Foreign.Ptr (Ptr)
 import Hatter
   ( MobileApp(..)
   , Action
-  , BottomSheetConfig(..)
-  , BottomSheetState(..)
-  , AppContext
   , startMobileApp
-  , derefAppContext
   , platformLog
-  , showBottomSheet
   , loggingMobileContext
   , newActionState
   , runActionM
   , createAction
   )
-import Hatter.AppContext (AppContext(..))
+import Hatter.AppContext (AppContext(..), derefAppContext)
+import Hatter.BottomSheet (BottomSheetConfig(..), BottomSheetState(..), showBottomSheet)
 import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)

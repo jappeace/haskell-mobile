@@ -15,20 +15,15 @@ import Foreign.Ptr (Ptr)
 import Hatter
   ( MobileApp(..)
   , Action
-  , BleState(..)
   , startMobileApp
-  , derefAppContext
   , platformLog
-  , checkBleAdapter
-  , startBleScan
-  , stopBleScan
   , loggingMobileContext
-  , AppContext
   , newActionState
   , runActionM
   , createAction
   )
-import Hatter.AppContext (AppContext(..))
+import Hatter.AppContext (AppContext(..), derefAppContext)
+import Hatter.Ble (BleState(..), checkBleAdapter, startBleScan, stopBleScan)
 import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)

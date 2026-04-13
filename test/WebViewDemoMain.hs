@@ -15,11 +15,11 @@ import Hatter
   , startMobileApp
   , platformLog
   , loggingMobileContext
-  , AppContext
   , newActionState
   , runActionM
   , createAction
   )
+import Hatter.AppContext (AppContext)
 import Hatter.Widget
   ( ButtonConfig(..)
   , TextConfig(..)

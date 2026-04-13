@@ -35,15 +35,6 @@ class HaskellBridge {
         setup_ios_animation_bridge(context)
     }
 
-    /// Call Haskell's haskellGreet and return the result as a Swift String.
-    /// The C-allocated string is freed after copying.
-    static func greet(_ name: String) -> String {
-        let result = haskellGreet(name)!
-        let greeting = String(cString: result)
-        free(result)
-        return greeting
-    }
-
     /// Notify Haskell of a lifecycle event.
     static func onLifecycle(_ event: Int32) {
         haskellOnLifecycle(context, event)

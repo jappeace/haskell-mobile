@@ -8,7 +8,8 @@ module Main where
 
 import Data.Text (pack)
 import Foreign.Ptr (Ptr)
-import Hatter (MobileApp(..), UserState(..), startMobileApp, AppContext, newActionState)
+import Hatter (MobileApp(..), UserState(..), startMobileApp, newActionState)
+import Hatter.AppContext (AppContext)
 import Hatter.Lifecycle (loggingMobileContext)
 import Hatter.Widget (TextConfig(..), Widget(..))
 

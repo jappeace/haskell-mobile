@@ -11,19 +11,15 @@ import Foreign.Ptr (Ptr)
 import Hatter
   ( MobileApp(..)
   , Action
-  , Permission(..)
-  , PermissionState(..)
   , startMobileApp
-  , derefAppContext
   , platformLog
-  , requestPermission
   , loggingMobileContext
-  , AppContext
   , newActionState
   , runActionM
   , createAction
   )
-import Hatter.AppContext (AppContext(..))
+import Hatter.AppContext (AppContext(..), derefAppContext)
+import Hatter.Permission (Permission(..), PermissionState(..), requestPermission)
 import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)

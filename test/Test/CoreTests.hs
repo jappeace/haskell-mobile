@@ -17,9 +17,7 @@ import Data.IORef (newIORef, readIORef, modifyIORef')
 import Data.List (sort)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
-import Foreign.C.String (newCString, peekCString)
-import Foreign.Marshal.Alloc (free)
-import Hatter (MobileApp(..), haskellGreet, haskellOnLifecycle)
+import Hatter (MobileApp(..), haskellOnLifecycle)
 import Hatter.Lifecycle
   ( LifecycleEvent(..)
   , loggingMobileContext
@@ -64,20 +62,6 @@ unitTests = testGroup "Unit tests"
   -- the following test does not hold
   , testCase "List comparison (same length)" $
       oneTwoThree `compare` [1,2,3] @?= EQ
-  , testCase "haskellGreet returns correct greeting" $ do
-      cname <- newCString "World"
-      cresult <- haskellGreet cname
-      result <- peekCString cresult
-      free cresult
-      free cname
-      result @?= "Hello from Haskell, World!"
-  , testCase "haskellGreet with different input" $ do
-      cname <- newCString "Android"
-      cresult <- haskellGreet cname
-      result <- peekCString cresult
-      free cresult
-      free cname
-      result @?= "Hello from Haskell, Android!"
   ]
 
 lifecycleTests :: TestTree

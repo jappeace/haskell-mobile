@@ -15,19 +15,15 @@ import Foreign.Ptr (Ptr)
 import Hatter
   ( MobileApp(..)
   , Action
-  , LocationState(..)
   , startMobileApp
-  , derefAppContext
   , platformLog
-  , startLocationUpdates
-  , stopLocationUpdates
   , loggingMobileContext
-  , AppContext
   , newActionState
   , runActionM
   , createAction
   )
-import Hatter.AppContext (AppContext(..))
+import Hatter.AppContext (AppContext(..), derefAppContext)
+import Hatter.Location (LocationState(..), startLocationUpdates, stopLocationUpdates)
 import Hatter.Location (LocationData(..))
 import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
 
