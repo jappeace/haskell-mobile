@@ -33,6 +33,11 @@ description:
   This is different from say Simplex chat where they call into the library to do Haskell from dirty java/swift code.
   This library should've written all swift/java code you'll ever need,
   so you can focus on your sweet Haskell.
+
+  NB: I uploaded this to hackage for the nice documentation, but I don't think this builds
+  with just cabal. You want to use the nix harness.
+  Although I'd like to get cabal to build stuff like this eventually,
+  that's a really big undertaking.
 copyright:      2026 Jappie Klooster
 license:        MIT
 license-file:   LICENSE
