@@ -153,6 +153,17 @@ let
     name = "hatter-authsession-simulator-app";
   };
 
+  platformSignInIos = import ./ios.nix {
+    inherit sources;
+    mainModule = ../test/PlatformSignInDemoMain.hs;
+    simulator = true;
+  };
+  platformSignInSimApp = lib.mkSimulatorApp {
+    iosLib = platformSignInIos;
+    iosSrc = ../ios;
+    name = "hatter-platformsignin-simulator-app";
+  };
+
   cameraIos = import ./ios.nix {
     inherit sources;
     mainModule = ../test/CameraDemoMain.hs;
@@ -262,6 +273,7 @@ DIALOG_SHARE_DIR="${dialogSimApp}/share/ios"
 LOCATION_SHARE_DIR="${locationSimApp}/share/ios"
 WEBVIEW_SHARE_DIR="${webviewSimApp}/share/ios"
 AUTH_SESSION_SHARE_DIR="${authSessionSimApp}/share/ios"
+PLATFORM_SIGN_IN_SHARE_DIR="${platformSignInSimApp}/share/ios"
 CAMERA_SHARE_DIR="${cameraSimApp}/share/ios"
 BOTTOM_SHEET_SHARE_DIR="${bottomSheetSimApp}/share/ios"
 HTTP_SHARE_DIR="${httpSimApp}/share/ios"
@@ -326,6 +338,7 @@ for share_dir in \
     "$LOCATION_SHARE_DIR" \
     "$WEBVIEW_SHARE_DIR" \
     "$AUTH_SESSION_SHARE_DIR" \
+    "$PLATFORM_SIGN_IN_SHARE_DIR" \
     "$CAMERA_SHARE_DIR" \
     "$BOTTOM_SHEET_SHARE_DIR" \
     "$HTTP_SHARE_DIR" \
@@ -896,6 +909,52 @@ if [ -z "$AUTH_SESSION_APP" ]; then
 fi
 echo "AuthSession app: $AUTH_SESSION_APP"
 
+# --- Stage and build platformsignin demo app ---
+echo "=== Staging platformsignin demo app ==="
+mkdir -p "$WORK_DIR/platformsignin/lib" "$WORK_DIR/platformsignin/include"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/platformsignin/lib/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/Hatter.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/PlatformSignInBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/CameraBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/platformsignin/include/"
+cp -r "$PLATFORM_SIGN_IN_SHARE_DIR/Hatter" "$WORK_DIR/platformsignin/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/project.yml" "$WORK_DIR/platformsignin/"
+chmod -R u+w "$WORK_DIR/platformsignin"
+
+echo "=== Generating platformsignin Xcode project ==="
+cd "$WORK_DIR/platformsignin"
+${xcodegen}/bin/xcodegen generate
+
+echo "=== Building platformsignin demo app for simulator ==="
+xcodebuild build \
+    -project Hatter.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk iphonesimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/platformsignin-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+PLATFORM_SIGN_IN_APP=$(find "$WORK_DIR/platformsignin-build" -name "*.app" -type d | head -1)
+if [ -z "$PLATFORM_SIGN_IN_APP" ]; then
+    echo "ERROR: Could not find platformsignin .app bundle"
+    exit 1
+fi
+echo "PlatformSignIn app: $PLATFORM_SIGN_IN_APP"
+
 # --- Stage and build camera demo app ---
 echo "=== Staging camera demo app ==="
 mkdir -p "$WORK_DIR/camera/lib" "$WORK_DIR/camera/include"
@@ -1272,7 +1331,7 @@ sleep 5
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP CAMERA_APP BOTTOM_SHEET_APP HTTP_APP NETWORK_STATUS_APP MAPVIEW_APP ANIMATION_APP FILES_DIR_APP WORK_DIR
+export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP PLATFORM_SIGN_IN_APP CAMERA_APP BOTTOM_SHEET_APP HTTP_APP NETWORK_STATUS_APP MAPVIEW_APP ANIMATION_APP FILES_DIR_APP WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -1354,6 +1413,8 @@ echo "--- mapview ---"
 run_with_retry "mapview" bash "$TEST_SCRIPTS/ios/mapview.sh" || PHASE9_EXIT=1
 echo "--- authsession ---"
 run_with_retry "authsession" bash "$TEST_SCRIPTS/ios/authsession.sh" || PHASE10_EXIT=1
+echo "--- platformsignin ---"
+run_with_retry "platformsignin" bash "$TEST_SCRIPTS/ios/platformsignin.sh" || PHASE10_EXIT=1
 echo "--- camera ---"
 run_with_retry "camera" bash "$TEST_SCRIPTS/ios/camera.sh" || PHASE10_EXIT=1
 echo "--- bottomsheet ---"

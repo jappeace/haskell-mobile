@@ -23,6 +23,8 @@
 
 ### Added
 
+- `Hatter.PlatformSignIn` — native platform sign-in (Sign in with Apple
+  on iOS/watchOS, Google identity via AccountManager on Android/Wear OS).
 - `Hatter` module now has a haddock header with overview, usage example,
   and a directory of platform subsystem modules.
 - Export list organised under haddock section headers: App setup, Widget,

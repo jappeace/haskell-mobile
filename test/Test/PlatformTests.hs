@@ -1,11 +1,13 @@
 -- | Platform service tests: Permission, SecureStorage, BLE, Dialog,
--- AuthSession, Location, BottomSheet, Camera, HTTP, NetworkStatus.
+-- AuthSession, PlatformSignIn, Location, BottomSheet, Camera, HTTP,
+-- NetworkStatus.
 module Test.PlatformTests
   ( permissionTests
   , secureStorageTests
   , bleTests
   , dialogTests
   , authSessionTests
+  , platformSignInTests
   , locationTests
   , bottomSheetTests
   , cameraTests
@@ -75,6 +77,18 @@ import Hatter.AuthSession
   , startAuthSession
   , dispatchAuthSessionResult
   , authSessionResultFromInt
+  )
+import Hatter.PlatformSignIn
+  ( SignInProvider(..)
+  , SignInCredential(..)
+  , SignInResult(..)
+  , PlatformSignInState(..)
+  , newPlatformSignInState
+  , startPlatformSignIn
+  , dispatchPlatformSignInResult
+  , signInResultFromInt
+  , providerToInt
+  , providerFromInt
   )
 import Hatter.Location
   ( LocationData(..)
@@ -1059,4 +1073,115 @@ networkStatusTests = testGroup "NetworkStatus"
         Just status -> do
           nsConnected status @?= False
           nsTransport status @?= TransportNone
+  ]
+
+platformSignInTests :: PlatformSignInState -> TestTree
+platformSignInTests ffiPlatformSignInState = sequentialTestGroup "PlatformSignIn" AllFinish
+  [ testCase "desktop stub returns Apple credentials" $ do
+      ref <- newIORef (Nothing :: Maybe SignInResult)
+      startPlatformSignIn ffiPlatformSignInState AppleSignIn
+        (\result -> writeIORef ref (Just result))
+      result <- readIORef ref
+      case result of
+        Just (SignInSuccess cred) -> do
+          sicProvider cred @?= AppleSignIn
+          sicUserId cred @?= "apple-stub-user-001"
+          assertBool "identity token present" (sicIdentityToken cred /= Nothing)
+          assertBool "email present" (sicEmail cred /= Nothing)
+          assertBool "full name present" (sicFullName cred /= Nothing)
+        _ -> assertFailure $ "expected SignInSuccess with Apple credentials, got: " ++ show result
+
+  , testCase "desktop stub returns Google credentials" $ do
+      ref <- newIORef (Nothing :: Maybe SignInResult)
+      startPlatformSignIn ffiPlatformSignInState GoogleSignIn
+        (\result -> writeIORef ref (Just result))
+      result <- readIORef ref
+      case result of
+        Just (SignInSuccess cred) -> do
+          sicProvider cred @?= GoogleSignIn
+          sicUserId cred @?= "google-stub-user-001"
+          assertBool "identity token present" (sicIdentityToken cred /= Nothing)
+          assertBool "email present" (sicEmail cred /= Nothing)
+        _ -> assertFailure $ "expected SignInSuccess with Google credentials, got: " ++ show result
+
+  , testCase "dispatchPlatformSignInResult fires Success callback" $ do
+      ref <- newIORef (Nothing :: Maybe SignInResult)
+      signInState <- newPlatformSignInState
+      modifyIORef' (psiCallbacks signInState) (\_ ->
+        IntMap.singleton 0 (\result -> writeIORef ref (Just result)))
+      dispatchPlatformSignInResult signInState 0 0
+        (Just "token123") (Just "user-42") (Just "user@example.com") (Just "Test User") 0
+      result <- readIORef ref
+      case result of
+        Just (SignInSuccess cred) -> do
+          sicIdentityToken cred @?= Just "token123"
+          sicUserId cred @?= "user-42"
+          sicEmail cred @?= Just "user@example.com"
+          sicFullName cred @?= Just "Test User"
+          sicProvider cred @?= AppleSignIn
+        _ -> assertFailure $ "expected SignInSuccess, got: " ++ show result
+
+  , testCase "dispatchPlatformSignInResult fires Cancelled callback" $ do
+      ref <- newIORef (Nothing :: Maybe SignInResult)
+      signInState <- newPlatformSignInState
+      modifyIORef' (psiCallbacks signInState) (\_ ->
+        IntMap.singleton 0 (\result -> writeIORef ref (Just result)))
+      dispatchPlatformSignInResult signInState 0 1 Nothing Nothing Nothing Nothing 0
+      result <- readIORef ref
+      result @?= Just SignInCancelled
+
+  , testCase "dispatchPlatformSignInResult fires Error callback with message" $ do
+      ref <- newIORef (Nothing :: Maybe SignInResult)
+      signInState <- newPlatformSignInState
+      modifyIORef' (psiCallbacks signInState) (\_ ->
+        IntMap.singleton 0 (\result -> writeIORef ref (Just result)))
+      dispatchPlatformSignInResult signInState 0 2 Nothing Nothing Nothing (Just "auth failed") 0
+      result <- readIORef ref
+      result @?= Just (SignInError "auth failed")
+
+  , testCase "callback removed after dispatch (idempotency)" $ do
+      ref <- newIORef (0 :: Int)
+      signInState <- newPlatformSignInState
+      modifyIORef' (psiCallbacks signInState) (\_ ->
+        IntMap.singleton 0 (\_ -> modifyIORef' ref (+ 1)))
+      dispatchPlatformSignInResult signInState 0 0
+        (Just "tok") (Just "uid") Nothing Nothing 0
+      count1 <- readIORef ref
+      count1 @?= 1
+      dispatchPlatformSignInResult signInState 0 0
+        (Just "tok") (Just "uid") Nothing Nothing 0
+      count2 <- readIORef ref
+      count2 @?= 1
+
+  , testCase "signInResultFromInt roundtrips valid codes" $ do
+      case signInResultFromInt 0 (Just "tok") (Just "uid") Nothing Nothing 0 of
+        Just (SignInSuccess cred) -> sicUserId cred @?= "uid"
+        other -> assertFailure $ "expected SignInSuccess, got: " ++ show other
+      signInResultFromInt 1 Nothing Nothing Nothing Nothing 0 @?= Just SignInCancelled
+      signInResultFromInt 2 Nothing Nothing Nothing (Just "err") 0 @?= Just (SignInError "err")
+
+  , testCase "signInResultFromInt rejects unknown codes" $ do
+      signInResultFromInt 3 Nothing Nothing Nothing Nothing 0 @?= Nothing
+      signInResultFromInt (-1) Nothing Nothing Nothing Nothing 0 @?= Nothing
+      signInResultFromInt 100 Nothing Nothing Nothing Nothing 0 @?= Nothing
+
+  , testCase "providerToInt and providerFromInt roundtrip" $ do
+      providerFromInt (providerToInt AppleSignIn) @?= Just AppleSignIn
+      providerFromInt (providerToInt GoogleSignIn) @?= Just GoogleSignIn
+      providerFromInt 99 @?= Nothing
+      providerFromInt (-1) @?= Nothing
+
+  , testCase "unknown requestId does not crash" $ do
+      signInState <- newPlatformSignInState
+      dispatchPlatformSignInResult signInState 999 0
+        (Just "tok") (Just "uid") Nothing Nothing 0
+
+  , testCase "unknown status code does not fire callback" $ do
+      ref <- newIORef (0 :: Int)
+      signInState <- newPlatformSignInState
+      modifyIORef' (psiCallbacks signInState) (\_ ->
+        IntMap.singleton 0 (\_ -> modifyIORef' ref (+ 1)))
+      dispatchPlatformSignInResult signInState 0 42 Nothing Nothing Nothing Nothing 0
+      count <- readIORef ref
+      count @?= 0
   ]

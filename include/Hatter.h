@@ -127,6 +127,32 @@ void haskellOnAuthSessionResult(void *ctx, int32_t requestId,
                                  const char *redirectUrl,
                                  const char *errorMessage);
 
+/* Platform sign-in status codes */
+#define PLATFORM_SIGN_IN_SUCCESS    0
+#define PLATFORM_SIGN_IN_CANCELLED  1
+#define PLATFORM_SIGN_IN_ERROR      2
+
+/* Platform sign-in provider codes */
+#define PLATFORM_SIGN_IN_APPLE   0
+#define PLATFORM_SIGN_IN_GOOGLE  1
+
+/* Dispatch a platform sign-in result from native code back to Haskell.
+ * requestId:     opaque ID from the original platform_sign_in_start() call.
+ * statusCode:    PLATFORM_SIGN_IN_SUCCESS (0), CANCELLED (1), or ERROR (2).
+ * identityToken: JWT (Apple) or OAuth2 token (Google), or NULL.
+ * userId:        stable user ID string, or NULL.
+ * email:         email address, or NULL.
+ * fullName:      full name, or NULL.
+ * provider:      PLATFORM_SIGN_IN_APPLE (0) or PLATFORM_SIGN_IN_GOOGLE (1).
+ * ctx must be a pointer returned by haskellRunMain(). */
+void haskellOnPlatformSignInResult(void *ctx, int32_t requestId,
+                                    int32_t statusCode,
+                                    const char *identityToken,
+                                    const char *userId,
+                                    const char *email,
+                                    const char *fullName,
+                                    int32_t provider);
+
 /* Camera status codes */
 #define CAMERA_SUCCESS           0
 #define CAMERA_CANCELLED         1

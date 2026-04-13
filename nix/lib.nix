@@ -194,6 +194,14 @@ in {
           -I${sysroot}/usr/include \
           -I$RTS_INCLUDE \
           -I${hatterSrc}/include \
+          -o platform_sign_in_android.o \
+          ${hatterSrc}/cbits/platform_sign_in_android.c
+
+        ${ndkCc} -c -fPIC \
+          -DJNI_PACKAGE=me_jappie_hatter \
+          -I${sysroot}/usr/include \
+          -I$RTS_INCLUDE \
+          -I${hatterSrc}/include \
           -o camera_bridge_android.o \
           ${hatterSrc}/cbits/camera_bridge_android.c
 
@@ -264,6 +272,7 @@ in {
         cp ${hatterSrc}/src/Hatter/Dialog.hs Hatter/
         cp ${hatterSrc}/src/Hatter/Location.hs Hatter/
         cp ${hatterSrc}/src/Hatter/AuthSession.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/PlatformSignIn.hs Hatter/
         cp ${hatterSrc}/src/Hatter/Camera.hs Hatter/
         cp ${hatterSrc}/src/Hatter/BottomSheet.hs Hatter/
         cp ${hatterSrc}/src/Hatter/Http.hs Hatter/
@@ -297,6 +306,7 @@ in {
         cp ${hatterSrc}/cbits/dialog_bridge.c cbits/
         cp ${hatterSrc}/cbits/location_bridge.c cbits/
         cp ${hatterSrc}/cbits/auth_session_bridge.c cbits/
+        cp ${hatterSrc}/cbits/platform_sign_in_bridge.c cbits/
         cp ${hatterSrc}/cbits/camera_bridge.c cbits/
         cp ${hatterSrc}/cbits/bottom_sheet_bridge.c cbits/
         cp ${hatterSrc}/cbits/http_bridge.c cbits/
@@ -369,6 +379,7 @@ in {
           -optl$(pwd)/dialog_bridge_android.o \
           -optl$(pwd)/location_bridge_android.o \
           -optl$(pwd)/auth_session_android.o \
+          -optl$(pwd)/platform_sign_in_android.o \
           -optl$(pwd)/camera_bridge_android.o \
           -optl$(pwd)/bottom_sheet_android.o \
           -optl$(pwd)/http_bridge_android.o \
@@ -386,6 +397,7 @@ in {
           -optl$(pwd)/cbits/dialog_bridge.o \
           -optl$(pwd)/cbits/location_bridge.o \
           -optl$(pwd)/cbits/auth_session_bridge.o \
+          -optl$(pwd)/cbits/platform_sign_in_bridge.o \
           -optl$(pwd)/cbits/camera_bridge.o \
           -optl$(pwd)/cbits/bottom_sheet_bridge.o \
           -optl$(pwd)/cbits/http_bridge.o \
@@ -405,6 +417,7 @@ in {
           -optl-Wl,-u,haskellOnDialogResult \
           -optl-Wl,-u,haskellOnLocationUpdate \
           -optl-Wl,-u,haskellOnAuthSessionResult \
+          -optl-Wl,-u,haskellOnPlatformSignInResult \
           -optl-Wl,-u,haskellOnCameraResult \
           -optl-Wl,-u,haskellOnVideoFrame \
           -optl-Wl,-u,haskellOnAudioChunk \
@@ -609,6 +622,7 @@ in {
         cp ${hatterSrc}/src/Hatter/Dialog.hs Hatter/
         cp ${hatterSrc}/src/Hatter/Location.hs Hatter/
         cp ${hatterSrc}/src/Hatter/AuthSession.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/PlatformSignIn.hs Hatter/
         cp ${hatterSrc}/src/Hatter/Camera.hs Hatter/
         cp ${hatterSrc}/src/Hatter/BottomSheet.hs Hatter/
         cp ${hatterSrc}/src/Hatter/Http.hs Hatter/
@@ -635,6 +649,7 @@ in {
         cp ${hatterSrc}/cbits/dialog_bridge.c cbits/
         cp ${hatterSrc}/cbits/location_bridge.c cbits/
         cp ${hatterSrc}/cbits/auth_session_bridge.c cbits/
+        cp ${hatterSrc}/cbits/platform_sign_in_bridge.c cbits/
         cp ${hatterSrc}/cbits/camera_bridge.c cbits/
         cp ${hatterSrc}/cbits/bottom_sheet_bridge.c cbits/
         cp ${hatterSrc}/cbits/http_bridge.c cbits/
@@ -658,6 +673,7 @@ in {
           -optl-Wl,-u,_haskellOnDialogResult \
           -optl-Wl,-u,_haskellOnLocationUpdate \
           -optl-Wl,-u,_haskellOnAuthSessionResult \
+          -optl-Wl,-u,_haskellOnPlatformSignInResult \
           -optl-Wl,-u,_haskellOnCameraResult \
           -optl-Wl,-u,_haskellOnVideoFrame \
           -optl-Wl,-u,_haskellOnAudioChunk \
@@ -675,6 +691,7 @@ in {
           cbits/dialog_bridge.c \
           cbits/location_bridge.c \
           cbits/auth_session_bridge.c \
+          cbits/platform_sign_in_bridge.c \
           cbits/camera_bridge.c \
           cbits/bottom_sheet_bridge.c \
           cbits/http_bridge.c \
@@ -704,6 +721,7 @@ in {
         cp ${hatterSrc}/include/DialogBridge.h $out/include/DialogBridge.h
         cp ${hatterSrc}/include/LocationBridge.h $out/include/LocationBridge.h
         cp ${hatterSrc}/include/AuthSessionBridge.h $out/include/AuthSessionBridge.h
+        cp ${hatterSrc}/include/PlatformSignInBridge.h $out/include/PlatformSignInBridge.h
         cp ${hatterSrc}/include/CameraBridge.h $out/include/CameraBridge.h
         cp ${hatterSrc}/include/BottomSheetBridge.h $out/include/BottomSheetBridge.h
         cp ${hatterSrc}/include/HttpBridge.h $out/include/HttpBridge.h
@@ -765,6 +783,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${iosLib}/include/DialogBridge.h $out/share/ios/include/
         cp ${iosLib}/include/LocationBridge.h $out/share/ios/include/
         cp ${iosLib}/include/AuthSessionBridge.h $out/share/ios/include/
+        cp ${iosLib}/include/PlatformSignInBridge.h $out/share/ios/include/
         cp ${iosLib}/include/CameraBridge.h $out/share/ios/include/
         cp ${iosLib}/include/BottomSheetBridge.h $out/share/ios/include/
         cp ${iosLib}/include/HttpBridge.h $out/share/ios/include/
@@ -821,6 +840,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${hatterSrc}/src/Hatter/Dialog.hs Hatter/
         cp ${hatterSrc}/src/Hatter/Location.hs Hatter/
         cp ${hatterSrc}/src/Hatter/AuthSession.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/PlatformSignIn.hs Hatter/
         cp ${hatterSrc}/src/Hatter/Camera.hs Hatter/
         cp ${hatterSrc}/src/Hatter/BottomSheet.hs Hatter/
         cp ${hatterSrc}/src/Hatter/Http.hs Hatter/
@@ -847,6 +867,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${hatterSrc}/cbits/dialog_bridge.c cbits/
         cp ${hatterSrc}/cbits/location_bridge.c cbits/
         cp ${hatterSrc}/cbits/auth_session_bridge.c cbits/
+        cp ${hatterSrc}/cbits/platform_sign_in_bridge.c cbits/
         cp ${hatterSrc}/cbits/camera_bridge.c cbits/
         cp ${hatterSrc}/cbits/bottom_sheet_bridge.c cbits/
         cp ${hatterSrc}/cbits/http_bridge.c cbits/
@@ -870,6 +891,7 @@ open(sys.argv[1], "w").write(yml)
           -optl-Wl,-u,_haskellOnDialogResult \
           -optl-Wl,-u,_haskellOnLocationUpdate \
           -optl-Wl,-u,_haskellOnAuthSessionResult \
+          -optl-Wl,-u,_haskellOnPlatformSignInResult \
           -optl-Wl,-u,_haskellOnCameraResult \
           -optl-Wl,-u,_haskellOnVideoFrame \
           -optl-Wl,-u,_haskellOnAudioChunk \
@@ -887,6 +909,7 @@ open(sys.argv[1], "w").write(yml)
           cbits/dialog_bridge.c \
           cbits/location_bridge.c \
           cbits/auth_session_bridge.c \
+          cbits/platform_sign_in_bridge.c \
           cbits/camera_bridge.c \
           cbits/bottom_sheet_bridge.c \
           cbits/http_bridge.c \
@@ -916,6 +939,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${hatterSrc}/include/DialogBridge.h $out/include/DialogBridge.h
         cp ${hatterSrc}/include/LocationBridge.h $out/include/LocationBridge.h
         cp ${hatterSrc}/include/AuthSessionBridge.h $out/include/AuthSessionBridge.h
+        cp ${hatterSrc}/include/PlatformSignInBridge.h $out/include/PlatformSignInBridge.h
         cp ${hatterSrc}/include/CameraBridge.h $out/include/CameraBridge.h
         cp ${hatterSrc}/include/BottomSheetBridge.h $out/include/BottomSheetBridge.h
         cp ${hatterSrc}/include/HttpBridge.h $out/include/HttpBridge.h
@@ -952,6 +976,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${watchosLib}/include/DialogBridge.h $out/share/watchos/include/
         cp ${watchosLib}/include/LocationBridge.h $out/share/watchos/include/
         cp ${watchosLib}/include/AuthSessionBridge.h $out/share/watchos/include/
+        cp ${watchosLib}/include/PlatformSignInBridge.h $out/share/watchos/include/
         cp ${watchosLib}/include/CameraBridge.h $out/share/watchos/include/
         cp ${watchosLib}/include/BottomSheetBridge.h $out/share/watchos/include/
         cp ${watchosLib}/include/HttpBridge.h $out/share/watchos/include/

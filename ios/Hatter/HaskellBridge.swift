@@ -33,6 +33,7 @@ class HaskellBridge {
         setup_ios_http_bridge(context)
         setup_ios_network_status_bridge(context)
         setup_ios_animation_bridge(context)
+        setup_ios_platform_sign_in_bridge(context)
     }
 
     /// Notify Haskell of a lifecycle event.

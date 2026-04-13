@@ -143,6 +143,17 @@ let
     name = "hatter-watchos-authsession-simulator-app";
   };
 
+  platformSignInWatchos = import ./watchos.nix {
+    inherit sources;
+    mainModule = ../test/PlatformSignInDemoMain.hs;
+    simulator = true;
+  };
+  platformSignInSimApp = lib.mkWatchOSSimulatorApp {
+    watchosLib = platformSignInWatchos;
+    watchosSrc = ../watchos;
+    name = "hatter-watchos-platformsignin-simulator-app";
+  };
+
   cameraWatchos = import ./watchos.nix {
     inherit sources;
     mainModule = ../test/CameraDemoMain.hs;
@@ -240,6 +251,7 @@ DIALOG_SHARE_DIR="${dialogSimApp}/share/watchos"
 LOCATION_SHARE_DIR="${locationSimApp}/share/watchos"
 WEBVIEW_SHARE_DIR="${webviewSimApp}/share/watchos"
 AUTH_SESSION_SHARE_DIR="${authSessionSimApp}/share/watchos"
+PLATFORM_SIGN_IN_SHARE_DIR="${platformSignInSimApp}/share/watchos"
 CAMERA_SHARE_DIR="${cameraSimApp}/share/watchos"
 BOTTOM_SHEET_SHARE_DIR="${bottomSheetSimApp}/share/watchos"
 NETWORK_STATUS_SHARE_DIR="${networkStatusSimApp}/share/watchos"
@@ -301,6 +313,7 @@ for share_dir in \
     "$LOCATION_SHARE_DIR" \
     "$WEBVIEW_SHARE_DIR" \
     "$AUTH_SESSION_SHARE_DIR" \
+    "$PLATFORM_SIGN_IN_SHARE_DIR" \
     "$CAMERA_SHARE_DIR" \
     "$BOTTOM_SHEET_SHARE_DIR" \
     "$NETWORK_STATUS_SHARE_DIR" \
@@ -814,6 +827,51 @@ if [ -z "$AUTH_SESSION_APP" ]; then
 fi
 echo "AuthSession app: $AUTH_SESSION_APP"
 
+# --- Stage and build platformsignin demo app ---
+echo "=== Staging platformsignin demo app ==="
+mkdir -p "$WORK_DIR/platformsignin/lib" "$WORK_DIR/platformsignin/include"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/platformsignin/lib/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/Hatter.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/PlatformSignInBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/CameraBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$BOTTOM_SHEET_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/platformsignin/include/"
+cp -r "$PLATFORM_SIGN_IN_SHARE_DIR/Hatter" "$WORK_DIR/platformsignin/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/project.yml" "$WORK_DIR/platformsignin/"
+chmod -R u+w "$WORK_DIR/platformsignin"
+
+echo "=== Generating platformsignin Xcode project ==="
+cd "$WORK_DIR/platformsignin"
+${xcodegen}/bin/xcodegen generate
+
+echo "=== Building platformsignin demo app for watchOS simulator ==="
+xcodebuild build \
+    -project Hatter.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk watchsimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/platformsignin-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+PLATFORM_SIGN_IN_APP=$(find "$WORK_DIR/platformsignin-build" -name "*.app" -type d | head -1)
+if [ -z "$PLATFORM_SIGN_IN_APP" ]; then
+    echo "ERROR: Could not find platformsignin .app bundle"
+    exit 1
+fi
+echo "PlatformSignIn app: $PLATFORM_SIGN_IN_APP"
+
 # --- Stage and build camera demo app ---
 echo "=== Staging camera demo app ==="
 mkdir -p "$WORK_DIR/camera/lib" "$WORK_DIR/camera/include"
@@ -1141,7 +1199,7 @@ sleep 5
 # ===========================================================================
 # Log subsystem differs from bundle ID for watchOS (bundle ID has .watchkitapp suffix)
 LOG_SUBSYSTEM="me.jappie.hatter"
-export SIM_UDID BUNDLE_ID LOG_SUBSYSTEM COUNTER_APP SCROLL_APP TEXTINPUT_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP CAMERA_APP BOTTOM_SHEET_APP NETWORK_STATUS_APP MAPVIEW_APP ANIMATION_APP FILES_DIR_APP WORK_DIR
+export SIM_UDID BUNDLE_ID LOG_SUBSYSTEM COUNTER_APP SCROLL_APP TEXTINPUT_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP PLATFORM_SIGN_IN_APP CAMERA_APP BOTTOM_SHEET_APP NETWORK_STATUS_APP MAPVIEW_APP ANIMATION_APP FILES_DIR_APP WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -1213,6 +1271,8 @@ echo "--- webview ---"
 run_with_retry "webview" bash "$TEST_SCRIPTS/watchos/webview.sh" || PHASE8_EXIT=1
 echo "--- authsession ---"
 run_with_retry "authsession" bash "$TEST_SCRIPTS/watchos/authsession.sh" || PHASE9_EXIT=1
+echo "--- platformsignin ---"
+run_with_retry "platformsignin" bash "$TEST_SCRIPTS/watchos/platformsignin.sh" || PHASE9_EXIT=1
 echo "--- camera ---"
 run_with_retry "camera" bash "$TEST_SCRIPTS/watchos/camera.sh" || PHASE10_EXIT=1
 echo "--- bottomsheet ---"

@@ -10,10 +10,11 @@ import Hatter.Dialog (DialogState)
 import Hatter.AuthSession (AuthSessionState)
 import Hatter.BottomSheet (BottomSheetState)
 import Hatter.Http (HttpState)
+import Hatter.PlatformSignIn (PlatformSignInState)
 import Test.Helpers (testApp)
 import Test.CoreTests (qcProps, unitTests, lifecycleTests, localeTests, i18nTests)
 import Test.WidgetTests (uiTests, scrollViewTests, textInputTests, imageTests, webViewTests, mapViewTests, styledTests, textAlignTests, colorTests)
-import Test.PlatformTests (permissionTests, secureStorageTests, bleTests, dialogTests, authSessionTests, locationTests, bottomSheetTests, cameraTests, httpTests, networkStatusTests)
+import Test.PlatformTests (permissionTests, secureStorageTests, bleTests, dialogTests, authSessionTests, platformSignInTests, locationTests, bottomSheetTests, cameraTests, httpTests, networkStatusTests)
 import Test.AppContextTests (registrationTests, appContextTests, exceptionHandlerTests)
 import Test.ActionTests (actionTests, widgetEqTests, incrementalRenderTests)
 import Test.AnimationTests (animationTests)
@@ -31,11 +32,12 @@ main = do
     (acSecureStorageState ffiAppCtx)
     (acDialogState ffiAppCtx)
     (acAuthSessionState ffiAppCtx)
+    (acPlatformSignInState ffiAppCtx)
     (acBottomSheetState ffiAppCtx)
     (acHttpState ffiAppCtx))
 
-tests :: PermissionState -> SecureStorageState -> DialogState -> AuthSessionState -> BottomSheetState -> HttpState -> TestTree
-tests ffiPermState ffiSecureStorageState ffiDialogState ffiAuthSessionState ffiBottomSheetState ffiHttpState =
+tests :: PermissionState -> SecureStorageState -> DialogState -> AuthSessionState -> PlatformSignInState -> BottomSheetState -> HttpState -> TestTree
+tests ffiPermState ffiSecureStorageState ffiDialogState ffiAuthSessionState ffiPlatformSignInState ffiBottomSheetState ffiHttpState =
   testGroup "Tests"
     [ qcProps
     , unitTests
@@ -59,6 +61,7 @@ tests ffiPermState ffiSecureStorageState ffiDialogState ffiAuthSessionState ffiB
     , locationTests
     , cameraTests
     , authSessionTests ffiAuthSessionState
+    , platformSignInTests ffiPlatformSignInState
     , bottomSheetTests ffiBottomSheetState
     , httpTests ffiHttpState
     , networkStatusTests
