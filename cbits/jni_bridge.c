@@ -39,7 +39,6 @@ extern void haskellLogLocale(void);
 extern void setAppFilesDir(const char *path);
 
 /* Haskell foreign exports */
-extern char* haskellGreet(const char* name);
 extern void haskellOnLifecycle(void *ctx, int eventType);
 extern void haskellRenderUI(void *ctx);
 extern void haskellOnUIEvent(void *ctx, int callbackId);
@@ -172,23 +171,6 @@ JNIEXPORT void JNICALL
 JNI_OnUnload(JavaVM *vm, void *reserved)
 {
     hs_exit();
-}
-
-JNIEXPORT jstring JNICALL
-JNI_METHOD(greet)(JNIEnv *env, jobject thiz, jstring jname)
-{
-    const char *cname = (*env)->GetStringUTFChars(env, jname, NULL);
-    if (cname == NULL) {
-        return NULL; /* OutOfMemoryError already thrown */
-    }
-
-    char *cresult = haskellGreet(cname);
-    (*env)->ReleaseStringUTFChars(env, jname, cname);
-
-    jstring jresult = (*env)->NewStringUTF(env, cresult);
-    free(cresult);
-
-    return jresult;
 }
 
 /* --- UI bridge JNI methods --- */

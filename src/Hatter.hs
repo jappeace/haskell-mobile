@@ -97,7 +97,6 @@ module Hatter
     -- should not need them.  The remaining @foreign export ccall@
     -- functions (permission, BLE, camera, etc.) are visible to the
     -- C linker but not re-exported as Haskell API.
-  , haskellGreet
   , haskellRenderUI
   , haskellOnUIEvent
   , haskellOnLifecycle
@@ -107,7 +106,7 @@ where
 import Control.Exception (SomeException, catch)
 import Data.IORef (readIORef, writeIORef)
 import Data.Text (Text, pack)
-import Foreign.C.String (CString, newCString, peekCString)
+import Foreign.C.String (CString, peekCString)
 import Foreign.C.Types (CDouble(..), CInt(..))
 import Foreign.Ptr (Ptr, castPtr, nullPtr)
 import Data.ByteString qualified as BS
@@ -257,15 +256,6 @@ errorWidget dismissAction exc = Column
       , bcFontConfig = Nothing
       }
   ]
-
--- | Takes a name as CString, returns "Hello from Haskell, <name>!" as CString.
--- Caller is responsible for freeing the returned CString.
-haskellGreet :: CString -> IO CString
-haskellGreet cname = do
-  name <- peekCString cname
-  newCString ("Hello from Haskell, " ++ name ++ "!")
-
-foreign export ccall haskellGreet :: CString -> IO CString
 
 -- | Render the UI tree. Dereferences the context pointer to obtain the
 -- 'RenderState', reads the view function from 'AppContext'

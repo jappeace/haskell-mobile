@@ -395,7 +395,6 @@ in {
           ${builtins.concatStringsSep " " (builtins.genList (i: "-optl$(pwd)/extra_jni_${toString i}.o") (builtins.length extraJniBridge))} \
           ${builtins.concatStringsSep " " (map (o: "-optl${o}") extraLinkObjects)} \
           -optl-Wl,-u,haskellRunMain \
-          -optl-Wl,-u,haskellGreet \
           -optl-Wl,-u,haskellOnLifecycle \
           -optl-Wl,-u,haskellRenderUI \
           -optl-Wl,-u,haskellOnUIEvent \
@@ -650,7 +649,6 @@ in {
           ${if crossDeps != null then "-package-db ${crossDeps}/pkgdb -i${crossDeps}/hi" else ""} \
           -optl-lffi \
           -optl-Wl,-u,_haskellRunMain \
-          -optl-Wl,-u,_haskellGreet \
           -optl-Wl,-u,_haskellOnLifecycle \
           -optl-Wl,-u,_haskellRenderUI \
           -optl-Wl,-u,_haskellOnUIEvent \
@@ -863,7 +861,6 @@ open(sys.argv[1], "w").write(yml)
           ${if crossDeps != null then "-package-db ${crossDeps}/pkgdb -i${crossDeps}/hi" else ""} \
           -optl-lffi \
           -optl-Wl,-u,_haskellRunMain \
-          -optl-Wl,-u,_haskellGreet \
           -optl-Wl,-u,_haskellOnLifecycle \
           -optl-Wl,-u,_haskellRenderUI \
           -optl-Wl,-u,_haskellOnUIEvent \
