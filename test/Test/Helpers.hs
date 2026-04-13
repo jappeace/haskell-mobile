@@ -18,11 +18,8 @@ import Hatter
   , ActionM
   , newActionState
   , runActionM
-  , freeAppContext
-  , derefAppContext
-  , AppContext(..)
   )
-import Hatter.AppContext (newAppContext)
+import Hatter.AppContext (AppContext(..), newAppContext, freeAppContext, derefAppContext)
 import Hatter.Lifecycle
   ( LifecycleEvent(..)
   , MobileContext(..)

@@ -6,7 +6,8 @@
 module Main where
 
 import Foreign.Ptr (Ptr)
-import Hatter (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext, newActionState, runActionM, createOnChange, OnChange)
+import Hatter (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), newActionState, runActionM, createOnChange, OnChange)
+import Hatter.AppContext (AppContext)
 import Hatter.Widget (InputType(..), TextConfig(..), TextInputConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)

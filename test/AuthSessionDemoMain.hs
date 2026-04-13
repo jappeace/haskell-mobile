@@ -10,19 +10,15 @@ import Foreign.Ptr (Ptr)
 import Hatter
   ( MobileApp(..)
   , Action
-  , AuthSessionResult(..)
-  , AuthSessionState(..)
   , startMobileApp
-  , derefAppContext
   , platformLog
   , loggingMobileContext
-  , AppContext
-  , startAuthSession
   , newActionState
   , runActionM
   , createAction
   )
-import Hatter.AppContext (AppContext(..))
+import Hatter.AppContext (AppContext(..), derefAppContext)
+import Hatter.AuthSession (AuthSessionResult(..), AuthSessionState(..), startAuthSession)
 import Hatter.Widget
   ( ButtonConfig(..)
   , TextConfig(..)

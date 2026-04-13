@@ -14,21 +14,14 @@ import Hatter
   ( MobileApp(..)
   , Action
   , startMobileApp
-  , derefAppContext
   , platformLog
   , loggingMobileContext
-  , AppContext
-  , HttpState(..)
-  , HttpRequest(..)
-  , HttpResponse(..)
-  , HttpMethod(..)
-  , HttpError(..)
-  , performRequest
   , newActionState
   , runActionM
   , createAction
   )
-import Hatter.AppContext (AppContext(..))
+import Hatter.AppContext (AppContext(..), derefAppContext)
+import Hatter.Http (HttpState(..), HttpRequest(..), HttpResponse(..), HttpMethod(..), HttpError(..), performRequest)
 import Hatter.Widget
   ( ButtonConfig(..)
   , TextConfig(..)

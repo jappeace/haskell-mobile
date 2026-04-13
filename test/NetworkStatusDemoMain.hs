@@ -16,20 +16,15 @@ import Foreign.Ptr (Ptr)
 import Hatter
   ( MobileApp(..)
   , Action
-  , NetworkStatusState(..)
   , startMobileApp
-  , derefAppContext
   , platformLog
-  , startNetworkMonitoring
-  , stopNetworkMonitoring
   , loggingMobileContext
-  , AppContext
   , newActionState
   , runActionM
   , createAction
   )
-import Hatter.AppContext (AppContext(..))
-import Hatter.NetworkStatus (NetworkStatus(..), NetworkTransport(..))
+import Hatter.AppContext (AppContext(..), derefAppContext)
+import Hatter.NetworkStatus (NetworkStatusState(..), NetworkStatus(..), NetworkTransport(..), startNetworkMonitoring, stopNetworkMonitoring)
 import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)

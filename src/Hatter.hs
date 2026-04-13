@@ -1,10 +1,78 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE OverloadedStrings #-}
+-- |
+-- Module      : Hatter
+-- Description : Cross-platform mobile UI framework for Haskell
+--
+-- Hatter lets you build native mobile apps in Haskell.  Define your UI
+-- as a pure 'Widget' tree, wire up callbacks with 'Action' handles, and
+-- the framework takes care of rendering on Android, iOS, and watchOS.
+--
+-- = Getting started
+--
+-- @
+-- import Hatter
+-- import Hatter.Widget
+--
+-- main :: IO ()
+-- main = do
+--   acts <- 'newActionState'
+--   greet <- 'runActionM' acts $ 'createAction' (putStrLn \"tapped!\")
+--   _ <- 'startMobileApp' MobileApp
+--     { maContext     = 'defaultMobileContext'
+--     , maView        = \\_ -> pure ('button' greet \"Tap me\")
+--     , maActionState = acts
+--     }
+--   pure ()
+-- @
+--
+-- = Platform subsystems
+--
+-- Domain-specific APIs live in their own modules.  Import them when you
+-- need a particular capability:
+--
+-- * "Hatter.Permission" — runtime permission requests
+-- * "Hatter.SecureStorage" — encrypted key-value storage
+-- * "Hatter.Ble" — Bluetooth Low Energy scanning
+-- * "Hatter.Dialog" — native alert dialogs
+-- * "Hatter.Location" — GPS \/ location updates
+-- * "Hatter.AuthSession" — OAuth browser sessions
+-- * "Hatter.Camera" — photo & video capture
+-- * "Hatter.BottomSheet" — modal bottom sheets
+-- * "Hatter.Http" — HTTP requests
+-- * "Hatter.NetworkStatus" — connectivity monitoring
+-- * "Hatter.Locale" — device locale & language
+-- * "Hatter.I18n" — internationalisation helpers
+-- * "Hatter.FilesDir" — app-private file storage path
+-- * "Hatter.AppContext" — low-level context pointer (advanced)
 module Hatter
-  ( MobileApp(..)
+  ( -- * App setup
+    MobileApp(..)
   , UserState(..)
   , startMobileApp
-  -- Action handles
+    -- * Widget
+  , Widget(..)
+  , WidgetStyle(..)
+  , defaultStyle
+  , ButtonConfig(..)
+  , TextConfig(..)
+  , FontConfig(..)
+  , TextInputConfig(..)
+  , InputType(..)
+  , ImageConfig(..)
+  , ImageSource(..)
+  , ResourceName(..)
+  , ScaleType(..)
+  , TextAlignment(..)
+  , WebViewConfig(..)
+  , MapViewConfig(..)
+  , Color(..)
+  , colorFromText
+  , colorToHex
+    -- ** Smart constructors
+  , button
+  , text
+    -- * Actions
   , Action(..)
   , OnChange(..)
   , ActionState
@@ -13,120 +81,26 @@ module Hatter
   , createOnChange
   , newActionState
   , runActionM
-  -- FFI exports
-  , haskellGreet
-  , haskellRenderUI
-  , haskellOnUIEvent
-  , haskellOnLifecycle
-  , haskellOnPermissionResult
-  , haskellOnSecureStorageResult
-  , haskellOnBleScanResult
-  , haskellOnDialogResult
-  , haskellOnLocationUpdate
-  , haskellOnAuthSessionResult
-  , haskellOnCameraResult
-  , haskellOnBottomSheetResult
-  , haskellOnHttpResult
-  , haskellOnNetworkStatusChange
-  , haskellOnAnimationFrame
-  -- Error handling
-  , errorWidget
-  -- Re-exports from Lifecycle
+    -- * Animation
+  , Easing(..)
+  , AnimatedConfig(..)
+    -- * Lifecycle
   , LifecycleEvent(..)
   , MobileContext(..)
   , defaultMobileContext
   , loggingMobileContext
   , platformLog
-  , newMobileContext
-  , freeMobileContext
-  -- Re-exports from AppContext
-  , AppContext(..)
-  , newAppContext
-  , freeAppContext
-  , derefAppContext
-  -- Re-exports from Locale
-  , Language(..)
-  , Locale(..)
-  , LocaleFailure(..)
-  , getSystemLocale
-  , parseLocale
-  , localeToText
-  , languageToCode
-  , languageFromCode
-  -- Re-exports from FilesDir
-  , getAppFilesDir
-  -- Re-exports from I18n
-  , Key(..)
-  , TranslateFailure(..)
-  , translate
-  -- Re-exports from Permission
-  , Permission(..)
-  , PermissionStatus(..)
-  , PermissionState(..)
-  , requestPermission
-  , checkPermission
-  -- Re-exports from SecureStorage
-  , SecureStorageStatus(..)
-  , SecureStorageState(..)
-  , secureStorageWrite
-  , secureStorageRead
-  , secureStorageDelete
-  -- Re-exports from Ble
-  , BleAdapterStatus(..)
-  , BleScanResult(..)
-  , BleState(..)
-  , checkBleAdapter
-  , startBleScan
-  , stopBleScan
-  -- Re-exports from Dialog
-  , DialogAction(..)
-  , DialogConfig(..)
-  , DialogState(..)
-  , showDialog
-  -- Re-exports from Location
-  , LocationData(..)
-  , LocationState(..)
-  , startLocationUpdates
-  , stopLocationUpdates
-  -- Re-exports from AuthSession
-  , AuthSessionResult(..)
-  , AuthSessionState(..)
-  , startAuthSession
-  -- Re-exports from Camera
-  , CameraSource(..)
-  , CameraStatus(..)
-  , Picture(..)
-  , CameraResult(..)
-  , CameraState(..)
-  , startCameraSession
-  , stopCameraSession
-  , capturePhoto
-  , startVideoCapture
-  , stopVideoCapture
-  , haskellOnVideoFrame
-  , haskellOnAudioChunk
-  -- Re-exports from BottomSheet
-  , BottomSheetAction(..)
-  , BottomSheetConfig(..)
-  , BottomSheetState(..)
-  , showBottomSheet
-  -- Re-exports from Http
-  , HttpMethod(..)
-  , HttpRequest(..)
-  , HttpResponse(..)
-  , HttpError(..)
-  , HttpState(..)
-  , performRequest
-  -- Re-exports from Animation
-  , AnimationState(..)
-  , Easing(..)
-  , AnimatedConfig(..)
-  -- Re-exports from NetworkStatus
-  , NetworkTransport(..)
-  , NetworkStatus(..)
-  , NetworkStatusState(..)
-  , startNetworkMonitoring
-  , stopNetworkMonitoring
+    -- * Error handling
+  , errorWidget
+    -- * Internal
+    -- | FFI entry points used by the test suite.  Application code
+    -- should not need them.  The remaining @foreign export ccall@
+    -- functions (permission, BLE, camera, etc.) are visible to the
+    -- C linker but not re-exported as Haskell API.
+  , haskellGreet
+  , haskellRenderUI
+  , haskellOnUIEvent
+  , haskellOnLifecycle
   )
 where
 
@@ -136,6 +110,8 @@ import Data.Text (Text, pack)
 import Foreign.C.String (CString, newCString, peekCString)
 import Foreign.C.Types (CDouble(..), CInt(..))
 import Foreign.Ptr (Ptr, castPtr, nullPtr)
+import Data.ByteString qualified as BS
+import Data.Word (Word8)
 import Hatter.Action
   ( Action(..)
   , OnChange(..)
@@ -146,113 +122,56 @@ import Hatter.Action
   , newActionState
   , runActionM
   )
-import Hatter.Animation
-  ( AnimationState(..)
-  , dispatchAnimationFrame
-  )
-import Hatter.AppContext (AppContext(..), newAppContext, freeAppContext, derefAppContext)
-import Hatter.AuthSession
-  ( AuthSessionResult(..)
-  , AuthSessionState(..)
-  , startAuthSession
-  , dispatchAuthSessionResult
-  )
-import Hatter.BottomSheet
-  ( BottomSheetAction(..)
-  , BottomSheetConfig(..)
-  , BottomSheetState(..)
-  , showBottomSheet
-  , dispatchBottomSheetResult
-  )
-import Hatter.Ble
-  ( BleAdapterStatus(..)
-  , BleScanResult(..)
-  , BleState(..)
-  , checkBleAdapter
-  , startBleScan
-  , stopBleScan
-  , dispatchBleScanResult
-  )
-import Data.ByteString qualified as BS
-import Data.Word (Word8)
+import Hatter.Animation (dispatchAnimationFrame)
+import Hatter.AppContext (AppContext(..), newAppContext, derefAppContext)
+import Hatter.AuthSession (dispatchAuthSessionResult)
+import Hatter.Ble (dispatchBleScanResult)
+import Hatter.BottomSheet (dispatchBottomSheetResult)
 import Hatter.Camera
-  ( CameraSource(..)
-  , CameraStatus(..)
-  , Picture(..)
-  , CameraResult(..)
-  , CameraState(..)
-  , startCameraSession
-  , stopCameraSession
-  , capturePhoto
-  , startVideoCapture
-  , stopVideoCapture
-  , dispatchCameraResult
+  ( dispatchCameraResult
   , dispatchVideoFrame
   , dispatchAudioChunk
   )
-import Hatter.Http
-  ( HttpMethod(..)
-  , HttpRequest(..)
-  , HttpResponse(..)
-  , HttpError(..)
-  , HttpState(..)
-  , performRequest
-  , dispatchHttpResult
-  )
-import Hatter.Dialog
-  ( DialogAction(..)
-  , DialogConfig(..)
-  , DialogState(..)
-  , showDialog
-  , dispatchDialogResult
-  )
-import Hatter.Location
-  ( LocationData(..)
-  , LocationState(..)
-  , startLocationUpdates
-  , stopLocationUpdates
-  , dispatchLocationUpdate
-  )
-import Hatter.NetworkStatus
-  ( NetworkTransport(..)
-  , NetworkStatus(..)
-  , NetworkStatusState(..)
-  , startNetworkMonitoring
-  , stopNetworkMonitoring
-  , dispatchNetworkStatusChange
-  )
+import Hatter.Dialog (dispatchDialogResult)
+import Hatter.Http (dispatchHttpResult)
 import Hatter.Lifecycle
   ( LifecycleEvent(..)
   , MobileContext(..)
   , defaultMobileContext
   , loggingMobileContext
   , platformLog
-  , newMobileContext
-  , freeMobileContext
   , lifecycleFromInt
   )
-import Hatter.FilesDir (getAppFilesDir)
-import Hatter.I18n (Key(..), TranslateFailure(..), translate)
-import Hatter.Locale (Language(..), Locale(..), LocaleFailure(..), getSystemLocale, parseLocale, localeToText, languageToCode, languageFromCode)
-import Hatter.Permission
-  ( Permission(..)
-  , PermissionStatus(..)
-  , PermissionState(..)
-  , requestPermission
-  , checkPermission
-  , dispatchPermissionResult
-  )
+import Hatter.Location (dispatchLocationUpdate)
+import Hatter.NetworkStatus (dispatchNetworkStatusChange)
+import Hatter.Permission (dispatchPermissionResult)
 import Hatter.Render (renderWidget, dispatchEvent, dispatchTextEvent)
-import Hatter.SecureStorage
-  ( SecureStorageStatus(..)
-  , SecureStorageState(..)
-  , secureStorageWrite
-  , secureStorageRead
-  , secureStorageDelete
-  , dispatchSecureStorageResult
-  )
+import Hatter.SecureStorage (dispatchSecureStorageResult)
 import Hatter.Types (MobileApp(..), UserState(..))
-import Hatter.Widget (AnimatedConfig(..), ButtonConfig(..), Easing(..), FontConfig(..), TextConfig(..), Widget(..))
+import Hatter.Widget
+  ( AnimatedConfig(..)
+  , ButtonConfig(..)
+  , Color(..)
+  , Easing(..)
+  , FontConfig(..)
+  , ImageConfig(..)
+  , ImageSource(..)
+  , InputType(..)
+  , MapViewConfig(..)
+  , ResourceName(..)
+  , ScaleType(..)
+  , TextAlignment(..)
+  , TextConfig(..)
+  , TextInputConfig(..)
+  , WebViewConfig(..)
+  , Widget(..)
+  , WidgetStyle(..)
+  , button
+  , colorFromText
+  , colorToHex
+  , defaultStyle
+  , text
+  )
 
 -- | Create an 'AppContext' from a 'MobileApp' and return it as a typed
 -- pointer suitable for the C FFI. This is the user-facing API: the user's
@@ -382,7 +301,7 @@ haskellOnUITextChange ctxPtr callbackId cstr =
 foreign export ccall haskellOnUITextChange :: Ptr AppContext -> CInt -> CString -> IO ()
 
 -- | Handle a permission result from native code. Dispatches to the
--- callback registered by 'requestPermission'.
+-- callback registered by 'Hatter.Permission.requestPermission'.
 haskellOnPermissionResult :: Ptr AppContext -> CInt -> CInt -> IO ()
 haskellOnPermissionResult ctxPtr requestId statusCode =
   withExceptionHandler ctxPtr $ do
@@ -392,7 +311,7 @@ haskellOnPermissionResult ctxPtr requestId statusCode =
 foreign export ccall haskellOnPermissionResult :: Ptr AppContext -> CInt -> CInt -> IO ()
 
 -- | Handle a BLE scan result from native code. Dispatches to the
--- callback registered by 'startBleScan'.
+-- callback registered by 'Hatter.Ble.startBleScan'.
 haskellOnBleScanResult :: Ptr AppContext -> CString -> CString -> CInt -> IO ()
 haskellOnBleScanResult ctxPtr cName cAddr cRssi =
   withExceptionHandler ctxPtr $ do
@@ -402,7 +321,7 @@ haskellOnBleScanResult ctxPtr cName cAddr cRssi =
 foreign export ccall haskellOnBleScanResult :: Ptr AppContext -> CString -> CString -> CInt -> IO ()
 
 -- | Handle a dialog result from native code. Dispatches to the
--- callback registered by 'showDialog'.
+-- callback registered by 'Hatter.Dialog.showDialog'.
 haskellOnDialogResult :: Ptr AppContext -> CInt -> CInt -> IO ()
 haskellOnDialogResult ctxPtr requestId actionCode =
   withExceptionHandler ctxPtr $ do
@@ -412,7 +331,7 @@ haskellOnDialogResult ctxPtr requestId actionCode =
 foreign export ccall haskellOnDialogResult :: Ptr AppContext -> CInt -> CInt -> IO ()
 
 -- | Handle a location update from native code. Dispatches to the
--- callback registered by 'startLocationUpdates'.
+-- callback registered by 'Hatter.Location.startLocationUpdates'.
 haskellOnLocationUpdate :: Ptr AppContext -> CDouble -> CDouble -> CDouble -> CDouble -> IO ()
 haskellOnLocationUpdate ctxPtr cLat cLon cAlt cAcc =
   withExceptionHandler ctxPtr $ do
@@ -438,8 +357,9 @@ haskellOnLifecycle ctxPtr code =
 foreign export ccall haskellOnLifecycle :: Ptr AppContext -> CInt -> IO ()
 
 -- | Handle a secure storage result from native code. Dispatches to the
--- callback registered by 'secureStorageWrite', 'secureStorageRead', or
--- 'secureStorageDelete'.  The @cValue@ parameter is non-null only for
+-- callback registered by 'Hatter.SecureStorage.secureStorageWrite',
+-- 'Hatter.SecureStorage.secureStorageRead', or
+-- 'Hatter.SecureStorage.secureStorageDelete'.  The @cValue@ parameter is non-null only for
 -- successful read operations.
 haskellOnSecureStorageResult :: Ptr AppContext -> CInt -> CInt -> CString -> IO ()
 haskellOnSecureStorageResult ctxPtr requestId statusCode cValue =
@@ -451,7 +371,7 @@ haskellOnSecureStorageResult ctxPtr requestId statusCode cValue =
 foreign export ccall haskellOnSecureStorageResult :: Ptr AppContext -> CInt -> CInt -> CString -> IO ()
 
 -- | Handle an auth session result from native code. Dispatches to the
--- callback registered by 'startAuthSession'. The @cRedirectUrl@ parameter
+-- callback registered by 'Hatter.AuthSession.startAuthSession'. The @cRedirectUrl@ parameter
 -- is non-null only for successful sessions. The @cErrorMsg@ parameter
 -- is non-null only for error sessions.
 haskellOnAuthSessionResult :: Ptr AppContext -> CInt -> CInt -> CString -> CString -> IO ()
@@ -465,7 +385,7 @@ haskellOnAuthSessionResult ctxPtr requestId statusCode cRedirectUrl cErrorMsg =
 foreign export ccall haskellOnAuthSessionResult :: Ptr AppContext -> CInt -> CInt -> CString -> CString -> IO ()
 
 -- | Handle a camera result from native code. Dispatches to the
--- callback registered by 'capturePhoto' or 'startVideoCapture'.
+-- callback registered by 'Hatter.Camera.capturePhoto' or 'Hatter.Camera.startVideoCapture'.
 -- The @imageDataPtr@/@imageDataLen@/@width@/@height@ parameters carry
 -- raw JPEG bytes for photo captures; null\/0 for video completions and
 -- error results.
@@ -486,7 +406,7 @@ foreign export ccall haskellOnCameraResult
   -> Ptr Word8 -> CInt -> CInt -> CInt -> IO ()
 
 -- | Handle a video frame from native code. Dispatches to the
--- per-frame callback registered by 'startVideoCapture'.
+-- per-frame callback registered by 'Hatter.Camera.startVideoCapture'.
 haskellOnVideoFrame :: Ptr AppContext -> CInt
                     -> Ptr Word8 -> CInt -> CInt -> CInt -> IO ()
 haskellOnVideoFrame ctxPtr requestId frameDataPtr frameDataLen width height =
@@ -499,7 +419,7 @@ foreign export ccall haskellOnVideoFrame
   :: Ptr AppContext -> CInt -> Ptr Word8 -> CInt -> CInt -> CInt -> IO ()
 
 -- | Handle an audio chunk from native code. Dispatches to the
--- per-audio-chunk callback registered by 'startVideoCapture'.
+-- per-audio-chunk callback registered by 'Hatter.Camera.startVideoCapture'.
 haskellOnAudioChunk :: Ptr AppContext -> CInt
                     -> Ptr Word8 -> CInt -> IO ()
 haskellOnAudioChunk ctxPtr requestId audioDataPtr audioDataLen =
@@ -511,7 +431,7 @@ haskellOnAudioChunk ctxPtr requestId audioDataPtr audioDataLen =
 foreign export ccall haskellOnAudioChunk
   :: Ptr AppContext -> CInt -> Ptr Word8 -> CInt -> IO ()
 -- | Handle a bottom sheet result from native code. Dispatches to the
--- callback registered by 'showBottomSheet'.
+-- callback registered by 'Hatter.BottomSheet.showBottomSheet'.
 haskellOnBottomSheetResult :: Ptr AppContext -> CInt -> CInt -> IO ()
 haskellOnBottomSheetResult ctxPtr requestId actionCode =
   withExceptionHandler ctxPtr $ do
@@ -521,7 +441,7 @@ haskellOnBottomSheetResult ctxPtr requestId actionCode =
 foreign export ccall haskellOnBottomSheetResult :: Ptr AppContext -> CInt -> CInt -> IO ()
 
 -- | Handle an HTTP result from native code. Dispatches to the
--- callback registered by 'performRequest'. The @cHeaders@ parameter
+-- callback registered by 'Hatter.Http.performRequest'. The @cHeaders@ parameter
 -- is newline-delimited key-value pairs for success, or an error message
 -- for network errors. The @bodyPtr@/@bodyLen@ carry the response body.
 haskellOnHttpResult :: Ptr AppContext -> CInt -> CInt -> CInt
@@ -542,7 +462,7 @@ foreign export ccall haskellOnHttpResult
   -> CString -> Ptr Word8 -> CInt -> IO ()
 
 -- | Handle a network status change from native code. Dispatches to the
--- callback registered by 'startNetworkMonitoring'.
+-- callback registered by 'Hatter.NetworkStatus.startNetworkMonitoring'.
 haskellOnNetworkStatusChange :: Ptr AppContext -> CInt -> CInt -> IO ()
 haskellOnNetworkStatusChange ctxPtr cConnected cTransport =
   withExceptionHandler ctxPtr $ do

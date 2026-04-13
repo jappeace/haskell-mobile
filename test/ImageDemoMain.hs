@@ -7,7 +7,8 @@ module Main where
 
 import Data.ByteString qualified as BS
 import Foreign.Ptr (Ptr)
-import Hatter (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext, newActionState)
+import Hatter (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), newActionState)
+import Hatter.AppContext (AppContext)
 import Hatter.Widget (ImageConfig(..), ImageSource(..), ResourceName(..), ScaleType(..), TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)

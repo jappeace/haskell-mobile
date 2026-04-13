@@ -14,21 +14,15 @@ import Foreign.Ptr (Ptr)
 import Hatter
   ( MobileApp(..)
   , Action
-  , CameraResult(..)
-  , CameraStatus(..)
-  , CameraState(..)
-  , Picture(..)
   , startMobileApp
-  , derefAppContext
   , platformLog
   , loggingMobileContext
-  , AppContext
-  , capturePhoto
   , newActionState
   , runActionM
   , createAction
   )
-import Hatter.AppContext (AppContext(..))
+import Hatter.AppContext (AppContext(..), derefAppContext)
+import Hatter.Camera (CameraResult(..), CameraStatus(..), CameraState(..), Picture(..), capturePhoto)
 import Hatter.Widget
   ( ButtonConfig(..)
   , TextConfig(..)

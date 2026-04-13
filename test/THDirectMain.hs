@@ -10,7 +10,8 @@ module Main where
 import Data.Text (pack)
 import Foreign.Ptr (Ptr)
 import Language.Haskell.TH.Syntax (lift)
-import Hatter (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext, newActionState)
+import Hatter (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), newActionState)
+import Hatter.AppContext (AppContext)
 import Hatter.Widget (TextConfig(..), Widget(..))
 
 -- | Compile-time evaluated splice — forces -fexternal-interpreter in mkAndroidLib.
