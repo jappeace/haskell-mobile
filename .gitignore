@@ -12,7 +12,7 @@ TAGS
 .envrc
 
 # Generated Xcode project (recreated via xcodegen)
-ios/HaskellMobile.xcodeproj/
+ios/Hatter.xcodeproj/
 
 # Staging dirs populated from nix build output
 ios/lib/

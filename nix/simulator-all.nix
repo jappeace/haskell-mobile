@@ -28,7 +28,7 @@ let
   counterSimApp = lib.mkSimulatorApp {
     iosLib = counterIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-simulator-app";
+    name = "hatter-simulator-app";
   };
 
   scrollIos = import ./ios.nix {
@@ -39,7 +39,7 @@ let
   scrollSimApp = lib.mkSimulatorApp {
     iosLib = scrollIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-scroll-simulator-app";
+    name = "hatter-scroll-simulator-app";
   };
 
   textinputIos = import ./ios.nix {
@@ -50,7 +50,7 @@ let
   textinputSimApp = lib.mkSimulatorApp {
     iosLib = textinputIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-textinput-simulator-app";
+    name = "hatter-textinput-simulator-app";
   };
 
   permissionIos = import ./ios.nix {
@@ -61,7 +61,7 @@ let
   permissionSimApp = lib.mkSimulatorApp {
     iosLib = permissionIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-permission-simulator-app";
+    name = "hatter-permission-simulator-app";
   };
 
   secureStorageIos = import ./ios.nix {
@@ -72,7 +72,7 @@ let
   secureStorageSimApp = lib.mkSimulatorApp {
     iosLib = secureStorageIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-securestorage-simulator-app";
+    name = "hatter-securestorage-simulator-app";
   };
 
   imageIos = import ./ios.nix {
@@ -83,7 +83,7 @@ let
   imageSimApp = lib.mkSimulatorApp {
     iosLib = imageIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-image-simulator-app";
+    name = "hatter-image-simulator-app";
   };
 
   nodepoolIos = import ./ios.nix {
@@ -94,7 +94,7 @@ let
   nodepoolSimApp = lib.mkSimulatorApp {
     iosLib = nodepoolIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-nodepool-simulator-app";
+    name = "hatter-nodepool-simulator-app";
     dynamicNodePool = true;
   };
 
@@ -106,7 +106,7 @@ let
   bleSimApp = lib.mkSimulatorApp {
     iosLib = bleIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-ble-simulator-app";
+    name = "hatter-ble-simulator-app";
   };
 
   dialogIos = import ./ios.nix {
@@ -117,7 +117,7 @@ let
   dialogSimApp = lib.mkSimulatorApp {
     iosLib = dialogIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-dialog-simulator-app";
+    name = "hatter-dialog-simulator-app";
   };
 
   locationIos = import ./ios.nix {
@@ -128,7 +128,7 @@ let
   locationSimApp = lib.mkSimulatorApp {
     iosLib = locationIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-location-simulator-app";
+    name = "hatter-location-simulator-app";
   };
 
   webviewIos = import ./ios.nix {
@@ -139,7 +139,7 @@ let
   webviewSimApp = lib.mkSimulatorApp {
     iosLib = webviewIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-webview-simulator-app";
+    name = "hatter-webview-simulator-app";
   };
 
   authSessionIos = import ./ios.nix {
@@ -150,7 +150,7 @@ let
   authSessionSimApp = lib.mkSimulatorApp {
     iosLib = authSessionIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-authsession-simulator-app";
+    name = "hatter-authsession-simulator-app";
   };
 
   cameraIos = import ./ios.nix {
@@ -161,7 +161,7 @@ let
   cameraSimApp = lib.mkSimulatorApp {
     iosLib = cameraIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-camera-simulator-app";
+    name = "hatter-camera-simulator-app";
   };
 
   bottomSheetIos = import ./ios.nix {
@@ -172,7 +172,7 @@ let
   bottomSheetSimApp = lib.mkSimulatorApp {
     iosLib = bottomSheetIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-bottomsheet-simulator-app";
+    name = "hatter-bottomsheet-simulator-app";
   };
 
   httpIos = import ./ios.nix {
@@ -183,7 +183,7 @@ let
   httpSimApp = lib.mkSimulatorApp {
     iosLib = httpIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-http-simulator-app";
+    name = "hatter-http-simulator-app";
   };
 
   networkStatusIos = import ./ios.nix {
@@ -194,7 +194,7 @@ let
   networkStatusSimApp = lib.mkSimulatorApp {
     iosLib = networkStatusIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-networkstatus-simulator-app";
+    name = "hatter-networkstatus-simulator-app";
   };
 
   mapviewIos = import ./ios.nix {
@@ -205,7 +205,7 @@ let
   mapviewSimApp = lib.mkSimulatorApp {
     iosLib = mapviewIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-mapview-simulator-app";
+    name = "hatter-mapview-simulator-app";
   };
 
   animationIos = import ./ios.nix {
@@ -216,7 +216,7 @@ let
   animationSimApp = lib.mkSimulatorApp {
     iosLib = animationIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-animation-simulator-app";
+    name = "hatter-animation-simulator-app";
   };
 
   filesDirIos = import ./ios.nix {
@@ -227,7 +227,7 @@ let
   filesDirSimApp = lib.mkSimulatorApp {
     iosLib = filesDirIos;
     iosSrc = ../ios;
-    name = "haskell-mobile-filesdir-simulator-app";
+    name = "hatter-filesdir-simulator-app";
   };
 
   xcodegen = pkgs.xcodegen;
@@ -235,7 +235,7 @@ let
   testScripts = builtins.path { path = ../test; name = "test-scripts"; };
 
 in pkgs.stdenv.mkDerivation {
-  name = "haskell-mobile-simulator-all-tests";
+  name = "hatter-simulator-all-tests";
 
   dontUnpack = true;
 
@@ -247,8 +247,8 @@ in pkgs.stdenv.mkDerivation {
 set -euo pipefail
 
 # --- Configuration ---
-BUNDLE_ID="me.jappie.haskellmobile"
-SCHEME="HaskellMobile"
+BUNDLE_ID="me.jappie.hatter"
+SCHEME="Hatter"
 DEVICE_TYPE="iPhone 16"
 COUNTER_SHARE_DIR="${counterSimApp}/share/ios"
 SCROLL_SHARE_DIR="${scrollSimApp}/share/ios"
@@ -272,7 +272,7 @@ FILES_DIR_SHARE_DIR="${filesDirSimApp}/share/ios"
 TEST_SCRIPTS="${testScripts}"
 
 # --- Temp working directory ---
-WORK_DIR=$(mktemp -d /tmp/haskell-mobile-sim-all-XXXX)
+WORK_DIR=$(mktemp -d /tmp/hatter-sim-all-XXXX)
 SIM_UDID=""
 
 # Phase result tracking
@@ -330,7 +330,7 @@ for share_dir in \
     "$BOTTOM_SHEET_SHARE_DIR" \
     "$HTTP_SHARE_DIR" \
     "$MAPVIEW_SHARE_DIR"; do
-    a_path="$share_dir/lib/libHaskellMobile.a"
+    a_path="$share_dir/lib/libHatter.a"
     A_BYTES=$(stat -f %z "$a_path" 2>/dev/null || stat -c %s "$a_path" 2>/dev/null || echo 0)
     A_MB=$((A_BYTES / 1048576))
     A_LABEL=$(echo "$share_dir" | grep -oE '[^/]+/share' | sed 's|/share||')
@@ -359,8 +359,8 @@ echo "============================================================"
 # --- Stage and build counter app ---
 echo "=== Staging counter app ==="
 mkdir -p "$WORK_DIR/counter/lib" "$WORK_DIR/counter/include"
-cp "$COUNTER_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/counter/lib/"
-cp "$COUNTER_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/counter/include/"
+cp "$COUNTER_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/counter/lib/"
+cp "$COUNTER_SHARE_DIR/include/Hatter.h" "$WORK_DIR/counter/include/"
 cp "$COUNTER_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/counter/include/"
 cp "$COUNTER_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/counter/include/"
 cp "$COUNTER_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/counter/include/"
@@ -373,7 +373,7 @@ cp "$COUNTER_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/counter/include/"
 cp "$COUNTER_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/counter/include/"
 cp "$COUNTER_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/counter/include/"
 cp "$COUNTER_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/counter/include/"
-cp -r "$COUNTER_SHARE_DIR/HaskellMobile" "$WORK_DIR/counter/"
+cp -r "$COUNTER_SHARE_DIR/Hatter" "$WORK_DIR/counter/"
 cp "$COUNTER_SHARE_DIR/project.yml" "$WORK_DIR/counter/"
 chmod -R u+w "$WORK_DIR/counter"
 
@@ -383,7 +383,7 @@ ${xcodegen}/bin/xcodegen generate
 
 echo "=== Building counter app for simulator ==="
 xcodebuild build \
-    -project HaskellMobile.xcodeproj \
+    -project Hatter.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
@@ -404,8 +404,8 @@ echo "Counter app: $COUNTER_APP"
 # --- Stage and build scroll demo app ---
 echo "=== Staging scroll demo app ==="
 mkdir -p "$WORK_DIR/scroll/lib" "$WORK_DIR/scroll/include"
-cp "$SCROLL_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/scroll/lib/"
-cp "$SCROLL_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/scroll/include/"
+cp "$SCROLL_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/scroll/lib/"
+cp "$SCROLL_SHARE_DIR/include/Hatter.h" "$WORK_DIR/scroll/include/"
 cp "$SCROLL_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/scroll/include/"
 cp "$SCROLL_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/scroll/include/"
 cp "$SCROLL_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/scroll/include/"
@@ -418,7 +418,7 @@ cp "$SCROLL_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/scroll/include/"
 cp "$SCROLL_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/scroll/include/"
 cp "$SCROLL_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/scroll/include/"
 cp "$SCROLL_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/scroll/include/"
-cp -r "$SCROLL_SHARE_DIR/HaskellMobile" "$WORK_DIR/scroll/"
+cp -r "$SCROLL_SHARE_DIR/Hatter" "$WORK_DIR/scroll/"
 cp "$SCROLL_SHARE_DIR/project.yml" "$WORK_DIR/scroll/"
 chmod -R u+w "$WORK_DIR/scroll"
 
@@ -428,7 +428,7 @@ ${xcodegen}/bin/xcodegen generate
 
 echo "=== Building scroll demo app for simulator ==="
 xcodebuild build \
-    -project HaskellMobile.xcodeproj \
+    -project Hatter.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
@@ -449,8 +449,8 @@ echo "Scroll app: $SCROLL_APP"
 # --- Stage and build textinput demo app ---
 echo "=== Staging textinput demo app ==="
 mkdir -p "$WORK_DIR/textinput/lib" "$WORK_DIR/textinput/include"
-cp "$TEXTINPUT_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/textinput/lib/"
-cp "$TEXTINPUT_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/textinput/include/"
+cp "$TEXTINPUT_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/textinput/lib/"
+cp "$TEXTINPUT_SHARE_DIR/include/Hatter.h" "$WORK_DIR/textinput/include/"
 cp "$TEXTINPUT_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/textinput/include/"
 cp "$TEXTINPUT_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/textinput/include/"
 cp "$TEXTINPUT_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/textinput/include/"
@@ -463,7 +463,7 @@ cp "$TEXTINPUT_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/textinput/inclu
 cp "$TEXTINPUT_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/textinput/include/"
 cp "$TEXTINPUT_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/textinput/include/"
 cp "$TEXTINPUT_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/textinput/include/"
-cp -r "$TEXTINPUT_SHARE_DIR/HaskellMobile" "$WORK_DIR/textinput/"
+cp -r "$TEXTINPUT_SHARE_DIR/Hatter" "$WORK_DIR/textinput/"
 cp "$TEXTINPUT_SHARE_DIR/project.yml" "$WORK_DIR/textinput/"
 chmod -R u+w "$WORK_DIR/textinput"
 
@@ -473,7 +473,7 @@ ${xcodegen}/bin/xcodegen generate
 
 echo "=== Building textinput demo app for simulator ==="
 xcodebuild build \
-    -project HaskellMobile.xcodeproj \
+    -project Hatter.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
@@ -494,8 +494,8 @@ echo "TextInput app: $TEXTINPUT_APP"
 # --- Stage and build permission demo app ---
 echo "=== Staging permission demo app ==="
 mkdir -p "$WORK_DIR/permission/lib" "$WORK_DIR/permission/include"
-cp "$PERMISSION_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/permission/lib/"
-cp "$PERMISSION_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/permission/include/"
+cp "$PERMISSION_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/permission/lib/"
+cp "$PERMISSION_SHARE_DIR/include/Hatter.h" "$WORK_DIR/permission/include/"
 cp "$PERMISSION_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/permission/include/"
 cp "$PERMISSION_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/permission/include/"
 cp "$PERMISSION_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/permission/include/"
@@ -508,7 +508,7 @@ cp "$PERMISSION_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/permission/inc
 cp "$PERMISSION_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/permission/include/"
 cp "$PERMISSION_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/permission/include/"
 cp "$PERMISSION_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/permission/include/"
-cp -r "$PERMISSION_SHARE_DIR/HaskellMobile" "$WORK_DIR/permission/"
+cp -r "$PERMISSION_SHARE_DIR/Hatter" "$WORK_DIR/permission/"
 cp "$PERMISSION_SHARE_DIR/project.yml" "$WORK_DIR/permission/"
 chmod -R u+w "$WORK_DIR/permission"
 
@@ -518,7 +518,7 @@ ${xcodegen}/bin/xcodegen generate
 
 echo "=== Building permission demo app for simulator ==="
 xcodebuild build \
-    -project HaskellMobile.xcodeproj \
+    -project Hatter.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
@@ -539,8 +539,8 @@ echo "Permission app: $PERMISSION_APP"
 # --- Stage and build securestorage demo app ---
 echo "=== Staging securestorage demo app ==="
 mkdir -p "$WORK_DIR/securestorage/lib" "$WORK_DIR/securestorage/include"
-cp "$SECURE_STORAGE_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/securestorage/lib/"
-cp "$SECURE_STORAGE_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/securestorage/include/"
+cp "$SECURE_STORAGE_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/securestorage/lib/"
+cp "$SECURE_STORAGE_SHARE_DIR/include/Hatter.h" "$WORK_DIR/securestorage/include/"
 cp "$SECURE_STORAGE_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/securestorage/include/"
 cp "$SECURE_STORAGE_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/securestorage/include/"
 cp "$SECURE_STORAGE_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/securestorage/include/"
@@ -553,7 +553,7 @@ cp "$SECURE_STORAGE_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/securestor
 cp "$SECURE_STORAGE_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/securestorage/include/"
 cp "$SECURE_STORAGE_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/securestorage/include/"
 cp "$SECURE_STORAGE_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/securestorage/include/"
-cp -r "$SECURE_STORAGE_SHARE_DIR/HaskellMobile" "$WORK_DIR/securestorage/"
+cp -r "$SECURE_STORAGE_SHARE_DIR/Hatter" "$WORK_DIR/securestorage/"
 cp "$SECURE_STORAGE_SHARE_DIR/project.yml" "$WORK_DIR/securestorage/"
 chmod -R u+w "$WORK_DIR/securestorage"
 
@@ -563,7 +563,7 @@ ${xcodegen}/bin/xcodegen generate
 
 echo "=== Building securestorage demo app for simulator (ad-hoc signed for Keychain entitlements) ==="
 xcodebuild build \
-    -project HaskellMobile.xcodeproj \
+    -project Hatter.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
@@ -584,8 +584,8 @@ echo "SecureStorage app: $SECURE_STORAGE_APP"
 # --- Stage and build image test app ---
 echo "=== Staging image test app ==="
 mkdir -p "$WORK_DIR/image/lib" "$WORK_DIR/image/include"
-cp "$IMAGE_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/image/lib/"
-cp "$IMAGE_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/image/include/"
+cp "$IMAGE_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/image/lib/"
+cp "$IMAGE_SHARE_DIR/include/Hatter.h" "$WORK_DIR/image/include/"
 cp "$IMAGE_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/image/include/"
 cp "$IMAGE_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/image/include/"
 cp "$IMAGE_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/image/include/"
@@ -598,7 +598,7 @@ cp "$IMAGE_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/image/include/"
 cp "$IMAGE_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/image/include/"
 cp "$IMAGE_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/image/include/"
 cp "$IMAGE_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/image/include/"
-cp -r "$IMAGE_SHARE_DIR/HaskellMobile" "$WORK_DIR/image/"
+cp -r "$IMAGE_SHARE_DIR/Hatter" "$WORK_DIR/image/"
 cp "$IMAGE_SHARE_DIR/project.yml" "$WORK_DIR/image/"
 chmod -R u+w "$WORK_DIR/image"
 
@@ -608,7 +608,7 @@ ${xcodegen}/bin/xcodegen generate
 
 echo "=== Building image test app for simulator ==="
 xcodebuild build \
-    -project HaskellMobile.xcodeproj \
+    -project Hatter.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
@@ -629,8 +629,8 @@ echo "Image app: $IMAGE_APP"
 # --- Stage and build node-pool test app ---
 echo "=== Staging node-pool test app ==="
 mkdir -p "$WORK_DIR/nodepool/lib" "$WORK_DIR/nodepool/include"
-cp "$NODEPOOL_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/nodepool/lib/"
-cp "$NODEPOOL_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/nodepool/include/"
+cp "$NODEPOOL_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/nodepool/lib/"
+cp "$NODEPOOL_SHARE_DIR/include/Hatter.h" "$WORK_DIR/nodepool/include/"
 cp "$NODEPOOL_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/nodepool/include/"
 cp "$NODEPOOL_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/nodepool/include/"
 cp "$NODEPOOL_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/nodepool/include/"
@@ -643,7 +643,7 @@ cp "$NODEPOOL_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/nodepool/include
 cp "$NODEPOOL_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/nodepool/include/"
 cp "$NODEPOOL_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/nodepool/include/"
 cp "$NODEPOOL_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/nodepool/include/"
-cp -r "$NODEPOOL_SHARE_DIR/HaskellMobile" "$WORK_DIR/nodepool/"
+cp -r "$NODEPOOL_SHARE_DIR/Hatter" "$WORK_DIR/nodepool/"
 cp "$NODEPOOL_SHARE_DIR/project.yml" "$WORK_DIR/nodepool/"
 chmod -R u+w "$WORK_DIR/nodepool"
 
@@ -653,7 +653,7 @@ ${xcodegen}/bin/xcodegen generate
 
 echo "=== Building node-pool test app for simulator ==="
 xcodebuild build \
-    -project HaskellMobile.xcodeproj \
+    -project Hatter.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
@@ -674,8 +674,8 @@ echo "NodePool app: $NODEPOOL_APP"
 # --- Stage and build BLE demo app ---
 echo "=== Staging BLE demo app ==="
 mkdir -p "$WORK_DIR/ble/lib" "$WORK_DIR/ble/include"
-cp "$BLE_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/ble/lib/"
-cp "$BLE_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/ble/include/"
+cp "$BLE_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/ble/lib/"
+cp "$BLE_SHARE_DIR/include/Hatter.h" "$WORK_DIR/ble/include/"
 cp "$BLE_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/ble/include/"
 cp "$BLE_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/ble/include/"
 cp "$BLE_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/ble/include/"
@@ -688,7 +688,7 @@ cp "$BLE_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/ble/include/"
 cp "$BLE_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/ble/include/"
 cp "$BLE_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/ble/include/"
 cp "$BLE_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/ble/include/"
-cp -r "$BLE_SHARE_DIR/HaskellMobile" "$WORK_DIR/ble/"
+cp -r "$BLE_SHARE_DIR/Hatter" "$WORK_DIR/ble/"
 cp "$BLE_SHARE_DIR/project.yml" "$WORK_DIR/ble/"
 chmod -R u+w "$WORK_DIR/ble"
 
@@ -698,7 +698,7 @@ ${xcodegen}/bin/xcodegen generate
 
 echo "=== Building BLE demo app for simulator ==="
 xcodebuild build \
-    -project HaskellMobile.xcodeproj \
+    -project Hatter.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
@@ -719,8 +719,8 @@ echo "BLE app: $BLE_APP"
 # --- Stage and build dialog demo app ---
 echo "=== Staging dialog demo app ==="
 mkdir -p "$WORK_DIR/dialog/lib" "$WORK_DIR/dialog/include"
-cp "$DIALOG_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/dialog/lib/"
-cp "$DIALOG_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/dialog/include/"
+cp "$DIALOG_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/dialog/lib/"
+cp "$DIALOG_SHARE_DIR/include/Hatter.h" "$WORK_DIR/dialog/include/"
 cp "$DIALOG_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/dialog/include/"
 cp "$DIALOG_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/dialog/include/"
 cp "$DIALOG_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/dialog/include/"
@@ -733,7 +733,7 @@ cp "$DIALOG_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/dialog/include/"
 cp "$DIALOG_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/dialog/include/"
 cp "$DIALOG_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/dialog/include/"
 cp "$DIALOG_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/dialog/include/"
-cp -r "$DIALOG_SHARE_DIR/HaskellMobile" "$WORK_DIR/dialog/"
+cp -r "$DIALOG_SHARE_DIR/Hatter" "$WORK_DIR/dialog/"
 cp "$DIALOG_SHARE_DIR/project.yml" "$WORK_DIR/dialog/"
 chmod -R u+w "$WORK_DIR/dialog"
 
@@ -743,7 +743,7 @@ ${xcodegen}/bin/xcodegen generate
 
 echo "=== Building dialog demo app for simulator ==="
 xcodebuild build \
-    -project HaskellMobile.xcodeproj \
+    -project Hatter.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
@@ -764,8 +764,8 @@ echo "Dialog app: $DIALOG_APP"
 # --- Stage and build location demo app ---
 echo "=== Staging location demo app ==="
 mkdir -p "$WORK_DIR/location/lib" "$WORK_DIR/location/include"
-cp "$LOCATION_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/location/lib/"
-cp "$LOCATION_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/location/include/"
+cp "$LOCATION_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/location/lib/"
+cp "$LOCATION_SHARE_DIR/include/Hatter.h" "$WORK_DIR/location/include/"
 cp "$LOCATION_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/location/include/"
 cp "$LOCATION_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/location/include/"
 cp "$LOCATION_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/location/include/"
@@ -778,7 +778,7 @@ cp "$LOCATION_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/location/include
 cp "$LOCATION_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/location/include/"
 cp "$LOCATION_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/location/include/"
 cp "$LOCATION_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/location/include/"
-cp -r "$LOCATION_SHARE_DIR/HaskellMobile" "$WORK_DIR/location/"
+cp -r "$LOCATION_SHARE_DIR/Hatter" "$WORK_DIR/location/"
 cp "$LOCATION_SHARE_DIR/project.yml" "$WORK_DIR/location/"
 chmod -R u+w "$WORK_DIR/location"
 
@@ -788,7 +788,7 @@ ${xcodegen}/bin/xcodegen generate
 
 echo "=== Building location demo app for simulator ==="
 xcodebuild build \
-    -project HaskellMobile.xcodeproj \
+    -project Hatter.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
@@ -809,8 +809,8 @@ echo "Location app: $LOCATION_APP"
 # --- Stage and build webview demo app ---
 echo "=== Staging webview demo app ==="
 mkdir -p "$WORK_DIR/webview/lib" "$WORK_DIR/webview/include"
-cp "$WEBVIEW_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/webview/lib/"
-cp "$WEBVIEW_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/webview/include/"
+cp "$WEBVIEW_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/webview/lib/"
+cp "$WEBVIEW_SHARE_DIR/include/Hatter.h" "$WORK_DIR/webview/include/"
 cp "$WEBVIEW_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/webview/include/"
 cp "$WEBVIEW_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/webview/include/"
 cp "$WEBVIEW_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/webview/include/"
@@ -823,7 +823,7 @@ cp "$WEBVIEW_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/webview/include/"
 cp "$WEBVIEW_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/webview/include/"
 cp "$WEBVIEW_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/webview/include/"
 cp "$WEBVIEW_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/webview/include/"
-cp -r "$WEBVIEW_SHARE_DIR/HaskellMobile" "$WORK_DIR/webview/"
+cp -r "$WEBVIEW_SHARE_DIR/Hatter" "$WORK_DIR/webview/"
 cp "$WEBVIEW_SHARE_DIR/project.yml" "$WORK_DIR/webview/"
 chmod -R u+w "$WORK_DIR/webview"
 
@@ -833,7 +833,7 @@ ${xcodegen}/bin/xcodegen generate
 
 echo "=== Building webview demo app for simulator ==="
 xcodebuild build \
-    -project HaskellMobile.xcodeproj \
+    -project Hatter.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
@@ -854,8 +854,8 @@ echo "WebView app: $WEBVIEW_APP"
 # --- Stage and build authsession demo app ---
 echo "=== Staging authsession demo app ==="
 mkdir -p "$WORK_DIR/authsession/lib" "$WORK_DIR/authsession/include"
-cp "$AUTH_SESSION_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/authsession/lib/"
-cp "$AUTH_SESSION_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/authsession/include/"
+cp "$AUTH_SESSION_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/authsession/lib/"
+cp "$AUTH_SESSION_SHARE_DIR/include/Hatter.h" "$WORK_DIR/authsession/include/"
 cp "$AUTH_SESSION_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/authsession/include/"
 cp "$AUTH_SESSION_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/authsession/include/"
 cp "$AUTH_SESSION_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/authsession/include/"
@@ -868,7 +868,7 @@ cp "$AUTH_SESSION_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/authsession/
 cp "$AUTH_SESSION_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/authsession/include/"
 cp "$AUTH_SESSION_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/authsession/include/"
 cp "$AUTH_SESSION_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/authsession/include/"
-cp -r "$AUTH_SESSION_SHARE_DIR/HaskellMobile" "$WORK_DIR/authsession/"
+cp -r "$AUTH_SESSION_SHARE_DIR/Hatter" "$WORK_DIR/authsession/"
 cp "$AUTH_SESSION_SHARE_DIR/project.yml" "$WORK_DIR/authsession/"
 chmod -R u+w "$WORK_DIR/authsession"
 
@@ -878,7 +878,7 @@ ${xcodegen}/bin/xcodegen generate
 
 echo "=== Building authsession demo app for simulator ==="
 xcodebuild build \
-    -project HaskellMobile.xcodeproj \
+    -project Hatter.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
@@ -899,8 +899,8 @@ echo "AuthSession app: $AUTH_SESSION_APP"
 # --- Stage and build camera demo app ---
 echo "=== Staging camera demo app ==="
 mkdir -p "$WORK_DIR/camera/lib" "$WORK_DIR/camera/include"
-cp "$CAMERA_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/camera/lib/"
-cp "$CAMERA_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/camera/include/"
+cp "$CAMERA_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/camera/lib/"
+cp "$CAMERA_SHARE_DIR/include/Hatter.h" "$WORK_DIR/camera/include/"
 cp "$CAMERA_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/camera/include/"
 cp "$CAMERA_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/camera/include/"
 cp "$CAMERA_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/camera/include/"
@@ -913,7 +913,7 @@ cp "$CAMERA_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/camera/include/"
 cp "$CAMERA_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/camera/include/"
 cp "$CAMERA_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/camera/include/"
 cp "$CAMERA_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/camera/include/"
-cp -r "$CAMERA_SHARE_DIR/HaskellMobile" "$WORK_DIR/camera/"
+cp -r "$CAMERA_SHARE_DIR/Hatter" "$WORK_DIR/camera/"
 cp "$CAMERA_SHARE_DIR/project.yml" "$WORK_DIR/camera/"
 chmod -R u+w "$WORK_DIR/camera"
 
@@ -923,7 +923,7 @@ ${xcodegen}/bin/xcodegen generate
 
 echo "=== Building camera demo app for simulator ==="
 xcodebuild build \
-    -project HaskellMobile.xcodeproj \
+    -project Hatter.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
@@ -944,8 +944,8 @@ echo "Camera app: $CAMERA_APP"
 # --- Stage and build bottomsheet demo app ---
 echo "=== Staging bottomsheet demo app ==="
 mkdir -p "$WORK_DIR/bottomsheet/lib" "$WORK_DIR/bottomsheet/include"
-cp "$BOTTOM_SHEET_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/bottomsheet/lib/"
-cp "$BOTTOM_SHEET_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/bottomsheet/include/"
+cp "$BOTTOM_SHEET_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/bottomsheet/lib/"
+cp "$BOTTOM_SHEET_SHARE_DIR/include/Hatter.h" "$WORK_DIR/bottomsheet/include/"
 cp "$BOTTOM_SHEET_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/bottomsheet/include/"
 cp "$BOTTOM_SHEET_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/bottomsheet/include/"
 cp "$BOTTOM_SHEET_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/bottomsheet/include/"
@@ -958,7 +958,7 @@ cp "$BOTTOM_SHEET_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/bottomsheet/
 cp "$BOTTOM_SHEET_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/bottomsheet/include/"
 cp "$BOTTOM_SHEET_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/bottomsheet/include/"
 cp "$BOTTOM_SHEET_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/bottomsheet/include/"
-cp -r "$BOTTOM_SHEET_SHARE_DIR/HaskellMobile" "$WORK_DIR/bottomsheet/"
+cp -r "$BOTTOM_SHEET_SHARE_DIR/Hatter" "$WORK_DIR/bottomsheet/"
 cp "$BOTTOM_SHEET_SHARE_DIR/project.yml" "$WORK_DIR/bottomsheet/"
 chmod -R u+w "$WORK_DIR/bottomsheet"
 
@@ -968,7 +968,7 @@ ${xcodegen}/bin/xcodegen generate
 
 echo "=== Building bottomsheet demo app for simulator ==="
 xcodebuild build \
-    -project HaskellMobile.xcodeproj \
+    -project Hatter.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
@@ -989,8 +989,8 @@ echo "BottomSheet app: $BOTTOM_SHEET_APP"
 # --- Stage and build http demo app ---
 echo "=== Staging http demo app ==="
 mkdir -p "$WORK_DIR/http/lib" "$WORK_DIR/http/include"
-cp "$HTTP_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/http/lib/"
-cp "$HTTP_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/http/include/"
+cp "$HTTP_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/http/lib/"
+cp "$HTTP_SHARE_DIR/include/Hatter.h" "$WORK_DIR/http/include/"
 cp "$HTTP_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/http/include/"
 cp "$HTTP_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/http/include/"
 cp "$HTTP_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/http/include/"
@@ -1003,7 +1003,7 @@ cp "$HTTP_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/http/include/"
 cp "$HTTP_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/http/include/"
 cp "$HTTP_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/http/include/"
 cp "$HTTP_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/http/include/"
-cp -r "$HTTP_SHARE_DIR/HaskellMobile" "$WORK_DIR/http/"
+cp -r "$HTTP_SHARE_DIR/Hatter" "$WORK_DIR/http/"
 cp "$HTTP_SHARE_DIR/project.yml" "$WORK_DIR/http/"
 chmod -R u+w "$WORK_DIR/http"
 
@@ -1013,7 +1013,7 @@ ${xcodegen}/bin/xcodegen generate
 
 echo "=== Building http demo app for simulator ==="
 xcodebuild build \
-    -project HaskellMobile.xcodeproj \
+    -project Hatter.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
@@ -1034,8 +1034,8 @@ echo "HTTP app: $HTTP_APP"
 # --- Stage and build network status demo app ---
 echo "=== Staging network status demo app ==="
 mkdir -p "$WORK_DIR/networkstatus/lib" "$WORK_DIR/networkstatus/include"
-cp "$NETWORK_STATUS_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/networkstatus/lib/"
-cp "$NETWORK_STATUS_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/networkstatus/include/"
+cp "$NETWORK_STATUS_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/networkstatus/lib/"
+cp "$NETWORK_STATUS_SHARE_DIR/include/Hatter.h" "$WORK_DIR/networkstatus/include/"
 cp "$NETWORK_STATUS_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/networkstatus/include/"
 cp "$NETWORK_STATUS_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/networkstatus/include/"
 cp "$NETWORK_STATUS_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/networkstatus/include/"
@@ -1048,7 +1048,7 @@ cp "$NETWORK_STATUS_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/networksta
 cp "$NETWORK_STATUS_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/networkstatus/include/"
 cp "$NETWORK_STATUS_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/networkstatus/include/"
 cp "$NETWORK_STATUS_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/networkstatus/include/"
-cp -r "$NETWORK_STATUS_SHARE_DIR/HaskellMobile" "$WORK_DIR/networkstatus/"
+cp -r "$NETWORK_STATUS_SHARE_DIR/Hatter" "$WORK_DIR/networkstatus/"
 cp "$NETWORK_STATUS_SHARE_DIR/project.yml" "$WORK_DIR/networkstatus/"
 chmod -R u+w "$WORK_DIR/networkstatus"
 
@@ -1058,7 +1058,7 @@ ${xcodegen}/bin/xcodegen generate
 
 echo "=== Building network status demo app for simulator ==="
 xcodebuild build \
-    -project HaskellMobile.xcodeproj \
+    -project Hatter.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
@@ -1079,8 +1079,8 @@ echo "Network status app: $NETWORK_STATUS_APP"
 # --- Stage and build mapview demo app ---
 echo "=== Staging mapview demo app ==="
 mkdir -p "$WORK_DIR/mapview/lib" "$WORK_DIR/mapview/include"
-cp "$MAPVIEW_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/mapview/lib/"
-cp "$MAPVIEW_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/mapview/lib/"
+cp "$MAPVIEW_SHARE_DIR/include/Hatter.h" "$WORK_DIR/mapview/include/"
 cp "$MAPVIEW_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/mapview/include/"
 cp "$MAPVIEW_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/mapview/include/"
 cp "$MAPVIEW_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/mapview/include/"
@@ -1093,7 +1093,7 @@ cp "$MAPVIEW_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/mapview/include/"
 cp "$MAPVIEW_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/mapview/include/"
 cp "$MAPVIEW_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/mapview/include/"
 cp "$MAPVIEW_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/mapview/include/"
-cp -r "$MAPVIEW_SHARE_DIR/HaskellMobile" "$WORK_DIR/mapview/"
+cp -r "$MAPVIEW_SHARE_DIR/Hatter" "$WORK_DIR/mapview/"
 cp "$MAPVIEW_SHARE_DIR/project.yml" "$WORK_DIR/mapview/"
 chmod -R u+w "$WORK_DIR/mapview"
 
@@ -1103,7 +1103,7 @@ ${xcodegen}/bin/xcodegen generate
 
 echo "=== Building mapview demo app for simulator ==="
 xcodebuild build \
-    -project HaskellMobile.xcodeproj \
+    -project Hatter.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
@@ -1124,8 +1124,8 @@ echo "MapView app: $MAPVIEW_APP"
 # --- Stage and build animation demo app ---
 echo "=== Staging animation demo app ==="
 mkdir -p "$WORK_DIR/animation/lib" "$WORK_DIR/animation/include"
-cp "$ANIMATION_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/animation/lib/"
-cp "$ANIMATION_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/animation/include/"
+cp "$ANIMATION_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/animation/lib/"
+cp "$ANIMATION_SHARE_DIR/include/Hatter.h" "$WORK_DIR/animation/include/"
 cp "$ANIMATION_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/animation/include/"
 cp "$ANIMATION_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/animation/include/"
 cp "$ANIMATION_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/animation/include/"
@@ -1138,7 +1138,7 @@ cp "$ANIMATION_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/animation/inclu
 cp "$ANIMATION_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/animation/include/"
 cp "$ANIMATION_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/animation/include/"
 cp "$ANIMATION_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/animation/include/"
-cp -r "$ANIMATION_SHARE_DIR/HaskellMobile" "$WORK_DIR/animation/"
+cp -r "$ANIMATION_SHARE_DIR/Hatter" "$WORK_DIR/animation/"
 cp "$ANIMATION_SHARE_DIR/project.yml" "$WORK_DIR/animation/"
 chmod -R u+w "$WORK_DIR/animation"
 
@@ -1148,7 +1148,7 @@ ${xcodegen}/bin/xcodegen generate
 
 echo "=== Building animation demo app for simulator ==="
 xcodebuild build \
-    -project HaskellMobile.xcodeproj \
+    -project Hatter.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \
@@ -1169,8 +1169,8 @@ echo "Animation app: $ANIMATION_APP"
 # --- Stage and build filesdir demo app ---
 echo "=== Staging filesdir demo app ==="
 mkdir -p "$WORK_DIR/filesdir/lib" "$WORK_DIR/filesdir/include"
-cp "$FILES_DIR_SHARE_DIR/lib/libHaskellMobile.a" "$WORK_DIR/filesdir/lib/"
-cp "$FILES_DIR_SHARE_DIR/include/HaskellMobile.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/filesdir/lib/"
+cp "$FILES_DIR_SHARE_DIR/include/Hatter.h" "$WORK_DIR/filesdir/include/"
 cp "$FILES_DIR_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/filesdir/include/"
 cp "$FILES_DIR_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/filesdir/include/"
 cp "$FILES_DIR_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/filesdir/include/"
@@ -1183,7 +1183,7 @@ cp "$FILES_DIR_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/filesdir/includ
 cp "$FILES_DIR_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/filesdir/include/"
 cp "$FILES_DIR_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/filesdir/include/"
 cp "$FILES_DIR_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/filesdir/include/"
-cp -r "$FILES_DIR_SHARE_DIR/HaskellMobile" "$WORK_DIR/filesdir/"
+cp -r "$FILES_DIR_SHARE_DIR/Hatter" "$WORK_DIR/filesdir/"
 cp "$FILES_DIR_SHARE_DIR/project.yml" "$WORK_DIR/filesdir/"
 chmod -R u+w "$WORK_DIR/filesdir"
 
@@ -1193,7 +1193,7 @@ ${xcodegen}/bin/xcodegen generate
 
 echo "=== Building filesdir demo app for simulator ==="
 xcodebuild build \
-    -project HaskellMobile.xcodeproj \
+    -project Hatter.xcodeproj \
     -scheme "$SCHEME" \
     -sdk iphonesimulator \
     -configuration Release \

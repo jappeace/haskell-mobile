@@ -13,7 +13,7 @@ module Main where
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Text (pack)
 import Foreign.Ptr (Ptr)
-import HaskellMobile
+import Hatter
   ( MobileApp(..)
   , Action
   , NetworkStatusState(..)
@@ -28,9 +28,9 @@ import HaskellMobile
   , runActionM
   , createAction
   )
-import HaskellMobile.AppContext (AppContext(..))
-import HaskellMobile.NetworkStatus (NetworkStatus(..), NetworkTransport(..))
-import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
+import Hatter.AppContext (AppContext(..))
+import Hatter.NetworkStatus (NetworkStatus(..), NetworkTransport(..))
+import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do

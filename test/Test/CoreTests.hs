@@ -19,15 +19,15 @@ import Data.Map.Strict qualified as Map
 import Data.Text qualified as Text
 import Foreign.C.String (newCString, peekCString)
 import Foreign.Marshal.Alloc (free)
-import HaskellMobile (MobileApp(..), haskellGreet, haskellOnLifecycle)
-import HaskellMobile.Lifecycle
+import Hatter (MobileApp(..), haskellGreet, haskellOnLifecycle)
+import Hatter.Lifecycle
   ( LifecycleEvent(..)
   , loggingMobileContext
   , lifecycleToInt
   , lifecycleFromInt
   , MobileContext(..)
   )
-import HaskellMobile.Locale
+import Hatter.Locale
   ( Language(..)
   , Locale(..)
   , LocaleFailure(..)
@@ -35,7 +35,7 @@ import HaskellMobile.Locale
   , parseLocale
   , localeToText
   )
-import HaskellMobile.I18n
+import Hatter.I18n
   ( Key(..)
   , TranslateFailure(..)
   , translate

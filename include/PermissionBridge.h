@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-/* Permission codes (must match HaskellMobile.Permission) */
+/* Permission codes (must match Hatter.Permission) */
 #define PERMISSION_LOCATION    0
 #define PERMISSION_BLUETOOTH   1
 #define PERMISSION_CAMERA      2
@@ -11,7 +11,7 @@
 #define PERMISSION_CONTACTS    4
 #define PERMISSION_STORAGE     5
 
-/* Permission status codes (must match HaskellMobile.Permission) */
+/* Permission status codes (must match Hatter.Permission) */
 #define PERMISSION_GRANTED     0
 #define PERMISSION_DENIED      1
 

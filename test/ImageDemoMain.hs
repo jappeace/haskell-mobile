@@ -7,8 +7,8 @@ module Main where
 
 import Data.ByteString qualified as BS
 import Foreign.Ptr (Ptr)
-import HaskellMobile (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext, newActionState)
-import HaskellMobile.Widget (ImageConfig(..), ImageSource(..), ResourceName(..), ScaleType(..), TextConfig(..), Widget(..))
+import Hatter (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext, newActionState)
+import Hatter.Widget (ImageConfig(..), ImageSource(..), ResourceName(..), ScaleType(..), TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do

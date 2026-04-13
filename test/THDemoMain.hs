@@ -10,8 +10,8 @@ module Main where
 import Data.Text (pack)
 import Foreign.Ptr (Ptr)
 import THConsumer (thGreeting)
-import HaskellMobile (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext, newActionState)
-import HaskellMobile.Widget (TextConfig(..), Widget(..))
+import Hatter (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext, newActionState)
+import Hatter.Widget (TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do

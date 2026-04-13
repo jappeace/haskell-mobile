@@ -7,5 +7,5 @@ in
 lib.mkSimulatorApp {
   inherit iosLib;
   iosSrc = ../ios;
-  name = "haskell-mobile-simulator-app";
+  name = "hatter-simulator-app";
 }

@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-/* Bottom sheet action codes (must match HaskellMobile.BottomSheet) */
+/* Bottom sheet action codes (must match Hatter.BottomSheet) */
 #define BOTTOM_SHEET_DISMISSED -1
 /* actionCode >= 0: 0-based index of the selected item */
 

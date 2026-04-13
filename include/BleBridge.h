@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-/* BLE adapter status codes (must match HaskellMobile.Ble) */
+/* BLE adapter status codes (must match Hatter.Ble) */
 #define BLE_ADAPTER_OFF          0
 #define BLE_ADAPTER_ON           1
 #define BLE_ADAPTER_UNAUTHORIZED 2

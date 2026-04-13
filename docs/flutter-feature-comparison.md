@@ -1,12 +1,12 @@
-# Flutter Feature Comparison with haskell-mobile
+# Flutter Feature Comparison with hatter
 
-A feature-by-feature comparison of Flutter's capabilities against what haskell-mobile currently supports. This serves as both a gap analysis and a roadmap reference.
+A feature-by-feature comparison of Flutter's capabilities against what hatter currently supports. This serves as both a gap analysis and a roadmap reference.
 
 ---
 
 ## Feature Matrix
 
-| # | Feature Area | Flutter | haskell-mobile | Gap |
+| # | Feature Area | Flutter | hatter | Gap |
 |---|---|---|---|---|
 | 1 | [Widgets (basic)](#1-basic-widgets) | ~180 built-in widgets | 8 widget types | Large |
 | 2 | [Layout system](#2-layout-system) | Constraint-based, Flex, Stack, Grid, Sliver | Column, Row, ScrollView | Large |
@@ -37,7 +37,7 @@ A feature-by-feature comparison of Flutter's capabilities against what haskell-m
 
 **Flutter** provides ~180 built-in widgets organized into categories: layout, text, input, display, scrolling, dialog, navigation, and platform-adaptive (Material and Cupertino). Core examples: `Container`, `Text`, `Image`, `Icon`, `Card`, `Chip`, `Divider`, `Checkbox`, `Radio`, `Switch`, `Slider`, `DropdownButton`, `PopupMenu`, `BottomSheet`, `Dialog`, `Scaffold`, `AppBar`, `TabBar`, `Drawer`, `FloatingActionButton`.
 
-**haskell-mobile** has 8 widget constructors:
+**hatter** has 8 widget constructors:
 
 | Widget | Description |
 |---|---|
@@ -68,7 +68,7 @@ A feature-by-feature comparison of Flutter's capabilities against what haskell-m
 - `Padding`, `Center`, `Align` -- positioning modifiers
 - `AspectRatio`, `FittedBox`, `IntrinsicWidth/Height` -- sizing utilities
 
-**haskell-mobile** has:
+**hatter** has:
 
 - `Column [Widget]` -- vertical stacking
 - `Row [Widget]` -- horizontal stacking
@@ -93,7 +93,7 @@ No flex weights, no alignment control on containers, no stacking/overlapping, no
 - Custom fonts loaded from assets
 - Right-to-left text support
 
-**haskell-mobile** supports:
+**hatter** supports:
 - `Text TextConfig` with `FontConfig` containing `fontSize`
 - Text color via `wsTextColor` in `WidgetStyle`
 - Text alignment (`AlignStart`, `AlignCenter`, `AlignEnd`)
@@ -116,7 +116,7 @@ No flex weights, no alignment control on containers, no stacking/overlapping, no
 - `MouseRegion` (hover, enter, exit)
 - `AbsorbPointer` / `IgnorePointer` (event blocking)
 
-**haskell-mobile** supports:
+**hatter** supports:
 - `Button` with `IO ()` click callback
 - `TextInput` with `tiOnChange :: Text -> IO ()` callback, controlled value, hint text
 - Two keyboard types: `InputText`, `InputNumber`
@@ -140,7 +140,7 @@ No flex weights, no alignment control on containers, no stacking/overlapping, no
 - Scroll controllers, scroll physics, scroll notifications
 - Estimated total scroll extent for scroll bar accuracy
 
-**haskell-mobile** supports:
+**hatter** supports:
 - `ScrollView [Widget]` -- vertically scrollable container with all children built eagerly
 
 **Gap**: No lazy list construction (all items built on every render), no grid scrolling, no horizontal scrolling, no scroll controllers, no pull-to-refresh, no reorderable lists, no slivers, no pagination.
@@ -160,7 +160,7 @@ No flex weights, no alignment control on containers, no stacking/overlapping, no
 - Dialog/modal/bottom sheet presentation
 - `WillPopScope` / `PopScope` for back-button interception
 
-**haskell-mobile** has no navigation system. The app is a single `maView :: UserState -> IO Widget` function. To simulate multiple screens, the user would need to manage screen state manually and branch in the view function.
+**hatter** has no navigation system. The app is a single `maView :: UserState -> IO Widget` function. To simulate multiple screens, the user would need to manage screen state manually and branch in the view function.
 
 **Gap**: No navigation stack, no route management, no deep linking, no screen transitions, no modal presentation.
 
@@ -179,7 +179,7 @@ No flex weights, no alignment control on containers, no stacking/overlapping, no
 - **Rive** support for interactive vector animations
 - Frame-accurate vsync-driven animation at 60/120fps
 
-**haskell-mobile** has no animation support. The rendering model is full clear-and-rebuild on each event-triggered re-render. There is no concept of frame-by-frame updates, interpolation, or timed transitions.
+**hatter** has no animation support. The rendering model is full clear-and-rebuild on each event-triggered re-render. There is no concept of frame-by-frame updates, interpolation, or timed transitions.
 
 **Gap**: Complete. No animation of any kind.
 
@@ -198,7 +198,7 @@ No flex weights, no alignment control on containers, no stacking/overlapping, no
 - `ColorScheme` with semantic color roles
 - Platform-adaptive styling (`Platform.isIOS`)
 
-**haskell-mobile** supports via `WidgetStyle`:
+**hatter** supports via `WidgetStyle`:
 - `wsPadding :: Double` -- uniform padding
 - `wsTextAlign :: TextAlignment` -- start, center, end
 - `wsTextColor :: Color` -- 8-bit RGBA
@@ -229,7 +229,7 @@ Applied via `Styled WidgetStyle Widget` wrapper.
 - `FilterQuality` for sampling
 - `ColorFilter`, `ImageFilter` for effects
 
-**haskell-mobile** supports via `ImageConfig`:
+**hatter** supports via `ImageConfig`:
 - `ImageResource Text` -- platform bundled resource by name
 - `ImageData ByteString` -- raw PNG/JPEG bytes
 - `ImageFile Text` -- file path on disk
@@ -251,7 +251,7 @@ Popular packages: Provider, Riverpod, Bloc/Cubit, GetX, MobX, Redux.
 
 Flutter's key advantage: incremental rebuild. Only the dirty subtree is rebuilt; unchanged subtrees are skipped via element identity matching.
 
-**haskell-mobile**:
+**hatter**:
 - `IORef (Maybe MobileApp)` stores the registered app
 - `RenderState` tracks callback registries (fresh `IntMap` each render)
 - Full re-render of entire widget tree on every event
@@ -271,7 +271,7 @@ The model is simple and correct, but every render rebuilds the entire widget tre
 - 350+ first-party and community plugins on pub.dev
 - Camera, GPS, file picker, share, local notifications, push notifications, biometrics, in-app purchase, maps, web view, sensors, battery, connectivity, device info, etc.
 
-**haskell-mobile** provides:
+**hatter** provides:
 - **Permissions**: Request/check for Location, Bluetooth, Camera, Microphone, Contacts, Storage
 - **Lifecycle events**: Create, Start, Resume, Pause, Stop, Destroy, LowMemory
 - **Locale detection**: `getSystemLocale` via JNI (Android) / system API (iOS)
@@ -296,7 +296,7 @@ All platform integration goes through the C bridge (`UIBridge.h`, `PermissionBri
 - Accessibility guidelines checking (large fonts, sufficient contrast)
 - Traversal ordering
 
-**haskell-mobile** has no explicit accessibility support. Native widgets (Button, TextInput) inherit platform defaults (the button label will be read by TalkBack/VoiceOver), but there are no semantic annotations, no custom labels, no role overrides, no live region support.
+**hatter** has no explicit accessibility support. Native widgets (Button, TextInput) inherit platform defaults (the button label will be read by TalkBack/VoiceOver), but there are no semantic annotations, no custom labels, no role overrides, no live region support.
 
 **Gap**: No semantic annotations, no custom accessibility labels, no traversal control, no screen reader announcements.
 
@@ -316,7 +316,7 @@ All platform integration goes through the C bridge (`UIBridge.h`, `PermissionBri
 - Code generation via `intl_utils` or `gen-l10n`
 - 78+ locales supported out of the box for Material widgets
 
-**haskell-mobile** supports:
+**hatter** supports:
 - `I18n` module with `translate :: Map Locale (Map Key Text) -> Locale -> Key -> Either TranslateFailure Text`
 - Fallback chain: exact locale -> language-only -> error
 - `Locale` type with ISO 639-1 language enum (70+ languages) + optional region
@@ -339,7 +339,7 @@ All platform integration goes through the C bridge (`UIBridge.h`, `PermissionBri
 - `find.byType`, `find.text`, `find.byKey`
 - Mock platform channels
 
-**haskell-mobile** supports:
+**hatter** supports:
 - Unit tests via Tasty (QuickCheck + HUnit)
 - Tests for: FFI dispatch, lifecycle routing, widget rendering (serialization to C bridge calls), callback registration, text input handling, ScrollView rendering, Image widget variants, Styled widget, text alignment, color parsing, locale parsing, i18n translation, permission dispatch, AppContext lifecycle, exception handling
 - Demo apps (counter, scrollview, textinput, permission, image) as smoke tests
@@ -359,7 +359,7 @@ All platform integration goes through the C bridge (`UIBridge.h`, `PermissionBri
 - `const` widgets skip rebuild via identity check
 - O(n) reconciliation only on changed subtrees
 
-**haskell-mobile**:
+**hatter**:
 - Full clear-and-rebuild on every render
 - Callback registry (`IntMap`) is cleared and recreated each render
 - Every widget tree is serialized to C bridge calls from scratch
@@ -373,9 +373,9 @@ All platform integration goes through the C bridge (`UIBridge.h`, `PermissionBri
 
 **Flutter**: Android, iOS, web (CanvasKit/HTML), macOS, Windows, Linux -- all from one codebase.
 
-**haskell-mobile**: Android (APK via Kotlin/JNI), iOS (static library linked into Xcode), watchOS (Swift bridge), desktop (GHC executable for testing).
+**hatter**: Android (APK via Kotlin/JNI), iOS (static library linked into Xcode), watchOS (Swift bridge), desktop (GHC executable for testing).
 
-**Gap**: Small. haskell-mobile covers the key mobile targets. No web support, but that is a different problem space. watchOS support is a unique advantage that Flutter lacks (Flutter has no watchOS target).
+**Gap**: Small. hatter covers the key mobile targets. No web support, but that is a different problem space. watchOS support is a unique advantage that Flutter lacks (Flutter has no watchOS target).
 
 ---
 
@@ -383,7 +383,7 @@ All platform integration goes through the C bridge (`UIBridge.h`, `PermissionBri
 
 **Flutter**: Sub-second hot reload preserving app state. The Dart VM injects updated source code into the running isolate, the framework re-runs `build()` on affected widgets, and the UI updates immediately. Hot restart (full restart without state preservation) is also available.
 
-**haskell-mobile**: No hot reload. Changes require recompilation (which involves cross-compilation via Nix for mobile targets) and redeployment to the device. Development iteration uses the desktop target for faster feedback.
+**hatter**: No hot reload. Changes require recompilation (which involves cross-compilation via Nix for mobile targets) and redeployment to the device. Development iteration uses the desktop target for faster feedback.
 
 **Gap**: Complete. GHC does not support injecting code into a running process. The desktop build target partially mitigates this for logic iteration but not for UI testing on device.
 
@@ -393,7 +393,7 @@ All platform integration goes through the C bridge (`UIBridge.h`, `PermissionBri
 
 **Flutter**: `CustomPainter` provides a `Canvas` API for arbitrary 2D drawing: lines, arcs, paths, text, images, gradients, shadows, blend modes, clip regions. Used for charts, custom shapes, games, signatures. Also supports fragment shaders via `FragmentProgram`.
 
-**haskell-mobile**: No custom painting. All rendering is through the predefined widget types.
+**hatter**: No custom painting. All rendering is through the predefined widget types.
 
 **Gap**: Complete. Adding a canvas/paint API would require significant bridge work.
 
@@ -403,7 +403,7 @@ All platform integration goes through the C bridge (`UIBridge.h`, `PermissionBri
 
 **Flutter**: `Form` widget groups `TextFormField` widgets. `TextFormField` has `validator` callback returning error string or null. `Form.validate()` runs all validators. `TextEditingController` for programmatic text access. `InputDecoration` for labels, hints, error text, prefixes, suffixes, icons. `FocusNode` for focus management between fields.
 
-**haskell-mobile**: `TextInput` with controlled value (`tiValue`), change callback (`tiOnChange`), hint text (`tiHint`), and keyboard type. No validation, no error display, no form grouping, no focus control.
+**hatter**: `TextInput` with controlled value (`tiValue`), change callback (`tiOnChange`), hint text (`tiHint`), and keyboard type. No validation, no error display, no form grouping, no focus control.
 
 **Gap**: No validation framework, no error display on inputs, no form grouping, no focus management.
 
@@ -413,15 +413,15 @@ All platform integration goes through the C bridge (`UIBridge.h`, `PermissionBri
 
 **Flutter**: The `http` package provides HTTP client. `dio` adds interceptors, retry, upload progress. `web_socket_channel` for WebSockets. `grpc` for gRPC. All async via Dart futures/streams.
 
-**haskell-mobile**: No networking in the framework. Users bring their own (e.g., `http-client`, `req`, `network`). This is arguably the correct approach -- networking is not a UI framework concern.
+**hatter**: No networking in the framework. Users bring their own (e.g., `http-client`, `req`, `network`). This is arguably the correct approach -- networking is not a UI framework concern.
 
 **Gap**: N/A. Not a framework responsibility, but Flutter's ecosystem makes it seamless.
 
 ---
 
-## Summary: Where haskell-mobile Stands
+## Summary: Where hatter Stands
 
-### What haskell-mobile does well
+### What hatter does well
 
 1. **Type safety** -- The widget tree is an algebraic data type. Invalid widget compositions are compile errors.
 2. **Simplicity** -- The entire framework is small enough to understand in a single sitting.

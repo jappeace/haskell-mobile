@@ -17,7 +17,7 @@ let
   };
 in
 lib.mkIOSLib {
-  haskellMobileSrc = ../.;
+  hatterSrc = ../.;
   inherit mainModule simulator;
   crossDeps = iosDeps;
 }

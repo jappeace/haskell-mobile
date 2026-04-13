@@ -7,7 +7,7 @@ module Main where
 
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Foreign.Ptr (Ptr)
-import HaskellMobile
+import Hatter
   ( MobileApp(..)
   , Action
   , AuthSessionResult(..)
@@ -22,8 +22,8 @@ import HaskellMobile
   , runActionM
   , createAction
   )
-import HaskellMobile.AppContext (AppContext(..))
-import HaskellMobile.Widget
+import Hatter.AppContext (AppContext(..))
+import Hatter.Widget
   ( ButtonConfig(..)
   , TextConfig(..)
   , Widget(..)
@@ -38,8 +38,8 @@ main = do
     createAction $ do
       Just authState <- readIORef authStateRef
       startAuthSession authState
-        "https://example.com/auth?client_id=demo&redirect_uri=haskellmobile://callback"
-        "haskellmobile"
+        "https://example.com/auth?client_id=demo&redirect_uri=hatter://callback"
+        "hatter"
         (\result -> case result of
           AuthSessionSuccess redirectUrl ->
             platformLog ("AuthSession success: " <> redirectUrl)

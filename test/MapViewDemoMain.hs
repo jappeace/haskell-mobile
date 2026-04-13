@@ -7,7 +7,7 @@ module Main where
 
 import Data.Text (pack)
 import Foreign.Ptr (Ptr)
-import HaskellMobile
+import Hatter
   ( MobileApp(..)
   , UserState
   , OnChange
@@ -19,7 +19,7 @@ import HaskellMobile
   , runActionM
   , createOnChange
   )
-import HaskellMobile.Widget
+import Hatter.Widget
   ( MapViewConfig(..)
   , TextConfig(..)
   , Widget(..)

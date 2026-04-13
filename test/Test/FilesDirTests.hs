@@ -10,7 +10,7 @@ import Test.Tasty.HUnit
 import Foreign.C.String (CString, newCString)
 import System.Directory (removeFile, getTemporaryDirectory)
 import System.FilePath ((</>))
-import HaskellMobile.FilesDir (getAppFilesDir)
+import Hatter.FilesDir (getAppFilesDir)
 
 foreign import ccall "setAppFilesDir" c_setAppFilesDir :: CString -> IO ()
 

@@ -22,7 +22,7 @@ let
 in
   pkgs.runCommand "readme-example-typecheck" {
     nativeBuildInputs = [
-      (hpkgs.ghcWithPackages (p: [ p.haskell-mobile-project ]))
+      (hpkgs.ghcWithPackages (p: [ p.hatter-project ]))
     ];
   } ''
     cp ${extractedMain} Main.hs

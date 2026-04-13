@@ -11,7 +11,7 @@ import Control.Exception (SomeException, try)
 import Data.Text (pack)
 import Foreign.Ptr (Ptr)
 import System.FilePath ((</>))
-import HaskellMobile
+import Hatter
   ( MobileApp(..)
   , AppContext
   , startMobileApp
@@ -20,7 +20,7 @@ import HaskellMobile
   , loggingMobileContext
   , newActionState
   )
-import HaskellMobile.Widget (TextConfig(..), Widget(..))
+import Hatter.Widget (TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do

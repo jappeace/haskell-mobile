@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-/* Secure storage status codes (must match HaskellMobile.SecureStorage) */
+/* Secure storage status codes (must match Hatter.SecureStorage) */
 #define SECURE_STORAGE_SUCCESS    0
 #define SECURE_STORAGE_NOT_FOUND  1
 #define SECURE_STORAGE_ERROR      2

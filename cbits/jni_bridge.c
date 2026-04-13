@@ -2,7 +2,7 @@
  * JNI bridge between Android Java and Haskell FFI exports.
  *
  * This file is compiled by NDK clang (not cabal), and linked into
- * libhaskellmobile.so alongside the Haskell static library.
+ * libhatter.so alongside the Haskell static library.
  *
  * The Java package name is controlled by -DJNI_PACKAGE at compile time;
  * see include/JniBridge.h for defaults.
@@ -32,7 +32,7 @@ extern void *haskellRunMain(void);
 /* Locale detection (cbits/locale.c) */
 extern void setSystemLocale(const char *locale);
 
-/* Log detected locale from Haskell (HaskellMobile.Locale) */
+/* Log detected locale from Haskell (Hatter.Locale) */
 extern void haskellLogLocale(void);
 
 /* App files directory (cbits/files_dir.c) */
@@ -103,7 +103,7 @@ extern void setup_android_network_status_bridge(JNIEnv *env, jobject activity, v
 /* Android animation bridge (from animation_bridge_android.c) */
 extern void setup_android_animation_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
 
-/* Lifecycle event codes (must match HaskellMobile.h) */
+/* Lifecycle event codes (must match Hatter.h) */
 #define LIFECYCLE_CREATE     0
 #define LIFECYCLE_START      1
 #define LIFECYCLE_RESUME     2

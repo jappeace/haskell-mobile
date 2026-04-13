@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-The haskell-mobile project uses **~20 distinct workarounds** in its Nix build system to cross-compile Haskell to Android, iOS, and watchOS. These fall into categories that reveal fundamental gaps in both GHC and Cabal's cross-compilation story. The core problem: **Cabal was designed for native builds and has never been seriously adapted for mobile cross-compilation**.
+The hatter project uses **~20 distinct workarounds** in its Nix build system to cross-compile Haskell to Android, iOS, and watchOS. These fall into categories that reveal fundamental gaps in both GHC and Cabal's cross-compilation story. The core problem: **Cabal was designed for native builds and has never been seriously adapted for mobile cross-compilation**.
 
 ---
 
@@ -18,7 +18,7 @@ The haskell-mobile project uses **~20 distinct workarounds** in its Nix build sy
 
 ### 2. `Setup.hs` Compiled with Cross-Compiler ([cabal#1493](https://github.com/haskell/cabal/issues/1493), [cabal#2085](https://github.com/haskell/cabal/issues/2085))
 
-**The hack:** haskell-mobile only works because its dependencies happen to use `build-type: Simple`. If any dependency used `build-type: Custom`, the build would fail entirely.
+**The hack:** hatter only works because its dependencies happen to use `build-type: Simple`. If any dependency used `build-type: Custom`, the build would fail entirely.
 
 **The problem:** Cabal compiles `Setup.hs` with whatever GHC is configured. If that's a cross-compiler, the resulting `Setup` binary targets ARM and can't run on the x86 build machine. There is no `--with-build-ghc` flag.
 
@@ -50,7 +50,7 @@ The haskell-mobile project uses **~20 distinct workarounds** in its Nix build sy
 
 ### 6. Mach-O Platform Tag Rewriting (mac2ios / mac2watchos)
 
-**The hack:** haskell-mobile includes two custom C programs (`mac2ios.c`, `mac2watchos.c`) that parse Mach-O binaries and rewrite `LC_BUILD_VERSION` from `PLATFORM_MACOS` to `PLATFORM_IOS` or `PLATFORM_WATCHOS`. Every compiled `.a` file goes through this binary patching.
+**The hack:** hatter includes two custom C programs (`mac2ios.c`, `mac2watchos.c`) that parse Mach-O binaries and rewrite `LC_BUILD_VERSION` from `PLATFORM_MACOS` to `PLATFORM_IOS` or `PLATFORM_WATCHOS`. Every compiled `.a` file goes through this binary patching.
 
 **The problem:** GHC on macOS always produces macOS-tagged binaries, even when the output is intended for iOS/watchOS. Apple's Xcode linker rejects macOS-tagged objects when building iOS apps.
 
@@ -98,7 +98,7 @@ Template Haskell splices execute code at compile time on the **build machine**, 
 
 **Current workaround:** GHC's `-fexternal-interpreter` with `iserv-proxy` + `remote-iserv`, delegating TH evaluation to an emulator (QEMU for Android, iOS Simulator for iOS). This works but is slow and fragile.
 
-**haskell-mobile's approach:** Avoid TH entirely. The project and its dependencies don't use Template Haskell, sidestepping the problem. This limits which Hackage packages can be used as dependencies.
+**hatter's approach:** Avoid TH entirely. The project and its dependencies don't use Template Haskell, sidestepping the problem. This limits which Hackage packages can be used as dependencies.
 
 ---
 
@@ -108,13 +108,13 @@ Template Haskell splices execute code at compile time on the **build machine**, 
 
 The most prominent production Haskell app on Android/iOS. Uses **haskell.nix** (not plain nixpkgs) for cross-compilation infrastructure. Ships `libsimplex.so` via `ghc -shared` with static linking. Maintains custom forks of several Hackage packages for Android compatibility.
 
-### haskell-mobile (this project)
+### hatter (this project)
 
 Uses **plain nixpkgs** (not haskell.nix) with `pkgsCross.aarch64-android-prebuilt`. Simpler but requires more manual workarounds. The Nix code in `nix/lib.nix` is essentially a hand-written cross-compilation build system.
 
 ---
 
-## Priority Ranking: What Would Help haskell-mobile Most
+## Priority Ranking: What Would Help hatter Most
 
 1. **`foreign-library standalone` on all platforms** -- eliminates the entire `--whole-archive` / `libtool -static` / boot library discovery machinery (~40% of Nix build code)
 2. **Build/host tool distinction in cabal** -- eliminates `Setup.hs` problem and `hsc2hs` propagation hacks
@@ -147,4 +147,4 @@ Uses **plain nixpkgs** (not haskell.nix) with `pkgsCross.aarch64-android-prebuil
 
 ## Conclusion
 
-**Nix is doing the job of a cross-compilation-aware build system because cabal isn't one.** Every hack in haskell-mobile exists because cabal assumes you're building natively and GHC assumes the target has a full POSIX environment. The most impactful single change would be making `foreign-library standalone` work on Linux/macOS, which would eliminate roughly 40% of the Nix build infrastructure.
+**Nix is doing the job of a cross-compilation-aware build system because cabal isn't one.** Every hack in hatter exists because cabal assumes you're building natively and GHC assumes the target has a full POSIX environment. The most impactful single change would be making `foreign-library standalone` work on Linux/macOS, which would eliminate roughly 40% of the Nix build infrastructure.

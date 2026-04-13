@@ -13,7 +13,7 @@ let
   };
 in
 lib.mkWatchOSLib {
-  haskellMobileSrc = ../.;
+  hatterSrc = ../.;
   inherit mainModule simulator;
   crossDeps = iosDeps;
 }

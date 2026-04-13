@@ -8,8 +8,8 @@ module Main where
 import Data.IORef (IORef, newIORef, readIORef, modifyIORef')
 import Data.Text qualified as Text
 import Foreign.Ptr (Ptr)
-import HaskellMobile (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext, newActionState, runActionM, createAction, Action)
-import HaskellMobile.Widget (ButtonConfig(..), Color(..), FontConfig(..), TextAlignment(..), TextConfig(..), Widget(..), WidgetStyle(..))
+import Hatter (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext, newActionState, runActionM, createAction, Action)
+import Hatter.Widget (ButtonConfig(..), Color(..), FontConfig(..), TextAlignment(..), TextConfig(..), Widget(..), WidgetStyle(..))
 
 main :: IO (Ptr AppContext)
 main = do

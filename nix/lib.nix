@@ -1,4 +1,4 @@
-# Reusable builder functions for haskell-mobile based projects.
+# Reusable builder functions for hatter based projects.
 #
 # Returns an attrset of 6 builder functions:
 #   mkAndroidLib       — cross-compile Haskell to .so for Android (aarch64 or armv7a)
@@ -10,7 +10,7 @@
 #
 # Usage:
 #   let lib = import ./lib.nix { sources = import ../npins; };
-#   in lib.mkAndroidLib { haskellMobileSrc = ../.; mainModule = ../test/ScrollDemoMain.hs; }
+#   in lib.mkAndroidLib { hatterSrc = ../.; mainModule = ../test/ScrollDemoMain.hs; }
 { sources, androidArch ? "aarch64" }:
 let
   archConfig = {
@@ -75,11 +75,11 @@ in {
   # mkAndroidLib: Cross-compile Haskell to shared .so for Android (aarch64/armv7a)
   # ---------------------------------------------------------------------------
   mkAndroidLib =
-    { haskellMobileSrc
+    { hatterSrc
     , mainModule
-    , pname ? "haskell-mobile-android"
-    , soName ? "libhaskellmobile.so"
-    , javaPackageName ? "me.jappie.haskellmobile"
+    , pname ? "hatter-android"
+    , soName ? "libhatter.so"
+    , javaPackageName ? "me.jappie.hatter"
     , extraJniBridge ? []
     , extraNdkCompile ? (_: _: "")
     , extraModuleCopy ? ""
@@ -105,7 +105,7 @@ in {
       inherit pname;
       version = "0.1.0.0";
 
-      src = haskellMobileSrc + "/src";
+      src = hatterSrc + "/src";
 
       nativeBuildInputs = [ ghc ];
       buildInputs = [ androidPkgs.libffi androidPkgs.gmp ];
@@ -120,16 +120,16 @@ in {
         echo "RTS include: $RTS_INCLUDE"
 
         # Step 1: Compile JNI bridge and Android UI bridge with NDK clang
-        # Core library C files always use me_jappie_haskellmobile because
-        # native methods are declared on HaskellMobileActivity (the library's
+        # Core library C files always use me_jappie_hatter because
+        # native methods are declared on HatterActivity (the library's
         # own class), not the consumer's subclass.
         ${ndkCc} -c -fPIC \
-          -DJNI_PACKAGE=me_jappie_haskellmobile \
+          -DJNI_PACKAGE=me_jappie_hatter \
           -I${sysroot}/usr/include \
           -I$RTS_INCLUDE \
-          -I${haskellMobileSrc}/include \
+          -I${hatterSrc}/include \
           -o jni_bridge.o \
-          ${haskellMobileSrc}/cbits/jni_bridge.c
+          ${hatterSrc}/cbits/jni_bridge.c
 
         ${ndkCc} -c -fPIC \
           ${if dynamicNodePool then "-DDYNAMIC_NODE_POOL"
@@ -137,97 +137,97 @@ in {
             else ""} \
           -I${sysroot}/usr/include \
           -I$RTS_INCLUDE \
-          -I${haskellMobileSrc}/include \
+          -I${hatterSrc}/include \
           -o ui_bridge_android.o \
-          ${haskellMobileSrc}/cbits/ui_bridge_android.c
+          ${hatterSrc}/cbits/ui_bridge_android.c
 
         ${ndkCc} -c -fPIC \
-          -DJNI_PACKAGE=me_jappie_haskellmobile \
+          -DJNI_PACKAGE=me_jappie_hatter \
           -I${sysroot}/usr/include \
           -I$RTS_INCLUDE \
-          -I${haskellMobileSrc}/include \
+          -I${hatterSrc}/include \
           -o permission_bridge_android.o \
-          ${haskellMobileSrc}/cbits/permission_bridge_android.c
+          ${hatterSrc}/cbits/permission_bridge_android.c
 
         ${ndkCc} -c -fPIC \
-          -DJNI_PACKAGE=me_jappie_haskellmobile \
+          -DJNI_PACKAGE=me_jappie_hatter \
           -I${sysroot}/usr/include \
           -I$RTS_INCLUDE \
-          -I${haskellMobileSrc}/include \
+          -I${hatterSrc}/include \
           -o secure_storage_android.o \
-          ${haskellMobileSrc}/cbits/secure_storage_android.c
+          ${hatterSrc}/cbits/secure_storage_android.c
 
         ${ndkCc} -c -fPIC \
-          -DJNI_PACKAGE=me_jappie_haskellmobile \
+          -DJNI_PACKAGE=me_jappie_hatter \
           -I${sysroot}/usr/include \
           -I$RTS_INCLUDE \
-          -I${haskellMobileSrc}/include \
+          -I${hatterSrc}/include \
           -o ble_bridge_android.o \
-          ${haskellMobileSrc}/cbits/ble_bridge_android.c
+          ${hatterSrc}/cbits/ble_bridge_android.c
 
         ${ndkCc} -c -fPIC \
-          -DJNI_PACKAGE=me_jappie_haskellmobile \
+          -DJNI_PACKAGE=me_jappie_hatter \
           -I${sysroot}/usr/include \
           -I$RTS_INCLUDE \
-          -I${haskellMobileSrc}/include \
+          -I${hatterSrc}/include \
           -o dialog_bridge_android.o \
-          ${haskellMobileSrc}/cbits/dialog_bridge_android.c
+          ${hatterSrc}/cbits/dialog_bridge_android.c
 
         ${ndkCc} -c -fPIC \
-          -DJNI_PACKAGE=me_jappie_haskellmobile \
+          -DJNI_PACKAGE=me_jappie_hatter \
           -I${sysroot}/usr/include \
           -I$RTS_INCLUDE \
-          -I${haskellMobileSrc}/include \
+          -I${hatterSrc}/include \
           -o location_bridge_android.o \
-          ${haskellMobileSrc}/cbits/location_bridge_android.c
+          ${hatterSrc}/cbits/location_bridge_android.c
 
         ${ndkCc} -c -fPIC \
-          -DJNI_PACKAGE=me_jappie_haskellmobile \
+          -DJNI_PACKAGE=me_jappie_hatter \
           -I${sysroot}/usr/include \
           -I$RTS_INCLUDE \
-          -I${haskellMobileSrc}/include \
+          -I${hatterSrc}/include \
           -o auth_session_android.o \
-          ${haskellMobileSrc}/cbits/auth_session_android.c
+          ${hatterSrc}/cbits/auth_session_android.c
 
         ${ndkCc} -c -fPIC \
-          -DJNI_PACKAGE=me_jappie_haskellmobile \
+          -DJNI_PACKAGE=me_jappie_hatter \
           -I${sysroot}/usr/include \
           -I$RTS_INCLUDE \
-          -I${haskellMobileSrc}/include \
+          -I${hatterSrc}/include \
           -o camera_bridge_android.o \
-          ${haskellMobileSrc}/cbits/camera_bridge_android.c
+          ${hatterSrc}/cbits/camera_bridge_android.c
 
         ${ndkCc} -c -fPIC \
-          -DJNI_PACKAGE=me_jappie_haskellmobile \
+          -DJNI_PACKAGE=me_jappie_hatter \
           -I${sysroot}/usr/include \
           -I$RTS_INCLUDE \
-          -I${haskellMobileSrc}/include \
+          -I${hatterSrc}/include \
           -o bottom_sheet_android.o \
-          ${haskellMobileSrc}/cbits/bottom_sheet_android.c
+          ${hatterSrc}/cbits/bottom_sheet_android.c
 
         ${ndkCc} -c -fPIC \
-          -DJNI_PACKAGE=me_jappie_haskellmobile \
+          -DJNI_PACKAGE=me_jappie_hatter \
           -I${sysroot}/usr/include \
           -I$RTS_INCLUDE \
-          -I${haskellMobileSrc}/include \
+          -I${hatterSrc}/include \
           -o http_bridge_android.o \
-          ${haskellMobileSrc}/cbits/http_bridge_android.c
+          ${hatterSrc}/cbits/http_bridge_android.c
 
         ${ndkCc} -c -fPIC \
-          -DJNI_PACKAGE=me_jappie_haskellmobile \
+          -DJNI_PACKAGE=me_jappie_hatter \
           -I${sysroot}/usr/include \
           -I$RTS_INCLUDE \
-          -I${haskellMobileSrc}/include \
+          -I${hatterSrc}/include \
           -o network_status_android.o \
-          ${haskellMobileSrc}/cbits/network_status_android.c
+          ${hatterSrc}/cbits/network_status_android.c
 
         ${ndkCc} -c -fPIC \
-          -DJNI_PACKAGE=me_jappie_haskellmobile \
+          -DJNI_PACKAGE=me_jappie_hatter \
           -I${sysroot}/usr/include \
           -I$RTS_INCLUDE \
-          -I${haskellMobileSrc}/include \
+          -I${hatterSrc}/include \
           -o animation_bridge_android.o \
-          ${haskellMobileSrc}/cbits/animation_bridge_android.c
+          ${hatterSrc}/cbits/animation_bridge_android.c
 
         # Compile extra JNI bridge sources (consumer-specific JNI methods)
         ${builtins.concatStringsSep "\n" (builtins.genList (i:
@@ -239,7 +239,7 @@ in {
           -DJNI_PACKAGE=${jniPackageMacro} \
           -I${sysroot}/usr/include \
           -I$RTS_INCLUDE \
-          -I${haskellMobileSrc}/include \
+          -I${hatterSrc}/include \
           -o ${oName} \
           ${src}
           '') (builtins.length extraJniBridge))}
@@ -250,28 +250,28 @@ in {
         # Step 2: Copy source modules into writable build directory.
         # GHC writes _stub.h files next to sources, so they can't live in
         # the read-only nix store.
-        mkdir -p HaskellMobile
-        cp ${haskellMobileSrc}/src/HaskellMobile/Types.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Lifecycle.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Widget.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/UIBridge.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Render.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Locale.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/I18n.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Permission.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/SecureStorage.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Ble.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Dialog.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Location.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/AuthSession.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Camera.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/BottomSheet.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Http.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/NetworkStatus.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/AppContext.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Animation.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/FilesDir.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile.hs .
+        mkdir -p Hatter
+        cp ${hatterSrc}/src/Hatter/Types.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Lifecycle.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Widget.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/UIBridge.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Render.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Locale.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/I18n.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Permission.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/SecureStorage.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Ble.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Dialog.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Location.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/AuthSession.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Camera.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/BottomSheet.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Http.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/NetworkStatus.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/AppContext.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Animation.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/FilesDir.hs Hatter/
+        cp ${hatterSrc}/src/Hatter.hs .
 
         # Extra module copies (consumer overrides, additional modules)
         ${extraModuleCopy}
@@ -285,29 +285,29 @@ in {
         # load them during Template Haskell evaluation (the C bridge
         # files reference Haskell FFI exports that iserv can't resolve).
         mkdir -p cbits
-        cp ${haskellMobileSrc}/cbits/android_stubs.c cbits/
-        cp ${haskellMobileSrc}/cbits/platform_log.c cbits/
-        cp ${haskellMobileSrc}/cbits/numa_stubs.c cbits/
-        cp ${haskellMobileSrc}/cbits/ui_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/run_main.c cbits/
-        cp ${haskellMobileSrc}/cbits/locale.c cbits/
-        cp ${haskellMobileSrc}/cbits/permission_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/secure_storage_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/ble_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/dialog_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/location_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/auth_session_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/camera_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/bottom_sheet_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/http_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/network_status_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/animation_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/files_dir.c cbits/
+        cp ${hatterSrc}/cbits/android_stubs.c cbits/
+        cp ${hatterSrc}/cbits/platform_log.c cbits/
+        cp ${hatterSrc}/cbits/numa_stubs.c cbits/
+        cp ${hatterSrc}/cbits/ui_bridge.c cbits/
+        cp ${hatterSrc}/cbits/run_main.c cbits/
+        cp ${hatterSrc}/cbits/locale.c cbits/
+        cp ${hatterSrc}/cbits/permission_bridge.c cbits/
+        cp ${hatterSrc}/cbits/secure_storage_bridge.c cbits/
+        cp ${hatterSrc}/cbits/ble_bridge.c cbits/
+        cp ${hatterSrc}/cbits/dialog_bridge.c cbits/
+        cp ${hatterSrc}/cbits/location_bridge.c cbits/
+        cp ${hatterSrc}/cbits/auth_session_bridge.c cbits/
+        cp ${hatterSrc}/cbits/camera_bridge.c cbits/
+        cp ${hatterSrc}/cbits/bottom_sheet_bridge.c cbits/
+        cp ${hatterSrc}/cbits/http_bridge.c cbits/
+        cp ${hatterSrc}/cbits/network_status_bridge.c cbits/
+        cp ${hatterSrc}/cbits/animation_bridge.c cbits/
+        cp ${hatterSrc}/cbits/files_dir.c cbits/
 
         echo "=== Compiling C bridge files with cross-GHC ==="
         for cfile in cbits/*.c; do
           echo "  $cfile"
-          ${ghcCmd} -c -I${haskellMobileSrc}/include "$cfile"
+          ${ghcCmd} -c -I${hatterSrc}/include "$cfile"
         done
 
         # Step 4: Compile Haskell to shared library with cross-GHC.
@@ -349,13 +349,13 @@ in {
 
         ${ghcCmd} -shared -O2 \
           -o ${soName} \
-          -I${haskellMobileSrc}/include \
+          -I${hatterSrc}/include \
           ${builtins.concatStringsSep " " (map (d: "-I${d}") extraGhcIncludeDirs)} \
           ${if crossDeps != null then "-package-db ${crossDeps}/pkgdb -i${crossDeps}/hi" else ""} \
           ${thFlags} \
           ${builtins.concatStringsSep " " extraGhcFlags} \
           Main.hs \
-          HaskellMobile.hs \
+          Hatter.hs \
           -optl-L${androidPkgs.gmp}/lib \
           -optl-L${androidPkgs.libffi}/lib \
           -optl-lffi \
@@ -469,7 +469,7 @@ in {
     { sharedLibs ? null       # list of { lib = <drv>; abiDir = "arm64-v8a"; }
     , sharedLib ? null        # backward compat: single lib drv (assumes arm64-v8a)
     , androidSrc
-    , baseJavaSrc ? null      # path to haskell-mobile's android/java/ for consumer APKs
+    , baseJavaSrc ? null      # path to hatter's android/java/ for consumer APKs
     , apkName ? "app.apk"
     , name ? "app-apk"
     }:
@@ -571,17 +571,17 @@ in {
   # mkIOSLib: Compile Haskell to static .a for iOS (device or simulator)
   # ---------------------------------------------------------------------------
   mkIOSLib =
-    { haskellMobileSrc
+    { hatterSrc
     , mainModule
     , simulator ? false
-    , pname ? "haskell-mobile-ios"
+    , pname ? "hatter-ios"
     , extraModuleCopy ? ""
     , crossDeps ? null          # output of ios-deps.nix (lib/, hi/, pkgdb/)
     }:
     let
       iosPkgs = import sources.nixpkgs {};
       iosGhc = iosPkgs.haskellPackages.ghc;
-      mac2ios = import (haskellMobileSrc + "/nix/mac2ios.nix") { inherit sources; pkgs = iosPkgs; };
+      mac2ios = import (hatterSrc + "/nix/mac2ios.nix") { inherit sources; pkgs = iosPkgs; };
       gmpStatic = iosPkgs.gmp.overrideAttrs (old: {
         dontDisableStatic = true;
       });
@@ -590,34 +590,34 @@ in {
       inherit pname;
       version = "0.1.0.0";
 
-      src = haskellMobileSrc + "/src";
+      src = hatterSrc + "/src";
 
       nativeBuildInputs = [ iosGhc iosPkgs.cctools ];
       buildInputs = [ iosPkgs.libffi gmpStatic ];
 
       buildPhase = ''
-        mkdir -p HaskellMobile
-        cp ${haskellMobileSrc}/src/HaskellMobile/Types.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Lifecycle.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Widget.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/UIBridge.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Render.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Locale.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/I18n.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Permission.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/SecureStorage.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Ble.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Dialog.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Location.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/AuthSession.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Camera.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/BottomSheet.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Http.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/NetworkStatus.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/AppContext.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Animation.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/FilesDir.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile.hs .
+        mkdir -p Hatter
+        cp ${hatterSrc}/src/Hatter/Types.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Lifecycle.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Widget.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/UIBridge.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Render.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Locale.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/I18n.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Permission.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/SecureStorage.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Ble.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Dialog.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Location.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/AuthSession.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Camera.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/BottomSheet.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Http.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/NetworkStatus.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/AppContext.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Animation.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/FilesDir.hs Hatter/
+        cp ${hatterSrc}/src/Hatter.hs .
 
         # Extra module copies
         ${extraModuleCopy}
@@ -626,27 +626,27 @@ in {
 
         # Copy C sources into writable build dir (GHC writes .o next to them)
         mkdir -p cbits
-        cp ${haskellMobileSrc}/cbits/platform_log.c cbits/
-        cp ${haskellMobileSrc}/cbits/ui_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/run_main.c cbits/
-        cp ${haskellMobileSrc}/cbits/locale.c cbits/
-        cp ${haskellMobileSrc}/cbits/permission_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/secure_storage_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/ble_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/dialog_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/location_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/auth_session_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/camera_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/bottom_sheet_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/http_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/network_status_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/animation_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/files_dir.c cbits/
+        cp ${hatterSrc}/cbits/platform_log.c cbits/
+        cp ${hatterSrc}/cbits/ui_bridge.c cbits/
+        cp ${hatterSrc}/cbits/run_main.c cbits/
+        cp ${hatterSrc}/cbits/locale.c cbits/
+        cp ${hatterSrc}/cbits/permission_bridge.c cbits/
+        cp ${hatterSrc}/cbits/secure_storage_bridge.c cbits/
+        cp ${hatterSrc}/cbits/ble_bridge.c cbits/
+        cp ${hatterSrc}/cbits/dialog_bridge.c cbits/
+        cp ${hatterSrc}/cbits/location_bridge.c cbits/
+        cp ${hatterSrc}/cbits/auth_session_bridge.c cbits/
+        cp ${hatterSrc}/cbits/camera_bridge.c cbits/
+        cp ${hatterSrc}/cbits/bottom_sheet_bridge.c cbits/
+        cp ${hatterSrc}/cbits/http_bridge.c cbits/
+        cp ${hatterSrc}/cbits/network_status_bridge.c cbits/
+        cp ${hatterSrc}/cbits/animation_bridge.c cbits/
+        cp ${hatterSrc}/cbits/files_dir.c cbits/
 
         ghc -staticlib \
           -O2 \
-          -o libHaskellMobile.a \
-          -I${haskellMobileSrc}/include \
+          -o libHatter.a \
+          -I${hatterSrc}/include \
           ${if crossDeps != null then "-package-db ${crossDeps}/pkgdb -i${crossDeps}/hi" else ""} \
           -optl-lffi \
           -optl-Wl,-u,_haskellRunMain \
@@ -684,33 +684,33 @@ in {
           cbits/animation_bridge.c \
           cbits/files_dir.c \
           Main.hs \
-          HaskellMobile.hs
+          Hatter.hs
       '';
 
       installPhase = ''
         mkdir -p $out/lib $out/include
 
-        echo "Merging static archives into libHaskellMobile.a"
-        libtool -static -o libCombined.a libHaskellMobile.a \
+        echo "Merging static archives into libHatter.a"
+        libtool -static -o libCombined.a libHatter.a \
           ${gmpStatic}/lib/libgmp.a \
           ${if crossDeps != null then "${crossDeps}/lib/*.a" else ""}
-        mv libCombined.a libHaskellMobile.a
+        mv libCombined.a libHatter.a
 
-        ${mac2ios}/bin/mac2ios ${if simulator then "-s" else ""} libHaskellMobile.a
-        cp libHaskellMobile.a $out/lib/
-        cp ${haskellMobileSrc}/include/HaskellMobile.h $out/include/HaskellMobile.h
-        cp ${haskellMobileSrc}/include/UIBridge.h $out/include/UIBridge.h
-        cp ${haskellMobileSrc}/include/PermissionBridge.h $out/include/PermissionBridge.h
-        cp ${haskellMobileSrc}/include/SecureStorageBridge.h $out/include/SecureStorageBridge.h
-        cp ${haskellMobileSrc}/include/BleBridge.h $out/include/BleBridge.h
-        cp ${haskellMobileSrc}/include/DialogBridge.h $out/include/DialogBridge.h
-        cp ${haskellMobileSrc}/include/LocationBridge.h $out/include/LocationBridge.h
-        cp ${haskellMobileSrc}/include/AuthSessionBridge.h $out/include/AuthSessionBridge.h
-        cp ${haskellMobileSrc}/include/CameraBridge.h $out/include/CameraBridge.h
-        cp ${haskellMobileSrc}/include/BottomSheetBridge.h $out/include/BottomSheetBridge.h
-        cp ${haskellMobileSrc}/include/HttpBridge.h $out/include/HttpBridge.h
-        cp ${haskellMobileSrc}/include/NetworkStatusBridge.h $out/include/NetworkStatusBridge.h
-        cp ${haskellMobileSrc}/include/AnimationBridge.h $out/include/AnimationBridge.h
+        ${mac2ios}/bin/mac2ios ${if simulator then "-s" else ""} libHatter.a
+        cp libHatter.a $out/lib/
+        cp ${hatterSrc}/include/Hatter.h $out/include/Hatter.h
+        cp ${hatterSrc}/include/UIBridge.h $out/include/UIBridge.h
+        cp ${hatterSrc}/include/PermissionBridge.h $out/include/PermissionBridge.h
+        cp ${hatterSrc}/include/SecureStorageBridge.h $out/include/SecureStorageBridge.h
+        cp ${hatterSrc}/include/BleBridge.h $out/include/BleBridge.h
+        cp ${hatterSrc}/include/DialogBridge.h $out/include/DialogBridge.h
+        cp ${hatterSrc}/include/LocationBridge.h $out/include/LocationBridge.h
+        cp ${hatterSrc}/include/AuthSessionBridge.h $out/include/AuthSessionBridge.h
+        cp ${hatterSrc}/include/CameraBridge.h $out/include/CameraBridge.h
+        cp ${hatterSrc}/include/BottomSheetBridge.h $out/include/BottomSheetBridge.h
+        cp ${hatterSrc}/include/HttpBridge.h $out/include/HttpBridge.h
+        cp ${hatterSrc}/include/NetworkStatusBridge.h $out/include/NetworkStatusBridge.h
+        cp ${hatterSrc}/include/AnimationBridge.h $out/include/AnimationBridge.h
       '';
     };
 
@@ -754,12 +754,12 @@ open(sys.argv[1], "w").write(yml)
       buildPhase = ''
         mkdir -p $out/share/ios/lib $out/share/ios/include
 
-        cp -r ${iosSrc}/HaskellMobile $out/share/ios/
+        cp -r ${iosSrc}/Hatter $out/share/ios/
         cp ${iosSrc}/project.yml $out/share/ios/project.yml
         chmod u+w $out/share/ios/project.yml
 
-        cp ${iosLib}/lib/libHaskellMobile.a $out/share/ios/lib/
-        cp ${iosLib}/include/HaskellMobile.h $out/share/ios/include/
+        cp ${iosLib}/lib/libHatter.a $out/share/ios/lib/
+        cp ${iosLib}/include/Hatter.h $out/share/ios/include/
         cp ${iosLib}/include/UIBridge.h $out/share/ios/include/
         cp ${iosLib}/include/PermissionBridge.h $out/share/ios/include/
         cp ${iosLib}/include/SecureStorageBridge.h $out/share/ios/include/
@@ -782,17 +782,17 @@ open(sys.argv[1], "w").write(yml)
   # mkWatchOSLib: Compile Haskell to static .a for watchOS (device or simulator)
   # ---------------------------------------------------------------------------
   mkWatchOSLib =
-    { haskellMobileSrc
+    { hatterSrc
     , mainModule
     , simulator ? false
-    , pname ? "haskell-mobile-watchos"
+    , pname ? "hatter-watchos"
     , extraModuleCopy ? ""
     , crossDeps ? null          # output of ios-deps.nix (lib/, hi/, pkgdb/)
     }:
     let
       iosPkgs = import sources.nixpkgs {};
       iosGhc = iosPkgs.haskellPackages.ghc;
-      mac2watchos = import (haskellMobileSrc + "/nix/mac2watchos.nix") {
+      mac2watchos = import (hatterSrc + "/nix/mac2watchos.nix") {
         inherit sources; pkgs = iosPkgs;
       };
       gmpStatic = iosPkgs.gmp.overrideAttrs (old: {
@@ -803,34 +803,34 @@ open(sys.argv[1], "w").write(yml)
       inherit pname;
       version = "0.1.0.0";
 
-      src = haskellMobileSrc + "/src";
+      src = hatterSrc + "/src";
 
       nativeBuildInputs = [ iosGhc iosPkgs.cctools ];
       buildInputs = [ iosPkgs.libffi gmpStatic ];
 
       buildPhase = ''
-        mkdir -p HaskellMobile
-        cp ${haskellMobileSrc}/src/HaskellMobile/Types.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Lifecycle.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Widget.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/UIBridge.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Render.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Locale.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/I18n.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Permission.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/SecureStorage.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Ble.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Dialog.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Location.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/AuthSession.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Camera.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/BottomSheet.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Http.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/NetworkStatus.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/AppContext.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/Animation.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile/FilesDir.hs HaskellMobile/
-        cp ${haskellMobileSrc}/src/HaskellMobile.hs .
+        mkdir -p Hatter
+        cp ${hatterSrc}/src/Hatter/Types.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Lifecycle.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Widget.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/UIBridge.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Render.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Locale.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/I18n.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Permission.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/SecureStorage.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Ble.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Dialog.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Location.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/AuthSession.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Camera.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/BottomSheet.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Http.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/NetworkStatus.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/AppContext.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/Animation.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/FilesDir.hs Hatter/
+        cp ${hatterSrc}/src/Hatter.hs .
 
         # Extra module copies
         ${extraModuleCopy}
@@ -839,27 +839,27 @@ open(sys.argv[1], "w").write(yml)
 
         # Copy C sources into writable build dir (GHC writes .o next to them)
         mkdir -p cbits
-        cp ${haskellMobileSrc}/cbits/platform_log.c cbits/
-        cp ${haskellMobileSrc}/cbits/ui_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/run_main.c cbits/
-        cp ${haskellMobileSrc}/cbits/locale.c cbits/
-        cp ${haskellMobileSrc}/cbits/permission_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/secure_storage_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/ble_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/dialog_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/location_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/auth_session_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/camera_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/bottom_sheet_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/http_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/network_status_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/animation_bridge.c cbits/
-        cp ${haskellMobileSrc}/cbits/files_dir.c cbits/
+        cp ${hatterSrc}/cbits/platform_log.c cbits/
+        cp ${hatterSrc}/cbits/ui_bridge.c cbits/
+        cp ${hatterSrc}/cbits/run_main.c cbits/
+        cp ${hatterSrc}/cbits/locale.c cbits/
+        cp ${hatterSrc}/cbits/permission_bridge.c cbits/
+        cp ${hatterSrc}/cbits/secure_storage_bridge.c cbits/
+        cp ${hatterSrc}/cbits/ble_bridge.c cbits/
+        cp ${hatterSrc}/cbits/dialog_bridge.c cbits/
+        cp ${hatterSrc}/cbits/location_bridge.c cbits/
+        cp ${hatterSrc}/cbits/auth_session_bridge.c cbits/
+        cp ${hatterSrc}/cbits/camera_bridge.c cbits/
+        cp ${hatterSrc}/cbits/bottom_sheet_bridge.c cbits/
+        cp ${hatterSrc}/cbits/http_bridge.c cbits/
+        cp ${hatterSrc}/cbits/network_status_bridge.c cbits/
+        cp ${hatterSrc}/cbits/animation_bridge.c cbits/
+        cp ${hatterSrc}/cbits/files_dir.c cbits/
 
         ghc -staticlib \
           -O2 \
-          -o libHaskellMobile.a \
-          -I${haskellMobileSrc}/include \
+          -o libHatter.a \
+          -I${hatterSrc}/include \
           ${if crossDeps != null then "-package-db ${crossDeps}/pkgdb -i${crossDeps}/hi" else ""} \
           -optl-lffi \
           -optl-Wl,-u,_haskellRunMain \
@@ -897,33 +897,33 @@ open(sys.argv[1], "w").write(yml)
           cbits/animation_bridge.c \
           cbits/files_dir.c \
           Main.hs \
-          HaskellMobile.hs
+          Hatter.hs
       '';
 
       installPhase = ''
         mkdir -p $out/lib $out/include
 
-        echo "Merging static archives into libHaskellMobile.a"
-        libtool -static -o libCombined.a libHaskellMobile.a \
+        echo "Merging static archives into libHatter.a"
+        libtool -static -o libCombined.a libHatter.a \
           ${gmpStatic}/lib/libgmp.a \
           ${if crossDeps != null then "${crossDeps}/lib/*.a" else ""}
-        mv libCombined.a libHaskellMobile.a
+        mv libCombined.a libHatter.a
 
-        ${mac2watchos}/bin/mac2watchos ${if simulator then "-s" else ""} libHaskellMobile.a
-        cp libHaskellMobile.a $out/lib/
-        cp ${haskellMobileSrc}/include/HaskellMobile.h $out/include/HaskellMobile.h
-        cp ${haskellMobileSrc}/include/UIBridge.h $out/include/UIBridge.h
-        cp ${haskellMobileSrc}/include/PermissionBridge.h $out/include/PermissionBridge.h
-        cp ${haskellMobileSrc}/include/SecureStorageBridge.h $out/include/SecureStorageBridge.h
-        cp ${haskellMobileSrc}/include/BleBridge.h $out/include/BleBridge.h
-        cp ${haskellMobileSrc}/include/DialogBridge.h $out/include/DialogBridge.h
-        cp ${haskellMobileSrc}/include/LocationBridge.h $out/include/LocationBridge.h
-        cp ${haskellMobileSrc}/include/AuthSessionBridge.h $out/include/AuthSessionBridge.h
-        cp ${haskellMobileSrc}/include/CameraBridge.h $out/include/CameraBridge.h
-        cp ${haskellMobileSrc}/include/BottomSheetBridge.h $out/include/BottomSheetBridge.h
-        cp ${haskellMobileSrc}/include/HttpBridge.h $out/include/HttpBridge.h
-        cp ${haskellMobileSrc}/include/NetworkStatusBridge.h $out/include/NetworkStatusBridge.h
-        cp ${haskellMobileSrc}/include/AnimationBridge.h $out/include/AnimationBridge.h
+        ${mac2watchos}/bin/mac2watchos ${if simulator then "-s" else ""} libHatter.a
+        cp libHatter.a $out/lib/
+        cp ${hatterSrc}/include/Hatter.h $out/include/Hatter.h
+        cp ${hatterSrc}/include/UIBridge.h $out/include/UIBridge.h
+        cp ${hatterSrc}/include/PermissionBridge.h $out/include/PermissionBridge.h
+        cp ${hatterSrc}/include/SecureStorageBridge.h $out/include/SecureStorageBridge.h
+        cp ${hatterSrc}/include/BleBridge.h $out/include/BleBridge.h
+        cp ${hatterSrc}/include/DialogBridge.h $out/include/DialogBridge.h
+        cp ${hatterSrc}/include/LocationBridge.h $out/include/LocationBridge.h
+        cp ${hatterSrc}/include/AuthSessionBridge.h $out/include/AuthSessionBridge.h
+        cp ${hatterSrc}/include/CameraBridge.h $out/include/CameraBridge.h
+        cp ${hatterSrc}/include/BottomSheetBridge.h $out/include/BottomSheetBridge.h
+        cp ${hatterSrc}/include/HttpBridge.h $out/include/HttpBridge.h
+        cp ${hatterSrc}/include/NetworkStatusBridge.h $out/include/NetworkStatusBridge.h
+        cp ${hatterSrc}/include/AnimationBridge.h $out/include/AnimationBridge.h
       '';
     };
 
@@ -943,11 +943,11 @@ open(sys.argv[1], "w").write(yml)
       buildPhase = ''
         mkdir -p $out/share/watchos/lib $out/share/watchos/include
 
-        cp -r ${watchosSrc}/HaskellMobile $out/share/watchos/
+        cp -r ${watchosSrc}/Hatter $out/share/watchos/
         cp ${watchosSrc}/project.yml $out/share/watchos/project.yml
 
-        cp ${watchosLib}/lib/libHaskellMobile.a $out/share/watchos/lib/
-        cp ${watchosLib}/include/HaskellMobile.h $out/share/watchos/include/
+        cp ${watchosLib}/lib/libHatter.a $out/share/watchos/lib/
+        cp ${watchosLib}/include/Hatter.h $out/share/watchos/include/
         cp ${watchosLib}/include/UIBridge.h $out/share/watchos/include/
         cp ${watchosLib}/include/PermissionBridge.h $out/share/watchos/include/
         cp ${watchosLib}/include/SecureStorageBridge.h $out/share/watchos/include/

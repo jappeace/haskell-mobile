@@ -17,7 +17,7 @@
 let
   depsList = builtins.concatStringsSep " " (map toString deps);
 
-in pkgs.runCommand "haskell-mobile-collected-deps" {
+in pkgs.runCommand "hatter-collected-deps" {
   nativeBuildInputs = [ pkgs.findutils ];
 } ''
   mkdir -p $out/lib $out/pkgdb

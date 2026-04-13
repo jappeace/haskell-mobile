@@ -8,7 +8,7 @@ module Main where
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Text (pack)
 import Foreign.Ptr (Ptr)
-import HaskellMobile
+import Hatter
   ( MobileApp(..)
   , UserState
   , Action
@@ -20,7 +20,7 @@ import HaskellMobile
   , runActionM
   , createAction
   )
-import HaskellMobile.Widget
+import Hatter.Widget
   ( ButtonConfig(..)
   , TextConfig(..)
   , WebViewConfig(..)

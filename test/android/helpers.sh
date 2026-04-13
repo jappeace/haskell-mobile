@@ -5,7 +5,7 @@
 # Required env vars (set by emulator-all.nix harness):
 #   ADB             — path to adb binary
 #   EMULATOR_SERIAL — e.g. emulator-5554
-#   PACKAGE         — me.jappie.haskellmobile
+#   PACKAGE         — me.jappie.hatter
 #   ACTIVITY        — .MainActivity
 #   WORK_DIR        — temp dir for scratch files
 

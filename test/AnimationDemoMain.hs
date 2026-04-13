@@ -10,7 +10,7 @@ module Main where
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Text (pack)
 import Foreign.Ptr (Ptr)
-import HaskellMobile
+import Hatter
   ( MobileApp(..)
   , UserState(..)
   , AnimatedConfig(..)
@@ -22,8 +22,8 @@ import HaskellMobile
   , loggingMobileContext
   , platformLog
   )
-import HaskellMobile.AppContext (AppContext(..))
-import HaskellMobile.Widget
+import Hatter.AppContext (AppContext(..))
+import Hatter.Widget
   ( Widget(..)
   , TextConfig(..)
   , ButtonConfig(..)

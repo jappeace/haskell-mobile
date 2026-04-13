@@ -1,4 +1,4 @@
-[![CI](https://img.shields.io/github/actions/workflow/status/jappeace/haskell-mobile/ci.yaml?branch=master)](https://github.com/jappeace/haskell-mobile/actions)
+[![CI](https://img.shields.io/github/actions/workflow/status/jappeace/hatter/ci.yaml?branch=master)](https://github.com/jappeace/hatter/actions)
 
 >  Why is a raven like a writing-desk?
 
@@ -59,12 +59,12 @@ module Main where
 import Data.IORef (newIORef, readIORef, modifyIORef')
 import Data.Text qualified as Text
 import Foreign.Ptr (Ptr)
-import HaskellMobile
+import Hatter
   ( startMobileApp, MobileApp(..), AppContext
   , loggingMobileContext
   , newActionState, runActionM, createAction, Action
   )
-import HaskellMobile.Widget
+import Hatter.Widget
 
 main :: IO (Ptr AppContext)
 main = do
@@ -122,7 +122,7 @@ and packages it into an APK with the Java UI layer.
 nix-build nix/apk.nix
 ```
 
-This produces `result/haskell-mobile.apk` containing both arm64-v8a and armeabi-v7a architectures.
+This produces `result/hatter.apk` containing both arm64-v8a and armeabi-v7a architectures.
 
 To build with your own `Main.hs`:
 
@@ -140,22 +140,22 @@ nix-build nix/android.nix --arg androidArch '"armv7a"'   # armv7a
 ### 2. Install
 
 ```bash
-adb install result/haskell-mobile.apk
+adb install result/hatter.apk
 ```
 
 ### 3. Consumer projects with extra Haskell dependencies
 
-If your app needs Hackage packages beyond what haskell-mobile provides,
+If your app needs Hackage packages beyond what hatter provides,
 pass them via `consumerCabalFile` or `hpkgs`:
 
 ```nix
 # your-app/default.nix
 let
-  haskellMobile = builtins.fetchGit {
-    url = "https://github.com/jappeace/haskell-mobile.git";
+  hatter = builtins.fetchGit {
+    url = "https://github.com/jappeace/hatter.git";
     ref = "master";
   };
-in import "${haskellMobile}/nix/apk.nix" {
+in import "${hatter}/nix/apk.nix" {
   mainModule = ./src/Main.hs;
   # Option A: point to your .cabal file (uses IFD to extract deps)
   consumerCabalFile = ./your-app.cabal;
@@ -166,19 +166,19 @@ in import "${haskellMobile}/nix/apk.nix" {
 
 ### How it works under the hood
 
-The Java activity (`HaskellMobileActivity`) loads the `.so` via `System.loadLibrary`,
+The Java activity (`HatterActivity`) loads the `.so` via `System.loadLibrary`,
 which triggers `JNI_OnLoad` in `cbits/jni_bridge.c`. That initializes the GHC RTS,
 runs your Haskell `main`, and stores the returned `AppContext` pointer.
 When `onCreate` fires, Java calls `renderUI` through JNI, which invokes your `maView`
 and the framework translates the `Widget` tree into Android `View` calls.
 
-You never need to write Java — `HaskellMobileActivity` handles all the native UI,
+You never need to write Java — `HatterActivity` handles all the native UI,
 permissions, camera, location, etc. Your consumer app's `MainActivity` just extends it:
 
 ```java
 package com.example.myapp;
-import me.jappie.haskellmobile.HaskellMobileActivity;
-public class MainActivity extends HaskellMobileActivity {}
+import me.jappie.hatter.HatterActivity;
+public class MainActivity extends HatterActivity {}
 ```
 
 ## Building for iOS
@@ -192,7 +192,7 @@ an Xcode project via a Swift bridge.
 nix-build nix/ios.nix
 ```
 
-This produces `result/lib/libHaskellMobile.a` and headers in `result/include/`.
+This produces `result/lib/libHatter.a` and headers in `result/include/`.
 
 To build with your own `Main.hs`:
 
@@ -206,11 +206,11 @@ Stage the library and headers, then generate the Xcode project with [XcodeGen](h
 
 ```bash
 mkdir -p ios/lib ios/include
-cp result/lib/libHaskellMobile.a ios/lib/
+cp result/lib/libHatter.a ios/lib/
 cp result/include/*.h ios/include/
 
 nix-shell -p xcodegen --run "cd ios && xcodegen generate"
-open ios/HaskellMobile.xcodeproj
+open ios/Hatter.xcodeproj
 ```
 
 The `ios/project.yml` configures the bridging header, library search paths,
@@ -223,12 +223,12 @@ build and run on a device or simulator.
 
 ### How it works under the hood
 
-The Swift bridge (`ios/HaskellMobile/HaskellBridge.swift`) calls `hs_init` and
+The Swift bridge (`ios/Hatter/HaskellBridge.swift`) calls `hs_init` and
 `haskellRunMain` to boot the GHC RTS and run your Haskell `main`.
 It then sets up all the platform bridges (permissions, camera, location, etc.)
 and calls `haskellRenderUI` when SwiftUI requests a view update.
 
-The bridging header (`HaskellMobile-Bridging-Header.h`) exposes the C FFI functions
+The bridging header (`Hatter-Bridging-Header.h`) exposes the C FFI functions
 to Swift. The `project.yml` links against the required system frameworks
 (CoreLocation, CoreBluetooth, AVFoundation, WebKit, etc.).
 
@@ -240,9 +240,9 @@ The key files are:
 | File | Purpose |
 |------|---------|
 | `HaskellBridge.swift` | Boots GHC RTS, dispatches UI events |
-| `HaskellMobileApp.swift` | SwiftUI `@main` entry point |
+| `HatterApp.swift` | SwiftUI `@main` entry point |
 | `ContentView.swift` | SwiftUI view that calls `HaskellBridge.renderUI()` |
-| `HaskellMobile-Bridging-Header.h` | C header imports for Swift |
+| `Hatter-Bridging-Header.h` | C header imports for Swift |
 | `project.yml` | XcodeGen spec with signing, frameworks, search paths |
 
 ## Building for watchOS

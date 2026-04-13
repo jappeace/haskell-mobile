@@ -12,7 +12,7 @@ module Test.Helpers
 
 import Data.IORef (readIORef)
 import Foreign.Ptr (Ptr)
-import HaskellMobile
+import Hatter
   ( MobileApp(..)
   , UserState(..)
   , ActionM
@@ -22,16 +22,16 @@ import HaskellMobile
   , derefAppContext
   , AppContext(..)
   )
-import HaskellMobile.AppContext (newAppContext)
-import HaskellMobile.Lifecycle
+import Hatter.AppContext (newAppContext)
+import Hatter.Lifecycle
   ( LifecycleEvent(..)
   , MobileContext(..)
   , defaultMobileContext
   , loggingMobileContext
   )
-import HaskellMobile.Animation (newAnimationState)
-import HaskellMobile.Widget (TextConfig(..), Widget(..))
-import HaskellMobile.Render (RenderState, newRenderState)
+import Hatter.Animation (newAnimationState)
+import Hatter.Widget (TextConfig(..), Widget(..))
+import Hatter.Render (RenderState, newRenderState)
 
 -- | Helper: create an ActionState, register actions via ActionM, and
 -- build a RenderState.  Returns the registered value together with the

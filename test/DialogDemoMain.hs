@@ -8,7 +8,7 @@ module Main where
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Text (pack)
 import Foreign.Ptr (Ptr)
-import HaskellMobile
+import Hatter
   ( MobileApp(..)
   , Action
   , DialogAction(..)
@@ -24,8 +24,8 @@ import HaskellMobile
   , runActionM
   , createAction
   )
-import HaskellMobile.AppContext (AppContext(..))
-import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
+import Hatter.AppContext (AppContext(..))
+import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do

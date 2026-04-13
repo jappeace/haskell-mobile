@@ -12,6 +12,6 @@ lib.mkApk {
     { lib = sharedLibArmv7a;  abiDir = "armeabi-v7a"; }
   ];
   androidSrc = ../android;
-  apkName = "haskell-mobile.apk";
-  name = "haskell-mobile-apk";
+  apkName = "hatter.apk";
+  name = "hatter-apk";
 }

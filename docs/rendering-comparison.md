@@ -1,6 +1,6 @@
 # How React Native and Flutter Do Rendering
 
-A technical comparison of the two dominant cross-platform mobile frameworks, written from the perspective of haskell-mobile's architecture.
+A technical comparison of the two dominant cross-platform mobile frameworks, written from the perspective of hatter's architecture.
 
 ---
 
@@ -364,22 +364,22 @@ As of Flutter 3.29+, **UI and Platform threads are merged** on iOS and Android. 
 
 ---
 
-## Part 3: Comparison and Lessons for haskell-mobile
+## Part 3: Comparison and Lessons for hatter
 
 ### 3.1 Rendering Strategy
 
-| | React Native | Flutter | haskell-mobile |
+| | React Native | Flutter | hatter |
 |---|---|---|---|
 | **Strategy** | Delegate to platform | Own the surface | Delegate to platform |
 | **Native look** | Automatic (uses real native widgets) | Must be reimplemented (Material/Cupertino) | Automatic (native widgets) |
 | **Consistency** | Varies by platform version | Pixel-identical everywhere | Varies by platform |
 | **Drawing custom UI** | Difficult (need native modules) | Natural (Canvas API) | Not yet supported |
 
-haskell-mobile follows the React Native strategy: send widget descriptions across a language boundary and let the platform render them. This gives native look-and-feel for free but introduces a communication boundary.
+hatter follows the React Native strategy: send widget descriptions across a language boundary and let the platform render them. This gives native look-and-feel for free but introduces a communication boundary.
 
 ### 3.2 Language Boundary
 
-| | React Native | Flutter | haskell-mobile |
+| | React Native | Flutter | hatter |
 |---|---|---|---|
 | **Bridge** | JSI (C++ host objects, sync capable) | None (Dart compiles to native) | FFI (`foreign export ccall`) |
 | **Serialization** | Eliminated with JSI | None | C structs / manual marshaling |
@@ -389,7 +389,7 @@ Flutter's biggest architectural advantage is that Dart compiles to native code a
 
 React Native's JSI eliminates the old serialization bottleneck but still crosses a language boundary (JS VM → C++).
 
-haskell-mobile uses direct FFI exports, which is conceptually similar to JSI but lower-level. The main pain point is marshaling complex data structures across the boundary.
+hatter uses direct FFI exports, which is conceptually similar to JSI but lower-level. The main pain point is marshaling complex data structures across the boundary.
 
 ### 3.3 Layout
 
@@ -402,7 +402,7 @@ haskell-mobile uses direct FFI exports, which is conceptually similar to JSI but
 
 Flutter's layout is simpler (single-pass, O(n)) but less familiar to web developers. Yoga implements a more complex multi-pass algorithm to match CSS flexbox semantics.
 
-For haskell-mobile, layout is currently handled by the platform (iOS Auto Layout, Android LayoutParams). If haskell-mobile ever needs its own layout engine, Flutter's constraint propagation model is simpler to implement than full flexbox.
+For hatter, layout is currently handled by the platform (iOS Auto Layout, Android LayoutParams). If hatter ever needs its own layout engine, Flutter's constraint propagation model is simpler to implement than full flexbox.
 
 ### 3.4 Tree Reconciliation
 
@@ -417,15 +417,15 @@ Both use O(n) algorithms with similar structure:
 
 The algorithms are nearly identical in spirit. Both prioritize the common case (lists that barely change) and use keys for reordering.
 
-### 3.5 What This Means for haskell-mobile
+### 3.5 What This Means for hatter
 
-**React Native's model is closer to what haskell-mobile does**: both describe a native widget tree from a non-native language and send updates across a boundary. Key lessons:
+**React Native's model is closer to what hatter does**: both describe a native widget tree from a non-native language and send updates across a boundary. Key lessons:
 
-1. **Immutable shadow trees with structural sharing** (Fabric) are the right model for cross-boundary rendering. haskell-mobile's widget descriptions should be diffable with minimal allocation.
+1. **Immutable shadow trees with structural sharing** (Fabric) are the right model for cross-boundary rendering. hatter's widget descriptions should be diffable with minimal allocation.
 
-2. **Layout should stay on the native side** unless there's a strong reason to move it. Both React Native and haskell-mobile benefit from Yoga/platform layout because it avoids reimplementing text measurement and platform conventions.
+2. **Layout should stay on the native side** unless there's a strong reason to move it. Both React Native and hatter benefit from Yoga/platform layout because it avoids reimplementing text measurement and platform conventions.
 
-3. **Synchronous communication matters**. React Native's move from async bridge to synchronous JSI was their biggest architectural improvement. haskell-mobile already has synchronous FFI, which is an advantage.
+3. **Synchronous communication matters**. React Native's move from async bridge to synchronous JSI was their biggest architectural improvement. hatter already has synchronous FFI, which is an advantage.
 
 4. **The Flutter model (own the surface) eliminates the bridge problem entirely** but requires reimplementing all platform UI. This is a massive engineering investment that only makes sense with a large team.
 

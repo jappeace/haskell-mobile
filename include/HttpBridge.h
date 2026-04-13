@@ -3,12 +3,12 @@
 
 #include <stdint.h>
 
-/* HTTP result codes (must match HaskellMobile.Http) */
+/* HTTP result codes (must match Hatter.Http) */
 #define HTTP_RESULT_SUCCESS       0
 #define HTTP_RESULT_NETWORK_ERROR 1
 #define HTTP_RESULT_TIMEOUT       2
 
-/* HTTP method codes (must match HaskellMobile.Http) */
+/* HTTP method codes (must match Hatter.Http) */
 #define HTTP_METHOD_GET    0
 #define HTTP_METHOD_POST   1
 #define HTTP_METHOD_PUT    2

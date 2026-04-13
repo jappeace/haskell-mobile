@@ -4,7 +4,7 @@
 #
 # Required env vars (set by simulator-all.nix harness):
 #   SIM_UDID    — simulator UUID
-#   BUNDLE_ID   — me.jappie.haskellmobile
+#   BUNDLE_ID   — me.jappie.hatter
 #   WORK_DIR    — temp dir for log files
 
 # Fatal patterns that indicate the native library failed to load on iOS.

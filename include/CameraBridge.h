@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-/* Camera status codes (must match HaskellMobile.Camera) */
+/* Camera status codes (must match Hatter.Camera) */
 #define CAMERA_SUCCESS           0
 #define CAMERA_CANCELLED         1
 #define CAMERA_PERMISSION_DENIED 2

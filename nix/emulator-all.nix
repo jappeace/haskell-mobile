@@ -37,8 +37,8 @@ let
   counterApk = lib.mkApk {
     sharedLibs = [{ lib = counterAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile.apk";
-    name = "haskell-mobile-apk";
+    apkName = "hatter.apk";
+    name = "hatter-apk";
   };
 
   scrollAndroid = import ./android.nix {
@@ -48,8 +48,8 @@ let
   scrollApk = lib.mkApk {
     sharedLibs = [{ lib = scrollAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-scroll.apk";
-    name = "haskell-mobile-scroll-apk";
+    apkName = "hatter-scroll.apk";
+    name = "hatter-scroll-apk";
   };
 
   textinputAndroid = import ./android.nix {
@@ -59,8 +59,8 @@ let
   textinputApk = lib.mkApk {
     sharedLibs = [{ lib = textinputAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-textinput.apk";
-    name = "haskell-mobile-textinput-apk";
+    apkName = "hatter-textinput.apk";
+    name = "hatter-textinput-apk";
   };
 
   permissionAndroid = import ./android.nix {
@@ -70,8 +70,8 @@ let
   permissionApk = lib.mkApk {
     sharedLibs = [{ lib = permissionAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-permission.apk";
-    name = "haskell-mobile-permission-apk";
+    apkName = "hatter-permission.apk";
+    name = "hatter-permission-apk";
   };
 
   secureStorageAndroid = import ./android.nix {
@@ -81,8 +81,8 @@ let
   secureStorageApk = lib.mkApk {
     sharedLibs = [{ lib = secureStorageAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-securestorage.apk";
-    name = "haskell-mobile-securestorage-apk";
+    apkName = "hatter-securestorage.apk";
+    name = "hatter-securestorage-apk";
   };
 
   imageAndroid = import ./android.nix {
@@ -92,8 +92,8 @@ let
   imageApk = lib.mkApk {
     sharedLibs = [{ lib = imageAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-image.apk";
-    name = "haskell-mobile-image-apk";
+    apkName = "hatter-image.apk";
+    name = "hatter-image-apk";
   };
 
   nodepoolAndroid = import ./android.nix {
@@ -104,8 +104,8 @@ let
   nodepoolApk = lib.mkApk {
     sharedLibs = [{ lib = nodepoolAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-nodepool.apk";
-    name = "haskell-mobile-nodepool-apk";
+    apkName = "hatter-nodepool.apk";
+    name = "hatter-nodepool-apk";
   };
 
   bleAndroid = import ./android.nix {
@@ -115,8 +115,8 @@ let
   bleApk = lib.mkApk {
     sharedLibs = [{ lib = bleAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-ble.apk";
-    name = "haskell-mobile-ble-apk";
+    apkName = "hatter-ble.apk";
+    name = "hatter-ble-apk";
   };
 
   dialogAndroid = import ./android.nix {
@@ -126,8 +126,8 @@ let
   dialogApk = lib.mkApk {
     sharedLibs = [{ lib = dialogAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-dialog.apk";
-    name = "haskell-mobile-dialog-apk";
+    apkName = "hatter-dialog.apk";
+    name = "hatter-dialog-apk";
   };
 
   locationAndroid = import ./android.nix {
@@ -137,8 +137,8 @@ let
   locationApk = lib.mkApk {
     sharedLibs = [{ lib = locationAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-location.apk";
-    name = "haskell-mobile-location-apk";
+    apkName = "hatter-location.apk";
+    name = "hatter-location-apk";
   };
 
   webviewAndroid = import ./android.nix {
@@ -148,8 +148,8 @@ let
   webviewApk = lib.mkApk {
     sharedLibs = [{ lib = webviewAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-webview.apk";
-    name = "haskell-mobile-webview-apk";
+    apkName = "hatter-webview.apk";
+    name = "hatter-webview-apk";
   };
 
   authSessionAndroid = import ./android.nix {
@@ -159,8 +159,8 @@ let
   authSessionApk = lib.mkApk {
     sharedLibs = [{ lib = authSessionAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-authsession.apk";
-    name = "haskell-mobile-authsession-apk";
+    apkName = "hatter-authsession.apk";
+    name = "hatter-authsession-apk";
   };
 
   cameraAndroid = import ./android.nix {
@@ -170,8 +170,8 @@ let
   cameraApk = lib.mkApk {
     sharedLibs = [{ lib = cameraAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-camera.apk";
-    name = "haskell-mobile-camera-apk";
+    apkName = "hatter-camera.apk";
+    name = "hatter-camera-apk";
   };
 
   bottomSheetAndroid = import ./android.nix {
@@ -181,8 +181,8 @@ let
   bottomSheetApk = lib.mkApk {
     sharedLibs = [{ lib = bottomSheetAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-bottomsheet.apk";
-    name = "haskell-mobile-bottomsheet-apk";
+    apkName = "hatter-bottomsheet.apk";
+    name = "hatter-bottomsheet-apk";
   };
 
   httpAndroid = import ./android.nix {
@@ -192,8 +192,8 @@ let
   httpApk = lib.mkApk {
     sharedLibs = [{ lib = httpAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-http.apk";
-    name = "haskell-mobile-http-apk";
+    apkName = "hatter-http.apk";
+    name = "hatter-http-apk";
   };
 
   networkStatusAndroid = import ./android.nix {
@@ -203,8 +203,8 @@ let
   networkStatusApk = lib.mkApk {
     sharedLibs = [{ lib = networkStatusAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-networkstatus.apk";
-    name = "haskell-mobile-networkstatus-apk";
+    apkName = "hatter-networkstatus.apk";
+    name = "hatter-networkstatus-apk";
   };
 
   mapviewAndroid = import ./android.nix {
@@ -214,8 +214,8 @@ let
   mapviewApk = lib.mkApk {
     sharedLibs = [{ lib = mapviewAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-mapview.apk";
-    name = "haskell-mobile-mapview-apk";
+    apkName = "hatter-mapview.apk";
+    name = "hatter-mapview-apk";
   };
 
   animationAndroid = import ./android.nix {
@@ -225,8 +225,8 @@ let
   animationApk = lib.mkApk {
     sharedLibs = [{ lib = animationAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-animation.apk";
-    name = "haskell-mobile-animation-apk";
+    apkName = "hatter-animation.apk";
+    name = "hatter-animation-apk";
   };
 
   filesDirAndroid = import ./android.nix {
@@ -236,8 +236,8 @@ let
   filesDirApk = lib.mkApk {
     sharedLibs = [{ lib = filesDirAndroid; inherit abiDir; }];
     androidSrc = ../android;
-    apkName = "haskell-mobile-filesdir.apk";
-    name = "haskell-mobile-filesdir-apk";
+    apkName = "hatter-filesdir.apk";
+    name = "hatter-filesdir-apk";
   };
 
   androidComposition = pkgs.androidenv.composeAndroidPackages {
@@ -260,7 +260,7 @@ let
   testScripts = builtins.path { path = ../test; name = "test-scripts"; };
 
 in pkgs.stdenv.mkDerivation {
-  name = "haskell-mobile-emulator-all-tests";
+  name = "hatter-emulator-all-tests";
 
   dontUnpack = true;
 
@@ -278,26 +278,26 @@ unset ANDROID_NDK_HOME 2>/dev/null || true
 ADB="$ANDROID_SDK_ROOT/platform-tools/adb"
 EMULATOR="$ANDROID_SDK_ROOT/emulator/emulator"
 AVDMANAGER="${sdk}/bin/avdmanager"
-COUNTER_APK="${counterApk}/haskell-mobile.apk"
-SCROLL_APK="${scrollApk}/haskell-mobile-scroll.apk"
-TEXTINPUT_APK="${textinputApk}/haskell-mobile-textinput.apk"
-PERMISSION_APK="${permissionApk}/haskell-mobile-permission.apk"
-SECURE_STORAGE_APK="${secureStorageApk}/haskell-mobile-securestorage.apk"
-IMAGE_APK="${imageApk}/haskell-mobile-image.apk"
-NODEPOOL_APK="${nodepoolApk}/haskell-mobile-nodepool.apk"
-BLE_APK="${bleApk}/haskell-mobile-ble.apk"
-DIALOG_APK="${dialogApk}/haskell-mobile-dialog.apk"
-LOCATION_APK="${locationApk}/haskell-mobile-location.apk"
-WEBVIEW_APK="${webviewApk}/haskell-mobile-webview.apk"
-AUTH_SESSION_APK="${authSessionApk}/haskell-mobile-authsession.apk"
-CAMERA_APK="${cameraApk}/haskell-mobile-camera.apk"
-BOTTOM_SHEET_APK="${bottomSheetApk}/haskell-mobile-bottomsheet.apk"
-HTTP_APK="${httpApk}/haskell-mobile-http.apk"
-NETWORK_STATUS_APK="${networkStatusApk}/haskell-mobile-networkstatus.apk"
-MAPVIEW_APK="${mapviewApk}/haskell-mobile-mapview.apk"
-ANIMATION_APK="${animationApk}/haskell-mobile-animation.apk"
-FILES_DIR_APK="${filesDirApk}/haskell-mobile-filesdir.apk"
-PACKAGE="me.jappie.haskellmobile"
+COUNTER_APK="${counterApk}/hatter.apk"
+SCROLL_APK="${scrollApk}/hatter-scroll.apk"
+TEXTINPUT_APK="${textinputApk}/hatter-textinput.apk"
+PERMISSION_APK="${permissionApk}/hatter-permission.apk"
+SECURE_STORAGE_APK="${secureStorageApk}/hatter-securestorage.apk"
+IMAGE_APK="${imageApk}/hatter-image.apk"
+NODEPOOL_APK="${nodepoolApk}/hatter-nodepool.apk"
+BLE_APK="${bleApk}/hatter-ble.apk"
+DIALOG_APK="${dialogApk}/hatter-dialog.apk"
+LOCATION_APK="${locationApk}/hatter-location.apk"
+WEBVIEW_APK="${webviewApk}/hatter-webview.apk"
+AUTH_SESSION_APK="${authSessionApk}/hatter-authsession.apk"
+CAMERA_APK="${cameraApk}/hatter-camera.apk"
+BOTTOM_SHEET_APK="${bottomSheetApk}/hatter-bottomsheet.apk"
+HTTP_APK="${httpApk}/hatter-http.apk"
+NETWORK_STATUS_APK="${networkStatusApk}/hatter-networkstatus.apk"
+MAPVIEW_APK="${mapviewApk}/hatter-mapview.apk"
+ANIMATION_APK="${animationApk}/hatter-animation.apk"
+FILES_DIR_APK="${filesDirApk}/hatter-filesdir.apk"
+PACKAGE="me.jappie.hatter"
 ACTIVITY=".MainActivity"
 DEVICE_NAME="test_all"
 TEST_SCRIPTS="${testScripts}"
@@ -308,24 +308,24 @@ TEST_SCRIPTS="${testScripts}"
 SO_MAX_MB=120
 SIZE_FAIL=0
 for so_path in \
-    "${counterAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${scrollAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${textinputAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${permissionAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${secureStorageAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${imageAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${nodepoolAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${bleAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${dialogAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${webviewAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${authSessionAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${cameraAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${bottomSheetAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${httpAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${networkStatusAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${mapviewAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${animationAndroid}/lib/${abiDir}/libhaskellmobile.so" \
-    "${filesDirAndroid}/lib/${abiDir}/libhaskellmobile.so"; do
+    "${counterAndroid}/lib/${abiDir}/libhatter.so" \
+    "${scrollAndroid}/lib/${abiDir}/libhatter.so" \
+    "${textinputAndroid}/lib/${abiDir}/libhatter.so" \
+    "${permissionAndroid}/lib/${abiDir}/libhatter.so" \
+    "${secureStorageAndroid}/lib/${abiDir}/libhatter.so" \
+    "${imageAndroid}/lib/${abiDir}/libhatter.so" \
+    "${nodepoolAndroid}/lib/${abiDir}/libhatter.so" \
+    "${bleAndroid}/lib/${abiDir}/libhatter.so" \
+    "${dialogAndroid}/lib/${abiDir}/libhatter.so" \
+    "${webviewAndroid}/lib/${abiDir}/libhatter.so" \
+    "${authSessionAndroid}/lib/${abiDir}/libhatter.so" \
+    "${cameraAndroid}/lib/${abiDir}/libhatter.so" \
+    "${bottomSheetAndroid}/lib/${abiDir}/libhatter.so" \
+    "${httpAndroid}/lib/${abiDir}/libhatter.so" \
+    "${networkStatusAndroid}/lib/${abiDir}/libhatter.so" \
+    "${mapviewAndroid}/lib/${abiDir}/libhatter.so" \
+    "${animationAndroid}/lib/${abiDir}/libhatter.so" \
+    "${filesDirAndroid}/lib/${abiDir}/libhatter.so"; do
     SO_BYTES=$(stat -c %s "$so_path")
     SO_MB=$((SO_BYTES / 1048576))
     SO_LABEL=$(echo "$so_path" | grep -oP '[^/]+(?=/lib/)')
@@ -364,7 +364,7 @@ else
 fi
 
 # --- Temp dirs ---
-WORK_DIR=$(mktemp -d /tmp/haskell-mobile-emu-all-XXXX)
+WORK_DIR=$(mktemp -d /tmp/hatter-emu-all-XXXX)
 export HOME="$WORK_DIR/home"
 export ANDROID_USER_HOME="$WORK_DIR/user-home"
 export ANDROID_AVD_HOME="$WORK_DIR/avd"

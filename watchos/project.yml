@@ -1,28 +1,28 @@
-name: HaskellMobile
+name: Hatter
 options:
   bundleIdPrefix: me.jappie
   deploymentTarget:
     watchOS: "9.0"
 
 targets:
-  HaskellMobile:
+  Hatter:
     type: application
     platform: watchOS
     sources:
-      - HaskellMobile
+      - Hatter
     info:
-      path: HaskellMobile/Info.plist
+      path: Hatter/Info.plist
       properties:
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: "1"
         WKApplication: true
         WKRunsIndependentlyOfCompanionApp: true
-        WKCompanionAppBundleIdentifier: me.jappie.haskellmobile
+        WKCompanionAppBundleIdentifier: me.jappie.hatter
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: me.jappie.haskellmobile.watchkitapp
-        CODE_SIGN_ENTITLEMENTS: HaskellMobile/HaskellMobile.entitlements
-        SWIFT_OBJC_BRIDGING_HEADER: HaskellMobile/HaskellMobile-Bridging-Header.h
+        PRODUCT_BUNDLE_IDENTIFIER: me.jappie.hatter.watchkitapp
+        CODE_SIGN_ENTITLEMENTS: Hatter/Hatter.entitlements
+        SWIFT_OBJC_BRIDGING_HEADER: Hatter/Hatter-Bridging-Header.h
         LIBRARY_SEARCH_PATHS: ["$(inherited)", "$(PROJECT_DIR)/lib"]
         HEADER_SEARCH_PATHS: ["$(inherited)", "$(PROJECT_DIR)/include"]
-        OTHER_LDFLAGS: ["$(inherited)", "-lHaskellMobile", "-lz", "-liconv", "-lffi", "-lc++", "-framework", "AuthenticationServices"]
+        OTHER_LDFLAGS: ["$(inherited)", "-lHatter", "-lz", "-liconv", "-lffi", "-lc++", "-framework", "AuthenticationServices"]

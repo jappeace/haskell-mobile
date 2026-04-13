@@ -10,8 +10,8 @@ module Main where
 import Data.Text (pack)
 import Foreign.Ptr (Ptr)
 import Language.Haskell.TH.Syntax (lift)
-import HaskellMobile (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext, newActionState)
-import HaskellMobile.Widget (TextConfig(..), Widget(..))
+import Hatter (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext, newActionState)
+import Hatter.Widget (TextConfig(..), Widget(..))
 
 -- | Compile-time evaluated splice — forces -fexternal-interpreter in mkAndroidLib.
 thMessage :: String

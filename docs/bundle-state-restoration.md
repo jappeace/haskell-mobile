@@ -1,6 +1,6 @@
-# Android Bundle vs iOS State Restoration: Should haskell-mobile Support Them?
+# Android Bundle vs iOS State Restoration: Should hatter Support Them?
 
-A technical evaluation of Android's `onSaveInstanceState(Bundle)` mechanism and iOS's equivalent state restoration APIs, examining reliability, platform asymmetry, and relevance to haskell-mobile's architecture.
+A technical evaluation of Android's `onSaveInstanceState(Bundle)` mechanism and iOS's equivalent state restoration APIs, examining reliability, platform asymmetry, and relevance to hatter's architecture.
 
 ---
 
@@ -8,9 +8,9 @@ A technical evaluation of Android's `onSaveInstanceState(Bundle)` mechanism and 
 
 Android provides a `Bundle` mechanism that serializes key-value state when an Activity stops, surviving process death. iOS has gone through three iterations of equivalent functionality — NSCoder-based restoration, NSUserActivity scene restoration, and SwiftUI's `@SceneStorage` — each progressively less reliable than the last.
 
-The industry consensus (2025–2026) is that these mechanisms are **lightweight optimization hints, not reliability mechanisms**. Apps should cold-start correctly from persistent storage alone. haskell-mobile's existing pattern — IORef for in-memory state, SQLite for persistence, full clear-and-rebuild rendering — already matches this modern best practice.
+The industry consensus (2025–2026) is that these mechanisms are **lightweight optimization hints, not reliability mechanisms**. Apps should cold-start correctly from persistent storage alone. hatter's existing pattern — IORef for in-memory state, SQLite for persistence, full clear-and-rebuild rendering — already matches this modern best practice.
 
-**Recommendation: Do not add Bundle/state restoration support to haskell-mobile.** The complexity cost is high, the iOS side is broken, and the benefit is marginal when state is properly persisted to a database.
+**Recommendation: Do not add Bundle/state restoration support to hatter.** The complexity cost is high, the iOS side is broken, and the benefit is marginal when state is properly persisted to a database.
 
 ---
 
@@ -115,14 +115,14 @@ Many developers have given up on system-provided restoration APIs entirely. The 
 
 ---
 
-## Part 4: Relevance to haskell-mobile
+## Part 4: Relevance to hatter
 
 ### 4.1 Current Architecture
 
-haskell-mobile already handles lifecycles without Bundle support:
+hatter already handles lifecycles without Bundle support:
 
 - **Android**: `MainActivity.onCreate(Bundle savedInstanceState)` calls `onLifecycleCreate()` without passing the Bundle. The `savedInstanceState` parameter is ignored.
-- **iOS**: `HaskellMobileApp` observes `scenePhase` and dispatches lifecycle events (Resume, Pause, Stop) to Haskell.
+- **iOS**: `HatterApp` observes `scenePhase` and dispatches lifecycle events (Resume, Pause, Stop) to Haskell.
 - **State**: IORef-based global state (`globalMobileApp`, `globalRenderState`) with full clear-and-rebuild rendering.
 - **Persistence**: App-level SQLite (demonstrated in downstream apps), not framework-level Bundle integration.
 
@@ -136,13 +136,13 @@ haskell-mobile already handles lifecycles without Bundle support:
 
 ### 4.3 Why It Is Not Worth It
 
-**The iOS side is broken.** Investing in cross-platform state restoration when one platform's implementation is widely reported as non-functional produces an abstraction that is unreliable by construction. haskell-mobile would need iOS-specific fallback code anyway, defeating the purpose.
+**The iOS side is broken.** Investing in cross-platform state restoration when one platform's implementation is widely reported as non-functional produces an abstraction that is unreliable by construction. hatter would need iOS-specific fallback code anyway, defeating the purpose.
 
 **The benefit is marginal.** Bundle support only helps with one scenario: the user backgrounds the app, Android kills the process, and the user returns. With SQLite persistence, the app cold-starts into the correct state. The only difference is avoiding a brief loading moment — a minor UX concern that does not justify the complexity.
 
-**The size limit is dangerous.** Haskell's data structures do not map naturally to Bundle's ~50KB limit. Accidentally exceeding it crashes the app. This would be a new failure mode that haskell-mobile does not currently have.
+**The size limit is dangerous.** Haskell's data structures do not map naturally to Bundle's ~50KB limit. Accidentally exceeding it crashes the app. This would be a new failure mode that hatter does not currently have.
 
-**It contradicts the industry direction.** Both Google and Apple now recommend that persistent storage (databases) own the truth, with saved-instance-state serving only as an optimization hint. haskell-mobile's architecture — SQLite for persistence, IORef for in-memory state, full rebuild on lifecycle changes — already follows this recommendation.
+**It contradicts the industry direction.** Both Google and Apple now recommend that persistent storage (databases) own the truth, with saved-instance-state serving only as an optimization hint. hatter's architecture — SQLite for persistence, IORef for in-memory state, full rebuild on lifecycle changes — already follows this recommendation.
 
 ### 4.4 What to Do Instead
 
@@ -158,4 +158,4 @@ This approach works identically on both platforms, does not have size limits, su
 
 ## Conclusion
 
-Android's Bundle mechanism is functional but constrained. iOS's equivalent is unreliable across versions. Neither is worth wrapping in a cross-platform abstraction when SQLite persistence provides a strictly superior alternative that already works in haskell-mobile's architecture. The recommendation is to document the SQLite persistence pattern for downstream apps rather than adding framework-level Bundle support.
+Android's Bundle mechanism is functional but constrained. iOS's equivalent is unreliable across versions. Neither is worth wrapping in a cross-platform abstraction when SQLite persistence provides a strictly superior alternative that already works in hatter's architecture. The recommendation is to document the SQLite persistence pattern for downstream apps rather than adding framework-level Bundle support.

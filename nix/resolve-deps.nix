@@ -34,7 +34,7 @@ let
   directDeps = depInfo.libraryHaskellDepends or [];
 
   # GHC boot/wired-in packages — already provided by the cross-GHC, so they
-  # must not be cross-compiled again.  Also excludes haskell-mobile itself
+  # must not be cross-compiled again.  Also excludes hatter itself
   # (compiled separately in mkAndroidLib/mkIOSLib).
   bootPackageNames = [
     "base" "ghc-prim" "ghc-bignum" "ghc-internal" "integer-gmp"
@@ -43,7 +43,7 @@ let
     "filepath" "directory" "process" "unix" "time" "binary"
     "parsec" "pretty" "ghc-boot-th" "ghc-boot" "ghc-heap"
     "hpc" "Cabal" "Cabal-syntax" "os-string"
-    "haskell-mobile"
+    "hatter"
   ];
 
   isBootPackage = name: builtins.elem name bootPackageNames;

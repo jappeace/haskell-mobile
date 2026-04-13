@@ -4,8 +4,8 @@
 #
 # Required env vars (set by watchos-simulator-all.nix harness):
 #   SIM_UDID       — simulator UUID
-#   BUNDLE_ID      — me.jappie.haskellmobile.watchkitapp (for simctl commands)
-#   LOG_SUBSYSTEM  — me.jappie.haskellmobile (for os_log predicates)
+#   BUNDLE_ID      — me.jappie.hatter.watchkitapp (for simctl commands)
+#   LOG_SUBSYSTEM  — me.jappie.hatter (for os_log predicates)
 #   WORK_DIR       — temp dir for log files
 
 # wait_for_log LOGFILE PATTERN TIMEOUT_SECONDS

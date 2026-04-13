@@ -1,17 +1,17 @@
-name: HaskellMobile
+name: Hatter
 options:
   bundleIdPrefix: me.jappie
   deploymentTarget:
     iOS: "15.0"
 
 targets:
-  HaskellMobile:
+  Hatter:
     type: application
     platform: iOS
     sources:
-      - HaskellMobile
+      - Hatter
     info:
-      path: HaskellMobile/Info.plist
+      path: Hatter/Info.plist
       properties:
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: "1"
@@ -25,9 +25,9 @@ targets:
           UISceneConfigurations: {}
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: me.jappie.haskellmobile
-        CODE_SIGN_ENTITLEMENTS: HaskellMobile/HaskellMobile.entitlements
-        SWIFT_OBJC_BRIDGING_HEADER: HaskellMobile/HaskellMobile-Bridging-Header.h
+        PRODUCT_BUNDLE_IDENTIFIER: me.jappie.hatter
+        CODE_SIGN_ENTITLEMENTS: Hatter/Hatter.entitlements
+        SWIFT_OBJC_BRIDGING_HEADER: Hatter/Hatter-Bridging-Header.h
         LIBRARY_SEARCH_PATHS: ["$(inherited)", "$(PROJECT_DIR)/lib"]
         HEADER_SEARCH_PATHS: ["$(inherited)", "$(PROJECT_DIR)/include"]
-        OTHER_LDFLAGS: ["$(inherited)", "-lHaskellMobile", "-lz", "-liconv", "-lffi", "-lc++", "-framework", "AVFoundation", "-framework", "AuthenticationServices", "-framework", "Contacts", "-framework", "CoreLocation", "-framework", "CoreBluetooth", "-framework", "WebKit", "-framework", "MapKit", "-framework", "QuartzCore"]
+        OTHER_LDFLAGS: ["$(inherited)", "-lHatter", "-lz", "-liconv", "-lffi", "-lc++", "-framework", "AVFoundation", "-framework", "AuthenticationServices", "-framework", "Contacts", "-framework", "CoreLocation", "-framework", "CoreBluetooth", "-framework", "WebKit", "-framework", "MapKit", "-framework", "QuartzCore"]

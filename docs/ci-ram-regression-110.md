@@ -115,10 +115,10 @@ Two layers of protection:
 **CI test suite (hard fail):** `nix/emulator-all.nix` checks the `.so` size of every test app before booting the emulator. If any `.so` exceeds 120 MB, the test fails immediately with a clear diagnostic. The counter app `.so` is ~80 MB, so 120 MB catches bloat early while leaving room for legitimate growth from new features.
 
 ```
-OK    haskell-mobile-android .so is 79 MB
-OK    haskell-mobile-scroll-android .so is 79 MB
+OK    hatter-android .so is 79 MB
+OK    hatter-scroll-android .so is 79 MB
 ...
-FAIL  haskell-mobile-android .so is 373 MB (limit: 120 MB)
+FAIL  hatter-android .so is 373 MB (limit: 120 MB)
 
 FATAL: .so size limit exceeded. This usually means boot package .a files
 ended up in the --whole-archive link group. See docs/ci-ram-regression-110.md

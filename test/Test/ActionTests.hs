@@ -10,7 +10,7 @@ import Test.Tasty.HUnit
 
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Int (Int32)
-import HaskellMobile
+import Hatter
   ( Action(..)
   , OnChange(..)
   , createAction
@@ -18,13 +18,13 @@ import HaskellMobile
   , newActionState
   , runActionM
   )
-import HaskellMobile.Widget
+import Hatter.Widget
   ( ButtonConfig(..)
   , TextConfig(..)
   , Widget(..)
   , WidgetStyle(..)
   )
-import HaskellMobile.Render
+import Hatter.Render
   ( RenderState(..)
   , RenderedNode(..)
   , renderWidget

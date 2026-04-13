@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-/* Dialog action codes (must match HaskellMobile.Dialog) */
+/* Dialog action codes (must match Hatter.Dialog) */
 #define DIALOG_BUTTON_1   0
 #define DIALOG_BUTTON_2   1
 #define DIALOG_BUTTON_3   2

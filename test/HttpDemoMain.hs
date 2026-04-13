@@ -10,7 +10,7 @@ import qualified Data.ByteString as BS
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Text (pack)
 import Foreign.Ptr (Ptr)
-import HaskellMobile
+import Hatter
   ( MobileApp(..)
   , Action
   , startMobileApp
@@ -28,8 +28,8 @@ import HaskellMobile
   , runActionM
   , createAction
   )
-import HaskellMobile.AppContext (AppContext(..))
-import HaskellMobile.Widget
+import Hatter.AppContext (AppContext(..))
+import Hatter.Widget
   ( ButtonConfig(..)
   , TextConfig(..)
   , Widget(..)

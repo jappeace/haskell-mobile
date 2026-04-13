@@ -1,5 +1,5 @@
-# Change log for haskell-mobile
+# Change log for hatter
 
 ## Version 1.0.0
 
-Initial release of haskell-mobile.
+Initial release of hatter.

@@ -2,13 +2,13 @@ module Main where
 
 import Test.Tasty
 
-import HaskellMobile (startMobileApp, derefAppContext, AppContext(..))
-import HaskellMobile.Permission (PermissionState)
-import HaskellMobile.SecureStorage (SecureStorageState)
-import HaskellMobile.Dialog (DialogState)
-import HaskellMobile.AuthSession (AuthSessionState)
-import HaskellMobile.BottomSheet (BottomSheetState)
-import HaskellMobile.Http (HttpState)
+import Hatter (startMobileApp, derefAppContext, AppContext(..))
+import Hatter.Permission (PermissionState)
+import Hatter.SecureStorage (SecureStorageState)
+import Hatter.Dialog (DialogState)
+import Hatter.AuthSession (AuthSessionState)
+import Hatter.BottomSheet (BottomSheetState)
+import Hatter.Http (HttpState)
 import Test.Helpers (testApp)
 import Test.CoreTests (qcProps, unitTests, lifecycleTests, localeTests, i18nTests)
 import Test.WidgetTests (uiTests, scrollViewTests, textInputTests, imageTests, webViewTests, mapViewTests, styledTests, textAlignTests, colorTests)

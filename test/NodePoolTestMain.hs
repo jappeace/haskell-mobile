@@ -8,9 +8,9 @@ module Main where
 
 import Data.Text (pack)
 import Foreign.Ptr (Ptr)
-import HaskellMobile (MobileApp(..), UserState(..), startMobileApp, AppContext, newActionState)
-import HaskellMobile.Lifecycle (loggingMobileContext)
-import HaskellMobile.Widget (TextConfig(..), Widget(..))
+import Hatter (MobileApp(..), UserState(..), startMobileApp, AppContext, newActionState)
+import Hatter.Lifecycle (loggingMobileContext)
+import Hatter.Widget (TextConfig(..), Widget(..))
 
 -- | Render 300 nodes: 1 Column parent + 299 Text children.
 nodePoolTestView :: UserState -> IO Widget

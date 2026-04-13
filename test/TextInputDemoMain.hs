@@ -6,8 +6,8 @@
 module Main where
 
 import Foreign.Ptr (Ptr)
-import HaskellMobile (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext, newActionState, runActionM, createOnChange, OnChange)
-import HaskellMobile.Widget (InputType(..), TextConfig(..), TextInputConfig(..), Widget(..))
+import Hatter (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), AppContext, newActionState, runActionM, createOnChange, OnChange)
+import Hatter.Widget (InputType(..), TextConfig(..), TextInputConfig(..), Widget(..))
 
 main :: IO (Ptr AppContext)
 main = do

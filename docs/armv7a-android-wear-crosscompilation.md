@@ -209,7 +209,7 @@ works because `d_ptr` values in `_DYNAMIC` are already absolute addresses.
 
 ## Consumer Changes (prrrrrrrrr)
 
-The haskell-mobile `test-aeabi-only` / `fix/armv7a-profiling` branch also
+The hatter `test-aeabi-only` / `fix/armv7a-profiling` branch also
 includes the Action handles API change (PR #126). Consumer apps need to:
 
 1. Create an `ActionState` with `newActionState`

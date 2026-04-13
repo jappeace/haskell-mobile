@@ -15,6 +15,6 @@ let
   };
 in
 lib.mkAndroidLib {
-  haskellMobileSrc = ../.;
+  hatterSrc = ../.;
   inherit mainModule crossDeps maxNodes dynamicNodePool;
 }

@@ -11,7 +11,7 @@ import Test.Tasty.HUnit
 import Control.Exception (IOException, throwIO, try)
 import Data.IORef (newIORef, readIORef, writeIORef, modifyIORef')
 import Data.List (isInfixOf)
-import HaskellMobile
+import Hatter
   ( MobileApp(..)
   , UserState(..)
   , Action(..)
@@ -26,24 +26,24 @@ import HaskellMobile
   , derefAppContext
   , AppContext(..)
   )
-import HaskellMobile.AppContext (newAppContext)
-import HaskellMobile.Lifecycle
+import Hatter.AppContext (newAppContext)
+import Hatter.Lifecycle
   ( LifecycleEvent(..)
   , MobileContext(..)
   , defaultMobileContext
   )
-import HaskellMobile.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
-import HaskellMobile.Permission (newPermissionState)
-import HaskellMobile.SecureStorage (newSecureStorageState)
-import HaskellMobile.Ble (newBleState)
-import HaskellMobile.Dialog (newDialogState)
-import HaskellMobile.Location (newLocationState)
-import HaskellMobile.AuthSession (newAuthSessionState)
-import HaskellMobile.Camera (newCameraState)
-import HaskellMobile.BottomSheet (newBottomSheetState)
-import HaskellMobile.Http (newHttpState)
-import HaskellMobile.Animation (newAnimationState)
-import HaskellMobile.NetworkStatus (newNetworkStatusState)
+import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
+import Hatter.Permission (newPermissionState)
+import Hatter.SecureStorage (newSecureStorageState)
+import Hatter.Ble (newBleState)
+import Hatter.Dialog (newDialogState)
+import Hatter.Location (newLocationState)
+import Hatter.AuthSession (newAuthSessionState)
+import Hatter.Camera (newCameraState)
+import Hatter.BottomSheet (newBottomSheetState)
+import Hatter.Http (newHttpState)
+import Hatter.Animation (newAnimationState)
+import Hatter.NetworkStatus (newNetworkStatusState)
 import Test.Helpers (testApp, viewIsErrorWidget)
 
 -- | Tests for the AppContext-based registration.

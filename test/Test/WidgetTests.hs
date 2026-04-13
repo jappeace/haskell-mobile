@@ -17,7 +17,7 @@ import Test.Tasty.HUnit
 
 import Data.ByteString qualified as BS
 import Data.IORef (newIORef, readIORef, modifyIORef')
-import HaskellMobile
+import Hatter
   ( MobileApp(..)
   , UserState(..)
   , Action(..)
@@ -25,7 +25,7 @@ import HaskellMobile
   , createAction
   , createOnChange
   )
-import HaskellMobile.Widget
+import Hatter.Widget
   ( ButtonConfig(..)
   , Color(..)
   , FontConfig(..)
@@ -45,18 +45,18 @@ import HaskellMobile.Widget
   , colorToHex
   , defaultStyle
   )
-import HaskellMobile.Render (renderWidget, dispatchEvent, dispatchTextEvent)
-import HaskellMobile.Permission (newPermissionState)
-import HaskellMobile.SecureStorage (newSecureStorageState)
-import HaskellMobile.Ble (newBleState)
-import HaskellMobile.Dialog (newDialogState)
-import HaskellMobile.Location (newLocationState)
-import HaskellMobile.AuthSession (newAuthSessionState)
-import HaskellMobile.Camera (newCameraState)
-import HaskellMobile.BottomSheet (newBottomSheetState)
-import HaskellMobile.Http (newHttpState)
-import HaskellMobile.Animation (newAnimationState)
-import HaskellMobile.NetworkStatus (newNetworkStatusState)
+import Hatter.Render (renderWidget, dispatchEvent, dispatchTextEvent)
+import Hatter.Permission (newPermissionState)
+import Hatter.SecureStorage (newSecureStorageState)
+import Hatter.Ble (newBleState)
+import Hatter.Dialog (newDialogState)
+import Hatter.Location (newLocationState)
+import Hatter.AuthSession (newAuthSessionState)
+import Hatter.Camera (newCameraState)
+import Hatter.BottomSheet (newBottomSheetState)
+import Hatter.Http (newHttpState)
+import Hatter.Animation (newAnimationState)
+import Hatter.NetworkStatus (newNetworkStatusState)
 import Test.Helpers (withActions, testApp)
 
 uiTests :: TestTree

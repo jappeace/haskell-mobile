@@ -3,7 +3,7 @@
   pkgs ? import ./nix/pkgs.nix {},
 }:
 hpkgs.shellFor {
-  packages = ps: [ ps."haskell-mobile-project" ];
+  packages = ps: [ ps."hatter-project" ];
   withHoogle = false;
 
   buildInputs = [

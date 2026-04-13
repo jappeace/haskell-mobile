@@ -7,5 +7,5 @@ in
 lib.mkWatchOSSimulatorApp {
   inherit watchosLib;
   watchosSrc = ../watchos;
-  name = "haskell-mobile-watchos-simulator-app";
+  name = "hatter-watchos-simulator-app";
 }

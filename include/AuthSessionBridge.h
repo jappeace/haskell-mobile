@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-/* Auth session status codes (must match HaskellMobile.AuthSession) */
+/* Auth session status codes (must match Hatter.AuthSession) */
 #define AUTH_SESSION_SUCCESS    0
 #define AUTH_SESSION_CANCELLED  1
 #define AUTH_SESSION_ERROR      2

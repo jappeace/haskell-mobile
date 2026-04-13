@@ -10,12 +10,12 @@ import Foreign.Ptr (nullPtr)
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import HaskellMobile
+import Hatter
   ( AnimatedConfig(..)
   , Easing(..)
   , newActionState
   )
-import HaskellMobile.Animation
+import Hatter.Animation
   ( ActiveTween(..)
   , AnimationState(..)
   , applyEasing
@@ -24,8 +24,8 @@ import HaskellMobile.Animation
   , newAnimationState
   , registerTween
   )
-import HaskellMobile.Render (RenderState(..), RenderedNode(..), newRenderState, renderWidget)
-import HaskellMobile.Widget
+import Hatter.Render (RenderState(..), RenderedNode(..), newRenderState, renderWidget)
+import Hatter.Widget
   ( Color(..)
   , Widget(..)
   , WidgetStyle(..)

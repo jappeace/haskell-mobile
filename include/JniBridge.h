@@ -5,18 +5,18 @@
  * jni_bridge.c (and any extra JNI C sources) so the resulting
  * symbols match the Java package of the actual application.
  *
- * Default: me_jappie_haskellmobile (haskell-mobile's own demo app).
+ * Default: me_jappie_hatter (hatter's own demo app).
  */
 
 #ifndef JNI_BRIDGE_H
 #define JNI_BRIDGE_H
 
 #ifndef JNI_PACKAGE
-#define JNI_PACKAGE me_jappie_haskellmobile
+#define JNI_PACKAGE me_jappie_hatter
 #endif
 
 #ifndef JNI_CLASS
-#define JNI_CLASS HaskellMobileActivity
+#define JNI_CLASS HatterActivity
 #endif
 
 /* Two levels of indirection so JNI_PACKAGE / JNI_CLASS are expanded

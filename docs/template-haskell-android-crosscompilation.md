@@ -38,7 +38,7 @@ entries (via `makeGot` in `rts/linker/elf_got.c`) go through
 Five components, all configured in the consumer's `nix/android.nix`. The
 consumer passes a modified `sources` (with QEMU overlay) and an `hpkgs`
 overlay (with iserv-proxy overrides and mkDerivation patching) to
-haskell-mobile's `cross-deps.nix`.
+hatter's `cross-deps.nix`.
 
 ### 1. Static iserv-proxy-interpreter
 
@@ -322,7 +322,7 @@ The consumer passes this modified nixpkgs to `cross-deps.nix`:
 ```nix
 sourcesWithQemuFix = sources // { nixpkgs = ./nixpkgs-qemu-fix; };
 
-crossDeps = import "${haskellMobileSrc}/nix/cross-deps.nix" {
+crossDeps = import "${hatterSrc}/nix/cross-deps.nix" {
   sources = sourcesWithQemuFix;
   inherit androidArch consumerCabal2Nix;
   hpkgs = self: super: { ... };

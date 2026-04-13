@@ -1,5 +1,5 @@
 /*
- * Platform-aware logging for HaskellMobile.
+ * Platform-aware logging for Hatter.
  *
  * Uses Android logcat, Apple os_log, or stderr depending on platform.
  * Called from Haskell via FFI to log lifecycle events and diagnostics.
@@ -15,7 +15,7 @@
 static os_log_t haskell_log(void) {
     static os_log_t log = NULL;
     if (!log) {
-        log = os_log_create("me.jappie.haskellmobile", "HaskellMobile");
+        log = os_log_create("me.jappie.hatter", "Hatter");
     }
     return log;
 }
@@ -23,12 +23,12 @@ static os_log_t haskell_log(void) {
 #include <stdio.h>
 #endif
 
-void haskellMobileLog(const char *msg) {
+void hatterLog(const char *msg) {
 #ifdef __ANDROID__
-    __android_log_print(ANDROID_LOG_INFO, "HaskellMobile", "%s", msg);
+    __android_log_print(ANDROID_LOG_INFO, "Hatter", "%s", msg);
 #elif defined(__APPLE__)
     os_log_with_type(haskell_log(), OS_LOG_TYPE_INFO, "%{public}s", msg);
 #else
-    fprintf(stderr, "[HaskellMobile] %s\n", msg);
+    fprintf(stderr, "[Hatter] %s\n", msg);
 #endif
 }

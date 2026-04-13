@@ -23,10 +23,10 @@ import Data.Text qualified as Text
 import Foreign.C.String (newCString)
 import Foreign.Marshal.Alloc (free)
 import Foreign.Ptr (nullPtr)
-import HaskellMobile (freeAppContext, derefAppContext, AppContext(..))
-import HaskellMobile.AppContext (newAppContext)
-import HaskellMobile.Widget (TextConfig(..), Widget(..))
-import HaskellMobile.Permission
+import Hatter (freeAppContext, derefAppContext, AppContext(..))
+import Hatter.AppContext (newAppContext)
+import Hatter.Widget (TextConfig(..), Widget(..))
+import Hatter.Permission
   ( PermissionStatus(..)
   , PermissionState(..)
   , newPermissionState
@@ -37,7 +37,7 @@ import HaskellMobile.Permission
   , permissionStatusFromInt
   , Permission(..)
   )
-import HaskellMobile.SecureStorage
+import Hatter.SecureStorage
   ( SecureStorageStatus(..)
   , SecureStorageState(..)
   , newSecureStorageState
@@ -47,7 +47,7 @@ import HaskellMobile.SecureStorage
   , dispatchSecureStorageResult
   , storageStatusFromInt
   )
-import HaskellMobile.Ble
+import Hatter.Ble
   ( BleAdapterStatus(..)
   , BleScanResult(..)
   , BleState(..)
@@ -59,7 +59,7 @@ import HaskellMobile.Ble
   , stopBleScan
   , dispatchBleScanResult
   )
-import HaskellMobile.Dialog
+import Hatter.Dialog
   ( DialogAction(..)
   , DialogConfig(..)
   , DialogState(..)
@@ -68,7 +68,7 @@ import HaskellMobile.Dialog
   , dispatchDialogResult
   , dialogActionFromInt
   )
-import HaskellMobile.AuthSession
+import Hatter.AuthSession
   ( AuthSessionResult(..)
   , AuthSessionState(..)
   , newAuthSessionState
@@ -76,7 +76,7 @@ import HaskellMobile.AuthSession
   , dispatchAuthSessionResult
   , authSessionResultFromInt
   )
-import HaskellMobile.Location
+import Hatter.Location
   ( LocationData(..)
   , LocationState(..)
   , newLocationState
@@ -84,7 +84,7 @@ import HaskellMobile.Location
   , stopLocationUpdates
   , dispatchLocationUpdate
   )
-import HaskellMobile.BottomSheet
+import Hatter.BottomSheet
   ( BottomSheetAction(..)
   , BottomSheetConfig(..)
   , BottomSheetState(..)
@@ -93,7 +93,7 @@ import HaskellMobile.BottomSheet
   , dispatchBottomSheetResult
   , bottomSheetActionFromInt
   )
-import HaskellMobile.Camera
+import Hatter.Camera
   ( CameraStatus(..)
   , Picture(..)
   , CameraResult(..)
@@ -109,7 +109,7 @@ import HaskellMobile.Camera
   , dispatchAudioChunk
   , CameraSource(..)
   )
-import HaskellMobile.Http
+import Hatter.Http
   ( HttpMethod(..)
   , HttpRequest(..)
   , HttpResponse(..)
@@ -122,7 +122,7 @@ import HaskellMobile.Http
   , parseHeaders
   , dispatchHttpResult
   )
-import HaskellMobile.NetworkStatus
+import Hatter.NetworkStatus
   ( NetworkTransport(..)
   , NetworkStatus(..)
   , NetworkStatusState(..)
@@ -522,12 +522,12 @@ authSessionTests ffiAuthSessionState = sequentialTestGroup "AuthSession" AllFini
       ref <- newIORef (Nothing :: Maybe AuthSessionResult)
       startAuthSession ffiAuthSessionState
         "https://example.com/auth?client_id=demo"
-        "haskellmobile"
+        "hatter"
         (\result -> writeIORef ref (Just result))
       result <- readIORef ref
       case result of
         Just (AuthSessionSuccess redirectUrl) -> do
-          assertBool "redirect URL contains scheme" ("haskellmobile://" `Text.isPrefixOf` redirectUrl)
+          assertBool "redirect URL contains scheme" ("hatter://" `Text.isPrefixOf` redirectUrl)
           assertBool "redirect URL contains code param" ("code=DESKTOP_STUB_CODE" `Text.isInfixOf` redirectUrl)
         _ -> assertFailure $ "expected AuthSessionSuccess, got: " ++ show result
 
