@@ -32,36 +32,14 @@ let
     inherit androidArch;
   };
 
-  # QEMU overlay for TH cross-compilation (both architectures).
+  # QEMU overlay for aarch64 TH cross-compilation.
   # Without -B, QEMU uses guest_base=0: guest addresses map directly to
   # host addresses.  The guest binary loads at ~0x200000 where QEMU's own
   # code resides, so mmap hints from GHC's RTS linker are ignored.
-  #
-  # aarch64: -B 0x4000000000 (256 GiB) shifts guest address space to
-  # keep loaded .o code within +-4 GiB ADRP relocation range.
-  #
-  # armv7a: -B 0x10000000 (256 MiB) shifts guest address space away from
-  # QEMU's host mappings.  Without this, the static iserv-proxy binary
-  # (loaded at 0x10000) overlaps QEMU's JIT code cache, causing segfaults
-  # when dlsym iterates the .dynsym table (issue #147).
-  #
-  # armv7a personality shim: Android Bionic's 32-bit static binary
-  # startup calls personality(0xffffffff), which QEMU passes to the
-  # host kernel.  The Nix build sandbox blocks this syscall via seccomp,
-  # returning EPERM — Bionic treats this as fatal and aborts.  The shim
-  # is LD_PRELOADed into the *host-side* QEMU process to intercept
-  # the libc personality() call.  64-bit Bionic skips the personality
-  # call (#if !defined(__LP64__)), so aarch64 is unaffected.
-  qemuOverlay = final: prev:
-    let
-      personalityShim = prev.runCommand "personality-shim" {
-        nativeBuildInputs = [ prev.gcc ];
-      } ''
-        mkdir -p $out/lib
-        gcc -shared -fPIC -o $out/lib/personality_shim.so \
-          ${./th-support/personality_shim.c}
-      '';
-    in {
+  # Loaded .o code lands far from the binary's symbols, exceeding the
+  # +-4 GiB range of aarch64 ADRP relocations.
+  # -B 0x4000000000 shifts the guest address space by 256 GiB.
+  qemuOverlay = final: prev: {
     qemu-user = prev.symlinkJoin {
       name = "qemu-user-with-guest-base";
       paths = [ prev.qemu-user ];
@@ -72,13 +50,6 @@ let
 exec ${prev.qemu-user}/bin/qemu-aarch64 -B 0x4000000000 "$@"
 WRAPPER
         chmod +x $out/bin/qemu-aarch64
-
-        rm $out/bin/qemu-arm
-        cat > $out/bin/qemu-arm <<'WRAPPER'
-#!/bin/sh
-exec env LD_PRELOAD=${personalityShim}/lib/personality_shim.so ${prev.qemu-user}/bin/qemu-arm -B 0x10000000 "$@"
-WRAPPER
-        chmod +x $out/bin/qemu-arm
       '';
     };
   };
@@ -86,8 +57,9 @@ WRAPPER
   pkgs = import nixpkgsSrc ({
     config.allowUnfree = true;
     config.android_sdk.accept_license = true;
-    overlays = [ qemuOverlay ];
-  });
+  } // (if androidArch == "aarch64"
+        then { overlays = [ qemuOverlay ]; }
+        else {}));
 
   # Cross-compilation toolchain
   androidPkgs = pkgs.pkgsCross.${archConfig.crossAttr};

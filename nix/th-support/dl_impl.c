@@ -310,10 +310,7 @@ void *dlsym(void *handle, const char *symbol) {
     }
 #endif
 
-    if (!g_symtab || !g_strtab) {
-        diag("dl_impl: dlsym: no symtab/strtab\n");
-        return NULL;
-    }
+    if (!g_symtab || !g_strtab) return NULL;
     for (i = 0; i < g_nsyms; i++) {
         if (g_strsz > 0 && g_symtab[i].st_name >= g_strsz) continue;
         if (g_symtab[i].st_shndx != SHN_UNDEF &&
