@@ -59,10 +59,11 @@ import Data.IORef (newIORef, readIORef, modifyIORef')
 import Data.Text qualified as Text
 import Foreign.Ptr (Ptr)
 import Hatter
-  ( startMobileApp, MobileApp(..), AppContext
+  ( startMobileApp, MobileApp(..)
   , loggingMobileContext
   , newActionState, runActionM, createAction, Action
   )
+import Hatter.AppContext (AppContext)
 import Hatter.Widget
 
 main :: IO (Ptr AppContext)

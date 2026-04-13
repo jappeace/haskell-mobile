@@ -143,6 +143,7 @@ import Hatter.Lifecycle
   , platformLog
   , lifecycleFromInt
   )
+import Hatter.Locale ()  -- for foreign export ccall haskellLogLocale
 import Hatter.Location (dispatchLocationUpdate)
 import Hatter.NetworkStatus (dispatchNetworkStatusChange)
 import Hatter.Permission (dispatchPermissionResult)
