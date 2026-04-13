@@ -35,22 +35,26 @@ install_apk() {
     return 0
 }
 
-# Fatal patterns that indicate the native library failed to load.
+# Fatal patterns that indicate the app crashed.
 # When any of these appear in logcat, further retries are pointless.
 FATAL_PATTERNS="UnsatisfiedLinkError|dlopen failed|cannot locate symbol|SIGABRT|SIGSEGV|Fatal signal"
 
 # check_fatal_logcat
-# Checks logcat for fatal native-library errors.
-# If found, prints the relevant lines and returns 0 (meaning "fatal found").
-# Returns 1 if no fatal error detected.
+# Checks logcat for fatal crash indicators.
+# If found, dumps the full unfiltered logcat so the native backtrace
+# (from debuggerd) is visible in CI output.
+# Returns 0 if fatal found, 1 if no fatal error detected.
 check_fatal_logcat() {
     local logcat_poll="$WORK_DIR/logcat_fatal.txt"
-    "$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:E' > "$logcat_poll" 2>&1 || true
+    "$ADB" -s "$EMULATOR_SERIAL" logcat -d > "$logcat_poll" 2>&1 || true
     if grep -qE "$FATAL_PATTERNS" "$logcat_poll" 2>/dev/null; then
         echo ""
-        echo "=== FATAL: Native library loading error detected ==="
-        grep -E "$FATAL_PATTERNS" "$logcat_poll" | tail -20
-        echo "=== End fatal logcat ==="
+        echo "=== FATAL: App crashed ==="
+        # Print the full logcat so the debuggerd native backtrace,
+        # Java stack traces, and Haskell RTS errors are all visible.
+        # Last 200 lines covers the crash dump + context.
+        tail -200 "$logcat_poll"
+        echo "=== End crash logcat ==="
         echo ""
         return 0
     fi
@@ -58,14 +62,14 @@ check_fatal_logcat() {
 }
 
 # dump_logcat LABEL
-# Dumps recent logcat errors to stdout for CI visibility.
+# Dumps recent logcat (all levels) to stdout for CI visibility.
 dump_logcat() {
     local label="$1"
     local logcat_dump="$WORK_DIR/logcat_dump_${label}.txt"
-    "$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:W' > "$logcat_dump" 2>&1 || true
+    "$ADB" -s "$EMULATOR_SERIAL" logcat -d > "$logcat_dump" 2>&1 || true
     echo ""
-    echo "=== Logcat dump ($label) — last 40 warning/error lines ==="
-    tail -40 "$logcat_dump"
+    echo "=== Logcat dump ($label) — last 200 lines ==="
+    tail -200 "$logcat_dump"
     echo "=== End logcat dump ==="
     echo ""
 }
@@ -195,7 +199,7 @@ wait_for_render() {
     local wait_rc=$?
     if [ $wait_rc -eq 2 ]; then
         dump_logcat "$label"
-        echo "FATAL: Native library failed to load — aborting"
+        echo "FATAL: App crashed before rendering — aborting $label"
         exit 1
     fi
 }
