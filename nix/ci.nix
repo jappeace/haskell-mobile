@@ -35,10 +35,24 @@ let
     };
   } else {});
 
+  # Known-failing targets: documented upstream issues, not included in
+  # all-builds but available for manual testing.
+  #
+  # th-direct-test-armv7a: Template Haskell on armv7a crashes with SIGSEGV
+  # in GHC's RTS linker during GC (heap closure has invalid info pointer).
+  # Root cause: GHC's ARM32 RTS linker is broken with per-function ELF
+  # sections (LLVM -ffunction-sections) in statically-linked iserv
+  # (GHC #14291, haskell.nix #1544).  ARM32 support is effectively
+  # abandoned in GHC — GHCup dropped it, haskell.nix closed as wontfix.
+  # Regular armv7a cross-compilation (without TH) works fine.
+  knownFailing = {
+    th-direct-test-armv7a = import ./test-th-direct.nix { inherit sources; androidArch = "armv7a"; };
+  };
+
   testScripts = builtins.path { path = ../test; name = "test-scripts"; };
 
 in
-  buildTargets // testRunners // {
+  buildTargets // testRunners // knownFailing // {
     # Meta-target: builds every compilation/link-test target.
     # Excludes emulator/simulator runners (they have dedicated CI jobs).
     # Adding a new attr to buildTargets automatically includes it here.
