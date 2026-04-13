@@ -24,6 +24,7 @@
 #include "HttpBridge.h"
 #include "NetworkStatusBridge.h"
 #include "AnimationBridge.h"
+#include "PlatformSignInBridge.h"
 
 /* Runs the user's Haskell main via RTS API (cbits/run_main.c).
  * Returns the opaque AppContext pointer. */
@@ -64,6 +65,13 @@ extern void haskellOnHttpResult(void *ctx, int32_t requestId,
                                  const char *body, int32_t bodyLen);
 extern void haskellOnNetworkStatusChange(void *ctx, int connected, int transport);
 extern void haskellOnAnimationFrame(void *ctx, double timestampMs);
+extern void haskellOnPlatformSignInResult(void *ctx, int32_t requestId,
+                                           int32_t statusCode,
+                                           const char *identityToken,
+                                           const char *userId,
+                                           const char *email,
+                                           const char *fullName,
+                                           int32_t provider);
 
 /* Android UI bridge (from ui_bridge_android.c) */
 extern void setup_android_ui_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
@@ -101,6 +109,9 @@ extern void setup_android_network_status_bridge(JNIEnv *env, jobject activity, v
 
 /* Android animation bridge (from animation_bridge_android.c) */
 extern void setup_android_animation_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
+
+/* Android platform sign-in bridge (from platform_sign_in_android.c) */
+extern void setup_android_platform_sign_in_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
 
 /* Lifecycle event codes (must match Hatter.h) */
 #define LIFECYCLE_CREATE     0
@@ -190,6 +201,7 @@ JNI_METHOD(renderUI)(JNIEnv *env, jobject thiz)
     setup_android_http_bridge(env, thiz, g_haskell_ctx);
     setup_android_network_status_bridge(env, thiz, g_haskell_ctx);
     setup_android_animation_bridge(env, thiz, g_haskell_ctx);
+    setup_android_platform_sign_in_bridge(env, thiz, g_haskell_ctx);
     haskellRenderUI(g_haskell_ctx);
 }
 

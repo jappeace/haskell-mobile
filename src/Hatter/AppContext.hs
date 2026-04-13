@@ -26,6 +26,7 @@ import Hatter.Lifecycle (MobileContext)
 import Hatter.Location (LocationState(..), newLocationState)
 import Hatter.NetworkStatus (NetworkStatusState(..), newNetworkStatusState)
 import Hatter.Permission (PermissionState(..), newPermissionState)
+import Hatter.PlatformSignIn (PlatformSignInState(..), newPlatformSignInState)
 import Hatter.Render (RenderState, newRenderState)
 import Hatter.SecureStorage (SecureStorageState(..), newSecureStorageState)
 import Hatter.Types (MobileApp(..), UserState(..))
@@ -49,6 +50,7 @@ data AppContext = AppContext
   , acHttpState           :: HttpState
   , acNetworkStatusState  :: NetworkStatusState
   , acAnimationState      :: AnimationState
+  , acPlatformSignInState :: PlatformSignInState
   , acViewFunction        :: IORef (UserState -> IO Widget)
   , acDismissAction       :: Action
     -- ^ Pre-registered dismiss action for the error widget.
@@ -76,7 +78,8 @@ newAppContext mobileApp = do
   cameraState        <- newCameraState
   bottomSheetState   <- newBottomSheetState
   httpState          <- newHttpState
-  networkStatusState <- newNetworkStatusState
+  networkStatusState    <- newNetworkStatusState
+  platformSignInState   <- newPlatformSignInState
   viewRef            <- newIORef (maView mobileApp)
   -- Pre-register a dismiss action that reads from an IORef.
   -- The real dismiss logic is written by handleException at exception time.
@@ -97,6 +100,7 @@ newAppContext mobileApp = do
         , acHttpState          = httpState
         , acNetworkStatusState = networkStatusState
         , acAnimationState     = animationState
+        , acPlatformSignInState = platformSignInState
         , acViewFunction       = viewRef
         , acDismissAction      = dismissAction
         , acDismissRef         = dismissRef
@@ -115,6 +119,7 @@ newAppContext mobileApp = do
   writeIORef (hsContextPtr httpState) (castPtr ptr)
   writeIORef (nssContextPtr networkStatusState) (castPtr ptr)
   writeIORef (ansContextPtr animationState) (castPtr ptr)
+  writeIORef (psiContextPtr platformSignInState) (castPtr ptr)
   pure ptr
 
 -- | Release a pointer previously created by 'newAppContext'.

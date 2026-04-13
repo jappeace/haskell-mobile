@@ -10,6 +10,7 @@
 #include "BottomSheetBridge.h"
 #include "NetworkStatusBridge.h"
 #include "AnimationBridge.h"
+#include "PlatformSignInBridge.h"
 
 /* Dispatch a text change event to Haskell.
  * Not declared in Hatter.h but exported via foreign export ccall. */

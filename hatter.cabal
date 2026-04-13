@@ -105,6 +105,7 @@ library
       Hatter.Dialog
       Hatter.Location
       Hatter.AuthSession
+      Hatter.PlatformSignIn
       Hatter.Camera
       Hatter.BottomSheet
       Hatter.Http
@@ -128,6 +129,7 @@ library
       cbits/dialog_bridge.c
       cbits/location_bridge.c
       cbits/auth_session_bridge.c
+      cbits/platform_sign_in_bridge.c
       cbits/camera_bridge.c
       cbits/bottom_sheet_bridge.c
       cbits/http_bridge.c

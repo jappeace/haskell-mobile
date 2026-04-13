@@ -163,6 +163,17 @@ let
     name = "hatter-authsession-apk";
   };
 
+  platformSignInAndroid = import ./android.nix {
+    inherit sources androidArch;
+    mainModule = ../test/PlatformSignInDemoMain.hs;
+  };
+  platformSignInApk = lib.mkApk {
+    sharedLibs = [{ lib = platformSignInAndroid; inherit abiDir; }];
+    androidSrc = ../android;
+    apkName = "hatter-platformsignin.apk";
+    name = "hatter-platformsignin-apk";
+  };
+
   cameraAndroid = import ./android.nix {
     inherit sources androidArch;
     mainModule = ../test/CameraDemoMain.hs;
@@ -290,6 +301,7 @@ DIALOG_APK="${dialogApk}/hatter-dialog.apk"
 LOCATION_APK="${locationApk}/hatter-location.apk"
 WEBVIEW_APK="${webviewApk}/hatter-webview.apk"
 AUTH_SESSION_APK="${authSessionApk}/hatter-authsession.apk"
+PLATFORM_SIGN_IN_APK="${platformSignInApk}/hatter-platformsignin.apk"
 CAMERA_APK="${cameraApk}/hatter-camera.apk"
 BOTTOM_SHEET_APK="${bottomSheetApk}/hatter-bottomsheet.apk"
 HTTP_APK="${httpApk}/hatter-http.apk"
@@ -319,6 +331,7 @@ for so_path in \
     "${dialogAndroid}/lib/${abiDir}/libhatter.so" \
     "${webviewAndroid}/lib/${abiDir}/libhatter.so" \
     "${authSessionAndroid}/lib/${abiDir}/libhatter.so" \
+    "${platformSignInAndroid}/lib/${abiDir}/libhatter.so" \
     "${cameraAndroid}/lib/${abiDir}/libhatter.so" \
     "${bottomSheetAndroid}/lib/${abiDir}/libhatter.so" \
     "${httpAndroid}/lib/${abiDir}/libhatter.so" \
@@ -509,7 +522,7 @@ sleep 30
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK FILES_DIR_APK PACKAGE ACTIVITY WORK_DIR
+export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PLATFORM_SIGN_IN_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK FILES_DIR_APK PACKAGE ACTIVITY WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -591,6 +604,8 @@ echo "--- mapview ---"
 run_with_retry "mapview" bash "$TEST_SCRIPTS/android/mapview.sh" || PHASE9_EXIT=1
 echo "--- authsession ---"
 run_with_retry "authsession" bash "$TEST_SCRIPTS/android/authsession.sh" || PHASE10_EXIT=1
+echo "--- platformsignin ---"
+run_with_retry "platformsignin" bash "$TEST_SCRIPTS/android/platformsignin.sh" || PHASE10_EXIT=1
 echo "--- camera ---"
 run_with_retry "camera" bash "$TEST_SCRIPTS/android/camera.sh" || PHASE10_EXIT=1
 echo "--- bottomsheet ---"

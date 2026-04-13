@@ -84,6 +84,10 @@ public class HatterActivity extends Activity implements View.OnClickListener {
                                       String headers, byte[] body);
     private native void onNetworkStatusChange(int connected, int transport);
     private native void onAnimationFrame(double timestampMs);
+    private native void onPlatformSignInResult(int requestId, int statusCode,
+                                                String identityToken, String userId,
+                                                String email, String fullName,
+                                                int provider);
 
     private static final String SECURE_PREFS_NAME = "hatter_secure_storage";
 
@@ -646,6 +650,63 @@ public class HatterActivity extends Activity implements View.OnClickListener {
                                  intent.getData().toString(), null);
             pendingAuthRequestId = -1;
         }
+    }
+
+    /**
+     * Start a platform sign-in flow. Called from native code via JNI.
+     * requestId: opaque ID passed back in the result callback.
+     * provider: 0 = Apple (not available on Android), 1 = Google.
+     */
+    public void startPlatformSignIn(int requestId, int provider) {
+        /* Apple Sign-In is not available on Android */
+        if (provider == 0) {
+            onPlatformSignInResult(requestId, 2 /* ERROR */,
+                                    null, null, null,
+                                    "Apple Sign-In not available on Android", 0);
+            return;
+        }
+
+        /* In autotest mode, return stub Google credentials */
+        if (getIntent().hasExtra("autotest")) {
+            onPlatformSignInResult(requestId, 0 /* SUCCESS */,
+                                    "ANDROID_AUTOTEST_GOOGLE_TOKEN",
+                                    "google-autotest-001",
+                                    "autotest@gmail.com",
+                                    "Autotest User", 1);
+            return;
+        }
+
+        /* Production Google sign-in via AccountManager */
+        android.accounts.AccountManager accountManager =
+            android.accounts.AccountManager.get(this);
+        android.accounts.Account[] accounts =
+            accountManager.getAccountsByType("com.google");
+        if (accounts.length == 0) {
+            onPlatformSignInResult(requestId, 2 /* ERROR */,
+                                    null, null, null,
+                                    "No Google accounts found", 1);
+            return;
+        }
+
+        android.accounts.Account account = accounts[0];
+        accountManager.getAuthToken(account, "oauth2:email profile openid",
+            null, this, new android.accounts.AccountManagerCallback<Bundle>() {
+                @Override
+                public void run(android.accounts.AccountManagerFuture<Bundle> future) {
+                    try {
+                        Bundle result = future.getResult();
+                        String token = result.getString(android.accounts.AccountManager.KEY_AUTHTOKEN);
+                        String accountName = account.name;
+                        onPlatformSignInResult(requestId, 0 /* SUCCESS */,
+                                                token, accountName,
+                                                accountName, null, 1);
+                    } catch (Exception e) {
+                        onPlatformSignInResult(requestId, 2 /* ERROR */,
+                                                null, null, null,
+                                                e.getMessage(), 1);
+                    }
+                }
+            }, new Handler());
     }
 
     /**

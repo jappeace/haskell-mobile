@@ -20,6 +20,7 @@ import Hatter.Lifecycle (MobileContext)
 import Hatter.Location (LocationState)
 import Hatter.NetworkStatus (NetworkStatusState)
 import Hatter.Permission (PermissionState)
+import Hatter.PlatformSignIn (PlatformSignInState)
 import Hatter.SecureStorage (SecureStorageState)
 import Hatter.Widget (Widget)
 
@@ -38,7 +39,8 @@ data UserState = UserState
   , userBottomSheetState   :: BottomSheetState
   , userHttpState              :: HttpState
   , userNetworkStatusState    :: NetworkStatusState
-  , userAnimationState     :: AnimationState
+  , userAnimationState        :: AnimationState
+  , userPlatformSignInState   :: PlatformSignInState
   }
 
 -- | Application definition record. Downstream apps create one of these

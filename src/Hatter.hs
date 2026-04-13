@@ -37,6 +37,7 @@
 -- * "Hatter.Dialog" — native alert dialogs
 -- * "Hatter.Location" — GPS \/ location updates
 -- * "Hatter.AuthSession" — OAuth browser sessions
+-- * "Hatter.PlatformSignIn" — native platform sign-in (Apple\/Google)
 -- * "Hatter.Camera" — photo & video capture
 -- * "Hatter.BottomSheet" — modal bottom sheets
 -- * "Hatter.Http" — HTTP requests
@@ -124,6 +125,7 @@ import Hatter.Action
 import Hatter.Animation (dispatchAnimationFrame)
 import Hatter.AppContext (AppContext(..), newAppContext, derefAppContext)
 import Hatter.AuthSession (dispatchAuthSessionResult)
+import Hatter.PlatformSignIn (dispatchPlatformSignInResult)
 import Hatter.Ble (dispatchBleScanResult)
 import Hatter.BottomSheet (dispatchBottomSheetResult)
 import Hatter.Camera
@@ -141,6 +143,7 @@ import Hatter.Lifecycle
   , platformLog
   , lifecycleFromInt
   )
+import Hatter.Locale ()  -- for foreign export ccall haskellLogLocale
 import Hatter.Location (dispatchLocationUpdate)
 import Hatter.NetworkStatus (dispatchNetworkStatusChange)
 import Hatter.Permission (dispatchPermissionResult)
@@ -232,7 +235,8 @@ renderView ctxPtr = do
         , userBottomSheetState   = acBottomSheetState appCtx
         , userHttpState              = acHttpState appCtx
         , userNetworkStatusState    = acNetworkStatusState appCtx
-        , userAnimationState     = acAnimationState appCtx
+        , userAnimationState        = acAnimationState appCtx
+        , userPlatformSignInState   = acPlatformSignInState appCtx
         }
   widget <- viewFunction userState
   renderWidget (acRenderState appCtx) widget
@@ -373,6 +377,24 @@ haskellOnAuthSessionResult ctxPtr requestId statusCode cRedirectUrl cErrorMsg =
     dispatchAuthSessionResult (acAuthSessionState appCtx) requestId statusCode maybeRedirectUrl maybeErrorMsg
 
 foreign export ccall haskellOnAuthSessionResult :: Ptr AppContext -> CInt -> CInt -> CString -> CString -> IO ()
+
+-- | Handle a platform sign-in result from native code. Dispatches to the
+-- callback registered by 'Hatter.PlatformSignIn.startPlatformSignIn'.
+-- The @cIdentityToken@, @cUserId@, @cEmail@, @cFullName@ parameters
+-- carry credential fields; null values become 'Nothing'.
+haskellOnPlatformSignInResult :: Ptr AppContext -> CInt -> CInt -> CString -> CString -> CString -> CString -> CInt -> IO ()
+haskellOnPlatformSignInResult ctxPtr requestId statusCode cIdentityToken cUserId cEmail cFullName cProvider =
+  withExceptionHandler ctxPtr $ do
+    appCtx <- derefAppContext ctxPtr
+    maybeToken    <- peekOptionalCString cIdentityToken
+    maybeUserId   <- peekOptionalCString cUserId
+    maybeEmail    <- peekOptionalCString cEmail
+    maybeFullName <- peekOptionalCString cFullName
+    dispatchPlatformSignInResult (acPlatformSignInState appCtx)
+      requestId statusCode maybeToken maybeUserId maybeEmail maybeFullName cProvider
+
+foreign export ccall haskellOnPlatformSignInResult
+  :: Ptr AppContext -> CInt -> CInt -> CString -> CString -> CString -> CString -> CInt -> IO ()
 
 -- | Handle a camera result from native code. Dispatches to the
 -- callback registered by 'Hatter.Camera.capturePhoto' or 'Hatter.Camera.startVideoCapture'.
