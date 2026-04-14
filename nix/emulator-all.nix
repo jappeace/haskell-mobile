@@ -262,6 +262,37 @@ let
     name = "hatter-filesdir-apk";
   };
 
+  # Consumer simulation — exercises crossDeps + extraJniBridge (issue #156).
+  # Real consumer apps (e.g. prrrrrrrrr) supply Hackage dependencies via
+  # crossDeps.  None of hatter's own tests exercise this path, so a SIGSEGV
+  # in consumer .so files went undetected.  This test uses hashable as a
+  # minimal non-boot dependency to trigger the consumer build path.
+  consumerSimCrossDeps = import ./cross-deps.nix {
+    inherit sources androidArch;
+    consumerCabal2Nix =
+      { mkDerivation, base, lib, hashable }:
+      mkDerivation {
+        pname = "consumer-sim";
+        version = "0.1.0.0";
+        libraryHaskellDepends = [ base hashable ];
+        license = lib.licenses.mit;
+      };
+  };
+
+  consumerSimAndroid = lib.mkAndroidLib {
+    hatterSrc = ../.;
+    mainModule = ../test/ConsumerSimDemoMain.hs;
+    crossDeps = consumerSimCrossDeps;
+    extraJniBridge = [ ../test/dummy_jni_consumer.c ];
+  };
+
+  consumerSimApk = lib.mkApk {
+    sharedLibs = [{ lib = consumerSimAndroid; inherit abiDir; }];
+    androidSrc = ../android;
+    apkName = "hatter-consumersim.apk";
+    name = "hatter-consumersim-apk";
+  };
+
   androidComposition = pkgs.androidenv.composeAndroidPackages {
     platformVersions = [ emulatorApiLevel ];
     includeEmulator = true;
@@ -321,6 +352,7 @@ NETWORK_STATUS_APK="${networkStatusApk}/hatter-networkstatus.apk"
 MAPVIEW_APK="${mapviewApk}/hatter-mapview.apk"
 ANIMATION_APK="${animationApk}/hatter-animation.apk"
 FILES_DIR_APK="${filesDirApk}/hatter-filesdir.apk"
+CONSUMER_SIM_APK="${consumerSimApk}/hatter-consumersim.apk"
 PACKAGE="me.jappie.hatter"
 ACTIVITY=".MainActivity"
 DEVICE_NAME="test_all"
@@ -351,7 +383,8 @@ for so_path in \
     "${networkStatusAndroid}/lib/${abiDir}/libhatter.so" \
     "${mapviewAndroid}/lib/${abiDir}/libhatter.so" \
     "${animationAndroid}/lib/${abiDir}/libhatter.so" \
-    "${filesDirAndroid}/lib/${abiDir}/libhatter.so"; do
+    "${filesDirAndroid}/lib/${abiDir}/libhatter.so" \
+    "${consumerSimAndroid}/lib/${abiDir}/libhatter.so"; do
     SO_BYTES=$(stat -c %s "$so_path")
     SO_MB=$((SO_BYTES / 1048576))
     SO_LABEL=$(echo "$so_path" | grep -oP '[^/]+(?=/lib/)')
@@ -419,6 +452,7 @@ PHASE11_OK=0
 PHASE12_OK=0
 PHASE13_OK=0
 PHASE14_OK=0
+PHASE15_OK=0
 
 cleanup() {
     echo ""
@@ -535,7 +569,7 @@ sleep 30
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK SCROLL_TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PLATFORM_SIGN_IN_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK FILES_DIR_APK PACKAGE ACTIVITY WORK_DIR
+export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK SCROLL_TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PLATFORM_SIGN_IN_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK FILES_DIR_APK CONSUMER_SIM_APK PACKAGE ACTIVITY WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -551,6 +585,7 @@ PHASE11_EXIT=0
 PHASE12_EXIT=0
 PHASE13_EXIT=0
 PHASE14_EXIT=0
+PHASE15_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -633,6 +668,8 @@ echo "--- animation ---"
 run_with_retry "animation" bash "$TEST_SCRIPTS/android/animation.sh" || PHASE13_EXIT=1
 echo "--- filesdir ---"
 run_with_retry "filesdir" bash "$TEST_SCRIPTS/android/filesdir.sh" || PHASE14_EXIT=1
+echo "--- consumer_sim ---"
+run_with_retry "consumer_sim" bash "$TEST_SCRIPTS/android/consumer_sim.sh" || PHASE15_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -773,6 +810,16 @@ else
     echo "PHASE 14 FAILED"
 fi
 
+if [ $PHASE15_EXIT -eq 0 ]; then
+    PHASE15_OK=1
+    echo ""
+    echo "PHASE 15 PASSED"
+else
+    PHASE15_OK=0
+    echo ""
+    echo "PHASE 15 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -878,6 +925,13 @@ if [ $PHASE14_OK -eq 1 ]; then
     echo "PASS  Phase 14 — FilesDir demo app"
 else
     echo "FAIL  Phase 14 — FilesDir demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE15_OK -eq 1 ]; then
+    echo "PASS  Phase 15 — Consumer simulation (crossDeps + extraJniBridge)"
+else
+    echo "FAIL  Phase 15 — Consumer simulation (crossDeps + extraJniBridge)"
     FINAL_EXIT=1
 fi
 
