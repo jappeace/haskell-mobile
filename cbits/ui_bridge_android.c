@@ -101,6 +101,7 @@ static jmethodID g_method_loadUrl;
 static jmethodID g_method_getSettings;
 static jmethodID g_method_setJavaScriptEnabled;
 static jmethodID g_method_registerWebViewClient;
+static jmethodID g_method_getChildAt;
 
 /* LinearLayout orientation constants */
 static jint ORIENTATION_VERTICAL   = 1;
@@ -224,6 +225,8 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
         "removeView", "(Landroid/view/View;)V");
     g_method_removeAllViews = (*env)->GetMethodID(env, g_class_ViewGroup,
         "removeAllViews", "()V");
+    g_method_getChildAt = (*env)->GetMethodID(env, g_class_ViewGroup,
+        "getChildAt", "(I)Landroid/view/View;");
 
     /* Activity.setContentView(View) */
     jclass activityClass = (*env)->GetObjectClass(env, activity);
@@ -439,9 +442,19 @@ static int32_t android_create_node(int32_t nodeType)
     case UI_NODE_TEXT_INPUT:
         view = (*env)->NewObject(env, g_class_EditText, g_ctor_EditText, g_activity);
         break;
-    case UI_NODE_SCROLL_VIEW:
+    case UI_NODE_SCROLL_VIEW: {
         view = (*env)->NewObject(env, g_class_ScrollView, g_ctor_ScrollView, g_activity);
+        /* Android ScrollView only accepts one direct child.
+         * Create an inner vertical LinearLayout so that multiple
+         * Haskell children can be added via addChild(). */
+        jobject innerLayout = (*env)->NewObject(env, g_class_LinearLayout,
+            g_ctor_LinearLayout, g_activity);
+        (*env)->CallVoidMethod(env, innerLayout, g_method_setOrientation,
+            ORIENTATION_VERTICAL);
+        (*env)->CallVoidMethod(env, view, g_method_addView, innerLayout);
+        (*env)->DeleteLocalRef(env, innerLayout);
         break;
+    }
     case UI_NODE_IMAGE:
         view = (*env)->NewObject(env, g_class_ImageView, g_ctor_ImageView, g_activity);
         break;
@@ -798,6 +811,19 @@ static void android_add_child(int32_t parentId, int32_t childId)
     jobject child  = get_node(childId);
     if (!parent || !child) return;
 
+    /* Android ScrollView only accepts one direct child.
+     * Redirect to the inner LinearLayout wrapper (child 0)
+     * that was created in android_create_node. */
+    if ((*env)->IsInstanceOf(env, parent, g_class_ScrollView)) {
+        jobject innerLayout = (*env)->CallObjectMethod(env, parent,
+            g_method_getChildAt, (jint)0);
+        if (innerLayout) {
+            (*env)->CallVoidMethod(env, innerLayout, g_method_addView, child);
+            (*env)->DeleteLocalRef(env, innerLayout);
+            return;
+        }
+    }
+
     (*env)->CallVoidMethod(env, parent, g_method_addView, child);
 }
 
@@ -807,6 +833,17 @@ static void android_remove_child(int32_t parentId, int32_t childId)
     jobject parent = get_node(parentId);
     jobject child  = get_node(childId);
     if (!parent || !child) return;
+
+    /* ScrollView: redirect to inner LinearLayout wrapper. */
+    if ((*env)->IsInstanceOf(env, parent, g_class_ScrollView)) {
+        jobject innerLayout = (*env)->CallObjectMethod(env, parent,
+            g_method_getChildAt, (jint)0);
+        if (innerLayout) {
+            (*env)->CallVoidMethod(env, innerLayout, g_method_removeView, child);
+            (*env)->DeleteLocalRef(env, innerLayout);
+            return;
+        }
+    }
 
     (*env)->CallVoidMethod(env, parent, g_method_removeView, child);
 }

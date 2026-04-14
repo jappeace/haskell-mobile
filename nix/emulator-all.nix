@@ -63,6 +63,17 @@ let
     name = "hatter-textinput-apk";
   };
 
+  scrollTextInputAndroid = import ./android.nix {
+    inherit sources androidArch;
+    mainModule = ../test/ScrollTextInputDemoMain.hs;
+  };
+  scrollTextInputApk = lib.mkApk {
+    sharedLibs = [{ lib = scrollTextInputAndroid; inherit abiDir; }];
+    androidSrc = ../android;
+    apkName = "hatter-scrolltextinput.apk";
+    name = "hatter-scrolltextinput-apk";
+  };
+
   permissionAndroid = import ./android.nix {
     inherit sources androidArch;
     mainModule = ../test/PermissionDemoMain.hs;
@@ -292,6 +303,7 @@ AVDMANAGER="${sdk}/bin/avdmanager"
 COUNTER_APK="${counterApk}/hatter.apk"
 SCROLL_APK="${scrollApk}/hatter-scroll.apk"
 TEXTINPUT_APK="${textinputApk}/hatter-textinput.apk"
+SCROLL_TEXTINPUT_APK="${scrollTextInputApk}/hatter-scrolltextinput.apk"
 PERMISSION_APK="${permissionApk}/hatter-permission.apk"
 SECURE_STORAGE_APK="${secureStorageApk}/hatter-securestorage.apk"
 IMAGE_APK="${imageApk}/hatter-image.apk"
@@ -323,6 +335,7 @@ for so_path in \
     "${counterAndroid}/lib/${abiDir}/libhatter.so" \
     "${scrollAndroid}/lib/${abiDir}/libhatter.so" \
     "${textinputAndroid}/lib/${abiDir}/libhatter.so" \
+    "${scrollTextInputAndroid}/lib/${abiDir}/libhatter.so" \
     "${permissionAndroid}/lib/${abiDir}/libhatter.so" \
     "${secureStorageAndroid}/lib/${abiDir}/libhatter.so" \
     "${imageAndroid}/lib/${abiDir}/libhatter.so" \
@@ -522,7 +535,7 @@ sleep 30
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PLATFORM_SIGN_IN_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK FILES_DIR_APK PACKAGE ACTIVITY WORK_DIR
+export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK SCROLL_TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PLATFORM_SIGN_IN_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK FILES_DIR_APK PACKAGE ACTIVITY WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -584,6 +597,8 @@ echo "--- locale ---"
 run_with_retry "locale"    bash "$TEST_SCRIPTS/android/locale.sh"    || PHASE1_EXIT=1
 echo "--- textinput ---"
 run_with_retry "textinput" bash "$TEST_SCRIPTS/android/textinput.sh" || PHASE3_EXIT=1
+echo "--- scroll_textinput ---"
+run_with_retry "scroll_textinput" bash "$TEST_SCRIPTS/android/scroll_textinput.sh" || PHASE3_EXIT=1
 echo "--- permission ---"
 run_with_retry "permission" bash "$TEST_SCRIPTS/android/permission.sh" || PHASE4_EXIT=1
 echo "--- securestorage ---"
