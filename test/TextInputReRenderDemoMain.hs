@@ -47,6 +47,7 @@ textInputReRenderView typedRef onChange = do
         , tiValue      = typed
         , tiOnChange   = onChange
         , tiFontConfig = Nothing
+        , tiAutoFocus  = True
         }
     , Text TextConfig
         { tcLabel      = displayLabel
