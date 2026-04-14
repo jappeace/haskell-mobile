@@ -65,23 +65,54 @@ fi
 # Wait for keyboard to fully settle
 sleep 5
 
+# Diagnostic: verify our app has focus and keyboard is shown
+echo "Focused window:"
+"$ADB" -s "$EMULATOR_SERIAL" shell dumpsys window | grep -E "mCurrentFocus|mFocusedWindow" || true
+echo "Input method status:"
+"$ADB" -s "$EMULATOR_SERIAL" shell dumpsys input_method | grep -E "mActive|mServedView|mInputShown" | head -5 || true
+
 # Type "hello" character by character using keyevent.
 # Individual KEYCODE_* events are more reliable than "input text"
 # on CI emulators where the soft keyboard may deactivate.
 echo "Typing 'hello' via individual keyevents..."
 "$ADB" -s "$EMULATOR_SERIAL" shell input keyevent KEYCODE_H
-sleep 0.5
+sleep 1
+
+# Diagnostic: check if first character triggered anything
+echo "After 'h' - checking logcat for TextChange:"
+grep -i "TextChange\|text change\|view rebuilt" "$LOGCAT_STREAM_FILE" 2>/dev/null | tail -5 || echo "(no text change logs)"
+
 "$ADB" -s "$EMULATOR_SERIAL" shell input keyevent KEYCODE_E
-sleep 0.5
+sleep 1
 "$ADB" -s "$EMULATOR_SERIAL" shell input keyevent KEYCODE_L
-sleep 0.5
+sleep 1
 "$ADB" -s "$EMULATOR_SERIAL" shell input keyevent KEYCODE_L
-sleep 0.5
+sleep 1
 "$ADB" -s "$EMULATOR_SERIAL" shell input keyevent KEYCODE_O
 echo "Done typing."
 
 # Wait for all key events to be processed and render to complete
 sleep 10
+
+# Diagnostic: dump UI to check EditText text content
+POST_DUMP="$WORK_DIR/textinput_rerender_post.xml"
+if "$ADB" -s "$EMULATOR_SERIAL" shell uiautomator dump /data/local/tmp/ui_post.xml 2>&1 | grep -q "dumped"; then
+    "$ADB" -s "$EMULATOR_SERIAL" pull /data/local/tmp/ui_post.xml "$POST_DUMP" 2>/dev/null
+    echo "=== Post-typing text values ==="
+    grep -o 'text="[^"]*"' "$POST_DUMP" 2>/dev/null | grep -v 'text=""' | head -10 || echo "(all empty)"
+    echo "=== EditText details ==="
+    grep 'class="android.widget.EditText"' "$POST_DUMP" 2>/dev/null | head -3 || echo "(no EditText)"
+    echo "==="
+fi
+
+# Diagnostic: focused window — is our app still foreground?
+echo "Post-typing focused window:"
+"$ADB" -s "$EMULATOR_SERIAL" shell dumpsys window | grep -E "mCurrentFocus|mFocusedWindow" || true
+
+# Diagnostic: app-specific logcat lines
+echo "=== App logcat lines ==="
+grep -i "hatter\|jappie\|view rebuilt\|setRoot\|setStrProp\|TextChange\|text change\|onUITextChange" "$LOGCAT_STREAM_FILE" 2>/dev/null | tail -30 || echo "(no app lines)"
+echo "=== End app logcat ==="
 
 # The key assertion: after typing, the view function should have been
 # called with the updated state, producing a logcat line like:
