@@ -34,6 +34,7 @@ textInputDemoView onWeightChange onNameChange = pure $ Column
       , tiValue      = ""
       , tiOnChange   = onWeightChange
       , tiFontConfig = Nothing
+      , tiAutoFocus  = True
       }
   , TextInput TextInputConfig
       { tiInputType  = InputText
@@ -41,5 +42,6 @@ textInputDemoView onWeightChange onNameChange = pure $ Column
       , tiValue      = ""
       , tiOnChange   = onNameChange
       , tiFontConfig = Nothing
+      , tiAutoFocus  = False
       }
   ]

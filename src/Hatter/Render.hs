@@ -20,6 +20,7 @@ module Hatter.Render
   )
 where
 
+import Control.Monad (when)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Int (Int32)
 import Data.Text (Text, pack)
@@ -168,6 +169,8 @@ createRenderedNode _animState widget@(TextInput config) = do
   Bridge.setNumProp nodeId Bridge.PropInputType (fromIntegral (inputTypeToInt (tiInputType config)))
   Bridge.setHandler nodeId Bridge.EventTextChange (onChangeId (tiOnChange config))
   applyFontConfig nodeId (tiFontConfig config)
+  when (tiAutoFocus config) $
+    Bridge.setNumProp nodeId Bridge.PropAutoFocus 1.0
   pure (RenderedLeaf widget nodeId)
 createRenderedNode animState widget@(Column children) = do
   nodeId <- Bridge.createNode Bridge.NodeColumn

@@ -1040,6 +1040,15 @@ public class HatterActivity extends Activity implements View.OnClickListener {
     }
 
     /**
+     * Request focus on a view, deferred via View.post() to ensure the
+     * view is attached to the hierarchy first. Called from native code
+     * when a TextInput has autoFocus enabled.
+     */
+    public void requestFocusOnView(final View view) {
+        view.post(view::requestFocus);
+    }
+
+    /**
      * Register a TextWatcher on an EditText. Called from native code
      * when a TextInput widget has an EventTextChange handler.
      * The watcher forwards text changes to the native onTextChange method.

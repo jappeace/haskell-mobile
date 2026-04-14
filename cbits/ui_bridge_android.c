@@ -102,6 +102,7 @@ static jmethodID g_method_getSettings;
 static jmethodID g_method_setJavaScriptEnabled;
 static jmethodID g_method_registerWebViewClient;
 static jmethodID g_method_getChildAt;
+static jmethodID g_method_requestFocusOnView;
 
 /* LinearLayout orientation constants */
 static jint ORIENTATION_VERTICAL   = 1;
@@ -327,6 +328,14 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
         "registerWebViewClient", "(Landroid/webkit/WebView;)V");
     if (!g_method_registerWebViewClient) {
         LOGE("registerWebViewClient not found — webview page-load events disabled");
+        (*env)->ExceptionClear(env);
+    }
+
+    /* Activity.requestFocusOnView(View) — our custom Java method */
+    g_method_requestFocusOnView = (*env)->GetMethodID(env, actClass,
+        "requestFocusOnView", "(Landroid/view/View;)V");
+    if (!g_method_requestFocusOnView) {
+        LOGE("requestFocusOnView not found — auto-focus disabled");
         (*env)->ExceptionClear(env);
     }
 
@@ -726,6 +735,15 @@ static void android_set_num_prop(int32_t nodeId, int32_t propId, double value)
             g_class_View, "setTranslationY", "(F)V");
         (*env)->CallVoidMethod(env, view, setTranslationY, (jfloat)value);
         LOGI("setNumProp(node=%d, translateY=%.1f)", nodeId, value);
+        break;
+    }
+    case UI_PROP_AUTO_FOCUS: {
+        if (g_method_requestFocusOnView) {
+            (*env)->CallVoidMethod(env, g_activity, g_method_requestFocusOnView, view);
+            LOGI("setNumProp(node=%d, autoFocus=%.0f)", nodeId, value);
+        } else {
+            LOGE("setNumProp: requestFocusOnView unavailable, skipping node=%d", nodeId);
+        }
         break;
     }
     default:

@@ -603,6 +603,15 @@ static void ios_set_num_prop(int32_t nodeId, int32_t propId, double value)
         LOGI("setNumProp(node=%d, translateY=%.1f)", nodeId, value);
         break;
     }
+    case UI_PROP_AUTO_FOCUS: {
+        if ([view isKindOfClass:[UITextField class]]) {
+            [(UITextField *)view becomeFirstResponder];
+            LOGI("setNumProp(node=%d, autoFocus=%.0f)", nodeId, value);
+        } else {
+            LOGI("setNumProp: autoFocus ignored on non-UITextField node=%d", nodeId);
+        }
+        break;
+    }
     default:
         LOGI("setNumProp: unknown propId %d", propId);
         break;

@@ -242,7 +242,7 @@ textInputTests = testGroup "TextInput"
       let widget = TextInput TextInputConfig
             { tiInputType = InputText, tiHint = "hint", tiValue = ""
             , tiOnChange = changeHandle
-            , tiFontConfig = Nothing }
+            , tiFontConfig = Nothing, tiAutoFocus = False }
       renderWidget rs widget
       dispatchTextEvent rs (onChangeId changeHandle) "hello"
       val <- readIORef ref
@@ -255,7 +255,7 @@ textInputTests = testGroup "TextInput"
       let widget = TextInput TextInputConfig
             { tiInputType = InputText, tiHint = "enter weight", tiValue = "80"
             , tiOnChange = changeHandle
-            , tiFontConfig = Nothing }
+            , tiFontConfig = Nothing, tiAutoFocus = False }
       renderWidget rs widget
       dispatchTextEvent rs (onChangeId changeHandle) "95.5"
       val <- readIORef ref
@@ -281,7 +281,7 @@ textInputTests = testGroup "TextInput"
             , TextInput TextInputConfig
                 { tiInputType = InputText, tiHint = "hint", tiValue = ""
                 , tiOnChange = changeHandle
-                , tiFontConfig = Nothing }
+                , tiFontConfig = Nothing, tiAutoFocus = False }
             ]
       renderWidget rs widget
       dispatchEvent rs (actionId clickHandle)
@@ -298,11 +298,11 @@ textInputTests = testGroup "TextInput"
       renderWidget rs $ TextInput TextInputConfig
         { tiInputType = InputText, tiHint = "old", tiValue = ""
         , tiOnChange = changeHandle
-        , tiFontConfig = Nothing }
+        , tiFontConfig = Nothing, tiAutoFocus = False }
       renderWidget rs $ TextInput TextInputConfig
         { tiInputType = InputText, tiHint = "new", tiValue = ""
         , tiOnChange = changeHandle
-        , tiFontConfig = Nothing }
+        , tiFontConfig = Nothing, tiAutoFocus = False }
       dispatchTextEvent rs (onChangeId changeHandle) "val"
       val <- readIORef ref
       val @?= show ("val" :: String)
@@ -314,7 +314,7 @@ textInputTests = testGroup "TextInput"
       let widget = TextInput TextInputConfig
             { tiInputType = InputNumber, tiHint = "weight", tiValue = ""
             , tiOnChange = changeHandle
-            , tiFontConfig = Nothing }
+            , tiFontConfig = Nothing, tiAutoFocus = False }
       renderWidget rs widget
       dispatchTextEvent rs (onChangeId changeHandle) "72.5"
       val <- readIORef ref
@@ -331,11 +331,11 @@ textInputTests = testGroup "TextInput"
             [ TextInput TextInputConfig
                 { tiInputType = InputText, tiHint = "name", tiValue = ""
                 , tiOnChange = textHandle
-                , tiFontConfig = Nothing }
+                , tiFontConfig = Nothing, tiAutoFocus = False }
             , TextInput TextInputConfig
                 { tiInputType = InputNumber, tiHint = "weight", tiValue = ""
                 , tiOnChange = numberHandle
-                , tiFontConfig = Nothing }
+                , tiFontConfig = Nothing, tiAutoFocus = False }
             ]
       renderWidget rs widget
       dispatchTextEvent rs (onChangeId textHandle) "Alice"

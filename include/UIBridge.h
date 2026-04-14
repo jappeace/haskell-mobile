@@ -35,6 +35,7 @@
 #define UI_PROP_MAP_SHOW_USER_LOC   8
 #define UI_PROP_TRANSLATE_X         9
 #define UI_PROP_TRANSLATE_Y         10
+#define UI_PROP_AUTO_FOCUS          11
 
 /* Event types */
 #define UI_EVENT_CLICK       0
