@@ -345,6 +345,29 @@ diffRenderNode animState (Just oldNode@(RenderedContainer _ containerNodeId oldC
       -- but fall through to destroy+create for safety.
       _ -> replaceNode animState oldNode newWidget
 
+-- Case: TextInput in-place update — keep native node to preserve
+-- cursor position and focus. Only sends bridge calls for properties
+-- that actually changed.
+diffRenderNode _animState (Just (RenderedLeaf (TextInput oldConfig) nodeId)) newWidget@(TextInput newConfig) = do
+  if tiValue oldConfig /= tiValue newConfig
+    then Bridge.setStrProp nodeId Bridge.PropText (tiValue newConfig)
+    else pure ()
+  if tiHint oldConfig /= tiHint newConfig
+    then Bridge.setStrProp nodeId Bridge.PropHint (tiHint newConfig)
+    else pure ()
+  if tiInputType oldConfig /= tiInputType newConfig
+    then Bridge.setNumProp nodeId Bridge.PropInputType
+           (fromIntegral (inputTypeToInt (tiInputType newConfig)))
+    else pure ()
+  if onChangeId (tiOnChange oldConfig) /= onChangeId (tiOnChange newConfig)
+    then Bridge.setHandler nodeId Bridge.EventTextChange
+           (onChangeId (tiOnChange newConfig))
+    else pure ()
+  if tiFontConfig oldConfig /= tiFontConfig newConfig
+    then applyFontConfig nodeId (tiFontConfig newConfig)
+    else pure ()
+  pure (RenderedLeaf newWidget nodeId)
+
 -- Case 5/6: Same leaf type with different properties, or completely different
 -- node types — destroy old and create new.
 diffRenderNode animState (Just oldNode) newWidget =
@@ -419,7 +442,9 @@ dispatchEvent rs callbackId = do
       "dispatchEvent: unknown callback ID " ++ show callbackId
 
 -- | Dispatch a native text-change event to the registered Haskell callback.
--- Does NOT trigger a re-render (avoids EditText flicker on Android).
+-- The caller ('Hatter.haskellOnUITextChange') triggers a re-render
+-- after dispatch; the diff algorithm updates TextInput nodes in-place
+-- so the native widget is preserved (no cursor reset or flicker).
 -- Logs an error to stderr if the callbackId is not found.
 dispatchTextEvent :: RenderState -> Int32 -> Text -> IO ()
 dispatchTextEvent rs callbackId newText = do

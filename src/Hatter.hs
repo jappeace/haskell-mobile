@@ -283,14 +283,18 @@ haskellOnUIEvent ctxPtr callbackId =
 foreign export ccall haskellOnUIEvent :: Ptr AppContext -> CInt -> IO ()
 
 -- | Handle a text change event from native code. Dispatches the callback
--- identified by @callbackId@ with the new text value. Does NOT re-render
--- to avoid EditText cursor/flicker issues on Android.
+-- identified by @callbackId@ with the new text value, then re-renders
+-- the UI so that state changes caused by the callback become visible.
+-- TextInput nodes are diffed in-place (see 'Hatter.Render.diffRenderNode')
+-- to avoid destroying and recreating the native widget, which would
+-- reset the cursor position and cause flicker on Android.
 haskellOnUITextChange :: Ptr AppContext -> CInt -> CString -> IO ()
 haskellOnUITextChange ctxPtr callbackId cstr =
   withExceptionHandler ctxPtr $ do
     appCtx <- derefAppContext ctxPtr
     str <- peekCString cstr
     dispatchTextEvent (acRenderState appCtx) (fromIntegral callbackId) (pack str)
+    renderView ctxPtr
 
 foreign export ccall haskellOnUITextChange :: Ptr AppContext -> CInt -> CString -> IO ()
 
