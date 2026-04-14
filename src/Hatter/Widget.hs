@@ -84,16 +84,21 @@ data InputType
 -- | Configuration for a text input field.
 -- Follows a controlled-component pattern: Haskell owns the state.
 data TextInputConfig = TextInputConfig
-  { tiInputType :: InputType
+  { tiInputType  :: InputType
     -- ^ Which on-screen keyboard to present.
-  , tiHint      :: Text
+  , tiHint       :: Text
     -- ^ Placeholder text shown when the field is empty.
-  , tiValue     :: Text
+  , tiValue      :: Text
     -- ^ Current text value (controlled by Haskell).
-  , tiOnChange  :: OnChange
+  , tiOnChange   :: OnChange
     -- ^ Handle for the callback fired when the user edits the field.
   , tiFontConfig :: Maybe FontConfig
     -- ^ Optional font override.
+  , tiAutoFocus  :: Bool
+    -- ^ Whether this input should receive focus when rendered.
+    -- On Android, defers @requestFocus()@ via @View.post()@ to ensure the
+    -- view is attached to the hierarchy first. On iOS, calls
+    -- @becomeFirstResponder@. No-op on watchOS.
   } deriving (Show, Eq)
 
 -- | Horizontal text alignment for text-bearing widgets.

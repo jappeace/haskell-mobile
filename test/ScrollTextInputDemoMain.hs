@@ -45,6 +45,7 @@ scrollTextInputView save back onWeight onNotes = pure $ ScrollView
       , tiValue      = ""
       , tiOnChange   = onWeight
       , tiFontConfig = Nothing
+      , tiAutoFocus  = False
       }
   , TextInput TextInputConfig
       { tiInputType  = InputText
@@ -52,6 +53,7 @@ scrollTextInputView save back onWeight onNotes = pure $ ScrollView
       , tiValue      = ""
       , tiOnChange   = onNotes
       , tiFontConfig = Nothing
+      , tiAutoFocus  = False
       }
   , Row
     [ Button ButtonConfig
