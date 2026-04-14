@@ -8,7 +8,11 @@
 #
 # Required env vars (set by emulator-all.nix harness):
 #   ADB, EMULATOR_SERIAL, ASYNC_OOM_APK, PACKAGE, ACTIVITY, WORK_DIR
-set -euo pipefail
+
+# NOTE: we intentionally use set -uo pipefail WITHOUT -e here.
+# With errexit, diagnostic commands that find nothing (grep returns 1)
+# would kill the script before we can report what happened.
+set -uo pipefail
 source "$(dirname "$0")/helpers.sh"
 
 EXIT_CODE=0
@@ -21,23 +25,20 @@ start_app "$ASYNC_OOM_APK" "async_oom"
 wait_for_logcat "async loaded" 60
 WAIT_RC=$?
 
-# --- Diagnostics (always run, even on success) ---
-# Temporarily disable errexit so diagnostic commands can't kill the script.
-set +e
-
+# --- Diagnostics (always run) ---
 echo ""
 echo "=== async_oom: logcat warnings/errors (last 80 lines) ==="
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:W' 2>&1 | tail -80
+"$ADB" -s "$EMULATOR_SERIAL" logcat -d '*:W' 2>&1 | tail -80 || true
 echo "=== end async_oom logcat ==="
 
 echo ""
 echo "=== async_oom: process status ==="
-"$ADB" -s "$EMULATOR_SERIAL" shell "ps -A 2>/dev/null | grep -i jappie || echo 'Process not found (likely killed)'"
+"$ADB" -s "$EMULATOR_SERIAL" shell "ps -A 2>/dev/null | grep -i jappie || echo 'Process not found (likely killed)'" || true
 echo "=== end process status ==="
 
 # Check for OOM/kill indicators
 LOGCAT_OOM="$WORK_DIR/async_oom_logcat.txt"
-"$ADB" -s "$EMULATOR_SERIAL" logcat -d > "$LOGCAT_OOM" 2>&1
+"$ADB" -s "$EMULATOR_SERIAL" logcat -d > "$LOGCAT_OOM" 2>&1 || true
 echo ""
 echo "=== async_oom: OOM/kill indicators ==="
 grep -iE "oom|out of memory|lowmemory|am_kill|am_proc_died|killing|lmk" "$LOGCAT_OOM" | grep -i "jappie\|hatter\|oom\|kill\|memory" | tail -20 || echo "(none found)"
@@ -48,15 +49,13 @@ echo ""
 echo "=== async_oom: native crash indicators ==="
 grep -E "UnsatisfiedLinkError|dlopen failed|cannot locate symbol|SIGABRT|SIGSEGV|Fatal signal" "$LOGCAT_OOM" | tail -10 || echo "(none found)"
 echo "=== end native crash indicators ==="
-
-set -e
 # --- End diagnostics ---
 
-if [ $WAIT_RC -eq 2 ]; then
+if [ "$WAIT_RC" -eq 2 ]; then
     echo ""
     echo "FATAL: Native library failed to load (expected for async OOM reproducer)"
     EXIT_CODE=1
-elif [ $WAIT_RC -eq 1 ]; then
+elif [ "$WAIT_RC" -eq 1 ]; then
     echo ""
     echo "FAIL: Timed out waiting for 'async loaded' (app likely OOM-killed)"
     EXIT_CODE=1
