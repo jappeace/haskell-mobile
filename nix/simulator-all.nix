@@ -241,6 +241,17 @@ let
     name = "hatter-filesdir-simulator-app";
   };
 
+  textinputRerenderIos = import ./ios.nix {
+    inherit sources;
+    mainModule = ../test/TextInputReRenderDemoMain.hs;
+    simulator = true;
+  };
+  textinputRerenderSimApp = lib.mkSimulatorApp {
+    iosLib = textinputRerenderIos;
+    iosSrc = ../ios;
+    name = "hatter-textinput-rerender-simulator-app";
+  };
+
   xcodegen = pkgs.xcodegen;
 
   testScripts = builtins.path { path = ../test; name = "test-scripts"; };
@@ -281,6 +292,7 @@ NETWORK_STATUS_SHARE_DIR="${networkStatusSimApp}/share/ios"
 MAPVIEW_SHARE_DIR="${mapviewSimApp}/share/ios"
 ANIMATION_SHARE_DIR="${animationSimApp}/share/ios"
 FILES_DIR_SHARE_DIR="${filesDirSimApp}/share/ios"
+TEXTINPUT_RERENDER_SHARE_DIR="${textinputRerenderSimApp}/share/ios"
 TEST_SCRIPTS="${testScripts}"
 
 # --- Temp working directory ---
@@ -302,6 +314,7 @@ PHASE11_OK=0
 PHASE12_OK=0
 PHASE13_OK=0
 PHASE14_OK=0
+PHASE15_OK=0
 
 cleanup() {
     echo ""
@@ -342,7 +355,8 @@ for share_dir in \
     "$CAMERA_SHARE_DIR" \
     "$BOTTOM_SHEET_SHARE_DIR" \
     "$HTTP_SHARE_DIR" \
-    "$MAPVIEW_SHARE_DIR"; do
+    "$MAPVIEW_SHARE_DIR" \
+    "$TEXTINPUT_RERENDER_SHARE_DIR"; do
     a_path="$share_dir/lib/libHatter.a"
     A_BYTES=$(stat -f %z "$a_path" 2>/dev/null || stat -c %s "$a_path" 2>/dev/null || echo 0)
     A_MB=$((A_BYTES / 1048576))
@@ -1289,6 +1303,52 @@ if [ -z "$FILES_DIR_APP" ]; then
 fi
 echo "FilesDir app: $FILES_DIR_APP"
 
+# --- Stage and build textinput-rerender demo app ---
+echo "=== Staging textinput-rerender demo app ==="
+mkdir -p "$WORK_DIR/textinput-rerender/lib" "$WORK_DIR/textinput-rerender/include"
+cp "$TEXTINPUT_RERENDER_SHARE_DIR/lib/libHatter.a" "$WORK_DIR/textinput-rerender/lib/"
+cp "$TEXTINPUT_RERENDER_SHARE_DIR/include/Hatter.h" "$WORK_DIR/textinput-rerender/include/"
+cp "$TEXTINPUT_RERENDER_SHARE_DIR/include/UIBridge.h" "$WORK_DIR/textinput-rerender/include/"
+cp "$TEXTINPUT_RERENDER_SHARE_DIR/include/PermissionBridge.h" "$WORK_DIR/textinput-rerender/include/"
+cp "$TEXTINPUT_RERENDER_SHARE_DIR/include/SecureStorageBridge.h" "$WORK_DIR/textinput-rerender/include/"
+cp "$TEXTINPUT_RERENDER_SHARE_DIR/include/BleBridge.h" "$WORK_DIR/textinput-rerender/include/"
+cp "$TEXTINPUT_RERENDER_SHARE_DIR/include/DialogBridge.h" "$WORK_DIR/textinput-rerender/include/"
+cp "$TEXTINPUT_RERENDER_SHARE_DIR/include/LocationBridge.h" "$WORK_DIR/textinput-rerender/include/"
+cp "$TEXTINPUT_RERENDER_SHARE_DIR/include/AuthSessionBridge.h" "$WORK_DIR/textinput-rerender/include/"
+cp "$TEXTINPUT_RERENDER_SHARE_DIR/include/PlatformSignInBridge.h" "$WORK_DIR/textinput-rerender/include/"
+cp "$TEXTINPUT_RERENDER_SHARE_DIR/include/CameraBridge.h" "$WORK_DIR/textinput-rerender/include/"
+cp "$TEXTINPUT_RERENDER_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/textinput-rerender/include/"
+cp "$TEXTINPUT_RERENDER_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/textinput-rerender/include/"
+cp "$TEXTINPUT_RERENDER_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/textinput-rerender/include/"
+cp "$TEXTINPUT_RERENDER_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/textinput-rerender/include/"
+cp -r "$TEXTINPUT_RERENDER_SHARE_DIR/Hatter" "$WORK_DIR/textinput-rerender/"
+cp "$TEXTINPUT_RERENDER_SHARE_DIR/project.yml" "$WORK_DIR/textinput-rerender/"
+chmod -R u+w "$WORK_DIR/textinput-rerender"
+
+echo "=== Generating textinput-rerender Xcode project ==="
+cd "$WORK_DIR/textinput-rerender"
+${xcodegen}/bin/xcodegen generate
+
+echo "=== Building textinput-rerender demo app for simulator ==="
+xcodebuild build \
+    -project Hatter.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk iphonesimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/textinput-rerender-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+TEXTINPUT_RERENDER_APP=$(find "$WORK_DIR/textinput-rerender-build" -name "*.app" -type d | head -1)
+if [ -z "$TEXTINPUT_RERENDER_APP" ]; then
+    echo "ERROR: Could not find textinput-rerender .app bundle"
+    exit 1
+fi
+echo "TextInputReRender app: $TEXTINPUT_RERENDER_APP"
+
 # --- Discover latest iOS runtime ---
 echo "=== Discovering iOS runtime ==="
 RUNTIME=$(xcrun simctl list runtimes -j \
@@ -1350,7 +1410,7 @@ sleep 5
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP PLATFORM_SIGN_IN_APP CAMERA_APP BOTTOM_SHEET_APP HTTP_APP NETWORK_STATUS_APP MAPVIEW_APP ANIMATION_APP FILES_DIR_APP WORK_DIR
+export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP PLATFORM_SIGN_IN_APP CAMERA_APP BOTTOM_SHEET_APP HTTP_APP NETWORK_STATUS_APP MAPVIEW_APP ANIMATION_APP FILES_DIR_APP TEXTINPUT_RERENDER_APP WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -1366,6 +1426,7 @@ PHASE11_EXIT=0
 PHASE12_EXIT=0
 PHASE13_EXIT=0
 PHASE14_EXIT=0
+PHASE15_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -1446,6 +1507,8 @@ echo "--- animation ---"
 run_with_retry "animation" bash "$TEST_SCRIPTS/ios/animation.sh" || PHASE13_EXIT=1
 echo "--- filesdir ---"
 run_with_retry "filesdir" bash "$TEST_SCRIPTS/ios/filesdir.sh" || PHASE14_EXIT=1
+echo "--- textinput_rerender ---"
+run_with_retry "textinput_rerender" bash "$TEST_SCRIPTS/ios/textinput_rerender.sh" || PHASE15_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -1586,6 +1649,16 @@ else
     echo "PHASE 14 FAILED"
 fi
 
+if [ $PHASE15_EXIT -eq 0 ]; then
+    PHASE15_OK=1
+    echo ""
+    echo "PHASE 15 PASSED"
+else
+    PHASE15_OK=0
+    echo ""
+    echo "PHASE 15 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -1691,6 +1764,13 @@ if [ $PHASE14_OK -eq 1 ]; then
     echo "PASS  Phase 14 — FilesDir demo app"
 else
     echo "FAIL  Phase 14 — FilesDir demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE15_OK -eq 1 ]; then
+    echo "PASS  Phase 15 — TextInput re-render demo app"
+else
+    echo "FAIL  Phase 15 — TextInput re-render demo app"
     FINAL_EXIT=1
 fi
 
