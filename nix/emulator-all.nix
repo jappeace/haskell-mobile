@@ -265,16 +265,18 @@ let
   # Consumer simulation — exercises crossDeps + extraJniBridge (issue #156).
   # Real consumer apps (e.g. prrrrrrrrr) supply Hackage dependencies via
   # crossDeps.  None of hatter's own tests exercise this path, so a SIGSEGV
-  # in consumer .so files went undetected.  This test uses hashable as a
-  # minimal non-boot dependency to trigger the consumer build path.
+  # in consumer .so files went undetected.  This test uses aeson as a heavy
+  # dependency to produce a large .so (aeson pulls in scientific, vector,
+  # attoparsec, hashable, unordered-containers, primitive, etc.) that is
+  # more likely to trigger libndk_translation bugs under ARM binary translation.
   consumerSimCrossDeps = import ./cross-deps.nix {
     inherit sources androidArch;
     consumerCabal2Nix =
-      { mkDerivation, base, lib, hashable }:
+      { mkDerivation, base, lib, aeson, text, bytestring }:
       mkDerivation {
         pname = "consumer-sim";
         version = "0.1.0.0";
-        libraryHaskellDepends = [ base hashable ];
+        libraryHaskellDepends = [ base aeson text bytestring ];
         license = lib.licenses.mit;
       };
   };

@@ -25,8 +25,8 @@ assert_logcat "$LOGCAT_FILE" "setRoot" "setRoot called"
 # Demo app registered (Haskell main executed)
 assert_logcat "$LOGCAT_FILE" "ConsumerSim demo app registered" "consumer sim demo app registered"
 
-# hashable sanity check (consumer dep actually loaded and ran)
-assert_logcat "$LOGCAT_FILE" "hashable sanity:" "hashable dependency functional"
+# aeson sanity check (consumer dep actually loaded and ran)
+assert_logcat "$LOGCAT_FILE" "aeson sanity:" "aeson dependency functional"
 
 # Explicit SIGSEGV check — if the app crashed, the above assertions would
 # already have failed (wait_for_render aborts on fatal signals), but this
