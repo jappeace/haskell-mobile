@@ -149,6 +149,16 @@ executable scrollview-switch-demo
       hatter,
       text
 
+executable column-child-reorder-demo
+  import: common-options
+  main-is: ColumnChildReorderDemoMain.hs
+  ghc-options: -Wno-unused-packages -threaded
+  hs-source-dirs:
+      test
+  build-depends:
+      hatter,
+      text
+
 executable stack-demo
   import: common-options
   main-is: StackDemoMain.hs
