@@ -317,6 +317,29 @@ let
     name = "hatter-horizontal-scroll-apk";
   };
 
+  # Async OOM reproducer (issue #163) — diagnostic only.
+  # Builds .so with DEBUG_OOM instrumentation and the async Hackage dependency.
+  # Expected to OOM-kill during dlopen; we run it to capture memory checkpoints.
+  asyncOomAndroid = import ./android.nix {
+    inherit sources androidArch;
+    mainModule = ../test/AsyncOomDemoMain.hs;
+    debugOom = true;
+    consumerCabal2Nix =
+      { mkDerivation, base, lib, async, text }:
+      mkDerivation {
+        pname = "async-oom-test";
+        version = "0.1.0.0";
+        libraryHaskellDepends = [ base async text ];
+        license = lib.licenses.mit;
+      };
+  };
+  asyncOomApk = lib.mkApk {
+    sharedLibs = [{ lib = asyncOomAndroid; inherit abiDir; }];
+    androidSrc = ../android;
+    apkName = "hatter-async-oom.apk";
+    name = "hatter-async-oom-apk";
+  };
+
   androidComposition = pkgs.androidenv.composeAndroidPackages {
     platformVersions = [ emulatorApiLevel ];
     includeEmulator = true;
@@ -381,6 +404,7 @@ STACK_APK="${stackApk}/hatter-stack.apk"
 SCROLLVIEW_SWITCH_APK="${scrollviewSwitchApk}/hatter-scrollview-switch.apk"
 STYLED_TYPE_CHANGE_APK="${styledTypeChangeApk}/hatter-styled-type-change.apk"
 HORIZONTAL_SCROLL_APK="${horizontalScrollApk}/hatter-horizontal-scroll.apk"
+ASYNC_OOM_APK="${asyncOomApk}/hatter-async-oom.apk"
 PACKAGE="me.jappie.hatter"
 ACTIVITY=".MainActivity"
 DEVICE_NAME="test_all"
@@ -426,6 +450,16 @@ for so_path in \
         echo "OK    $SO_LABEL .so is ''${SO_MB} MB"
     fi
 done
+# Async OOM .so has a higher threshold — it pulls in 'async' and is known to be larger.
+ASYNC_OOM_SO="${asyncOomAndroid}/lib/${abiDir}/libhatter.so"
+ASYNC_OOM_SO_BYTES=$(stat -c %s "$ASYNC_OOM_SO")
+ASYNC_OOM_SO_MB=$((ASYNC_OOM_SO_BYTES / 1048576))
+if [ "$ASYNC_OOM_SO_MB" -gt 200 ]; then
+    echo "FAIL  async-oom-test .so is ''${ASYNC_OOM_SO_MB} MB (limit: 200 MB)"
+    SIZE_FAIL=1
+else
+    echo "OK    async-oom-test .so is ''${ASYNC_OOM_SO_MB} MB (limit: 200 MB)"
+fi
 if [ "$SIZE_FAIL" -eq 1 ]; then
     echo ""
     echo "FATAL: .so size limit exceeded. This usually means boot package .a files"
@@ -603,7 +637,7 @@ sleep 30
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK SCROLL_TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PLATFORM_SIGN_IN_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK FILES_DIR_APK TEXTINPUT_RERENDER_APK STACK_APK SCROLLVIEW_SWITCH_APK STYLED_TYPE_CHANGE_APK HORIZONTAL_SCROLL_APK PACKAGE ACTIVITY WORK_DIR
+export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK SCROLL_TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PLATFORM_SIGN_IN_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK FILES_DIR_APK TEXTINPUT_RERENDER_APK STACK_APK SCROLLVIEW_SWITCH_APK STYLED_TYPE_CHANGE_APK HORIZONTAL_SCROLL_APK ASYNC_OOM_APK PACKAGE ACTIVITY WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -716,6 +750,12 @@ echo "--- styled-type-change ---"
 run_with_retry "styled-type-change" bash "$TEST_SCRIPTS/android/styled-type-change.sh" || PHASE18_EXIT=1
 echo "--- horizontal-scroll ---"
 run_with_retry "horizontal-scroll" bash "$TEST_SCRIPTS/android/horizontal-scroll.sh" || PHASE19_EXIT=1
+
+# --- Async OOM diagnostic (expected to fail — captures memory checkpoint data) ---
+echo ""
+echo "--- async_oom (diagnostic — expected to fail) ---"
+bash "$TEST_SCRIPTS/android/async_oom.sh" || true
+echo "--- async_oom diagnostic complete ---"
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
