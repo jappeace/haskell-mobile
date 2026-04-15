@@ -52,6 +52,25 @@ __attribute__((constructor(101)))
 static void oom_debug_constructor(void) {
     log_memory_status("init_array");
 }
+
+/* malloc wrapper: intercept large allocations to find who asks for 1 GB.
+ * Linked via -Wl,--wrap=malloc — the linker renames:
+ *   malloc       → __wrap_malloc   (our function)
+ *   __real_malloc → the real malloc (for chaining)
+ */
+extern void *__real_malloc(size_t size);
+
+void *__wrap_malloc(size_t size) {
+    /* 512 MB threshold — anything this large is suspicious on 32-bit */
+    if (size >= 512 * 1024 * 1024) {
+        void *caller = __builtin_return_address(0);
+        __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
+            "LARGE malloc(%zu) = %zu MB, caller: %p",
+            size, size / (1024*1024), caller);
+        log_memory_status("large_malloc");
+    }
+    return __real_malloc(size);
+}
 #endif /* DEBUG_OOM */
 
 /* Runs the user's Haskell main via RTS API (cbits/run_main.c).
