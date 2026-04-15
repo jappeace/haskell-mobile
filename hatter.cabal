@@ -149,6 +149,16 @@ executable scrollview-switch-demo
       hatter,
       text
 
+executable animated-type-change-demo
+  import: common-options
+  main-is: AnimatedTypeChangeDemoMain.hs
+  ghc-options: -Wno-unused-packages -threaded
+  hs-source-dirs:
+      test
+  build-depends:
+      hatter,
+      text
+
 executable stack-demo
   import: common-options
   main-is: StackDemoMain.hs

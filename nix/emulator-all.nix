@@ -295,6 +295,17 @@ let
     name = "hatter-scrollview-switch-apk";
   };
 
+  animatedTypeChangeAndroid = import ./android.nix {
+    inherit sources androidArch;
+    mainModule = ../test/AnimatedTypeChangeDemoMain.hs;
+  };
+  animatedTypeChangeApk = lib.mkApk {
+    sharedLibs = [{ lib = animatedTypeChangeAndroid; inherit abiDir; }];
+    androidSrc = ../android;
+    apkName = "hatter-animated-type-change.apk";
+    name = "hatter-animated-type-change-apk";
+  };
+
   androidComposition = pkgs.androidenv.composeAndroidPackages {
     platformVersions = [ emulatorApiLevel ];
     includeEmulator = true;
@@ -357,6 +368,7 @@ FILES_DIR_APK="${filesDirApk}/hatter-filesdir.apk"
 TEXTINPUT_RERENDER_APK="${textinputRerenderApk}/hatter-textinput-rerender.apk"
 STACK_APK="${stackApk}/hatter-stack.apk"
 SCROLLVIEW_SWITCH_APK="${scrollviewSwitchApk}/hatter-scrollview-switch.apk"
+ANIMATED_TYPE_CHANGE_APK="${animatedTypeChangeApk}/hatter-animated-type-change.apk"
 PACKAGE="me.jappie.hatter"
 ACTIVITY=".MainActivity"
 DEVICE_NAME="test_all"
@@ -389,7 +401,8 @@ for so_path in \
     "${animationAndroid}/lib/${abiDir}/libhatter.so" \
     "${filesDirAndroid}/lib/${abiDir}/libhatter.so" \
     "${textinputRerenderAndroid}/lib/${abiDir}/libhatter.so" \
-    "${stackAndroid}/lib/${abiDir}/libhatter.so"; do
+    "${stackAndroid}/lib/${abiDir}/libhatter.so" \
+    "${animatedTypeChangeAndroid}/lib/${abiDir}/libhatter.so"; do
     SO_BYTES=$(stat -c %s "$so_path")
     SO_MB=$((SO_BYTES / 1048576))
     SO_LABEL=$(echo "$so_path" | grep -oP '[^/]+(?=/lib/)')
@@ -459,6 +472,7 @@ PHASE13_OK=0
 PHASE14_OK=0
 PHASE15_OK=0
 PHASE16_OK=0
+PHASE18_OK=0
 
 cleanup() {
     echo ""
@@ -575,7 +589,7 @@ sleep 30
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK SCROLL_TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PLATFORM_SIGN_IN_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK FILES_DIR_APK TEXTINPUT_RERENDER_APK STACK_APK SCROLLVIEW_SWITCH_APK PACKAGE ACTIVITY WORK_DIR
+export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK SCROLL_TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PLATFORM_SIGN_IN_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK FILES_DIR_APK TEXTINPUT_RERENDER_APK STACK_APK SCROLLVIEW_SWITCH_APK ANIMATED_TYPE_CHANGE_APK PACKAGE ACTIVITY WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -594,6 +608,7 @@ PHASE14_EXIT=0
 PHASE15_EXIT=0
 PHASE16_EXIT=0
 PHASE17_EXIT=0
+PHASE18_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -682,6 +697,8 @@ echo "--- stack ---"
 run_with_retry "stack" bash "$TEST_SCRIPTS/android/stack.sh" || PHASE16_EXIT=1
 echo "--- scrollview-switch ---"
 run_with_retry "scrollview-switch" bash "$TEST_SCRIPTS/android/scrollview-switch.sh" || PHASE17_EXIT=1
+echo "--- animated-type-change ---"
+run_with_retry "animated-type-change" bash "$TEST_SCRIPTS/android/animated-type-change.sh" || PHASE18_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -852,6 +869,16 @@ else
     echo "PHASE 17 FAILED"
 fi
 
+if [ $PHASE18_EXIT -eq 0 ]; then
+    PHASE18_OK=1
+    echo ""
+    echo "PHASE 18 PASSED"
+else
+    PHASE18_OK=0
+    echo ""
+    echo "PHASE 18 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -978,6 +1005,13 @@ if [ $PHASE17_OK -eq 1 ]; then
     echo "PASS  Phase 17 — ScrollView switch (issue #168 reproducer)"
 else
     echo "FAIL  Phase 17 — ScrollView switch (issue #168 reproducer)"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE18_OK -eq 1 ]; then
+    echo "PASS  Phase 18 — Animated child type change"
+else
+    echo "FAIL  Phase 18 — Animated child type change"
     FINAL_EXIT=1
 fi
 
