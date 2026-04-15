@@ -430,7 +430,7 @@ in {
           -optl-Wl,-u,haskellOnHttpResult \
           -optl-Wl,-u,haskellOnNetworkStatusChange \
           -optl-Wl,-u,haskellLogLocale \
-          ${if debugOom then "-optl-Wl,--wrap=malloc" else ""} \
+          ${if debugOom then "-optl-Wl,--wrap=malloc -optl-Wl,--wrap=mmap" else ""} \
           -optl-Wl,--no-undefined \
           -optl-Wl,--whole-archive \
           -optl$RTS_LIB \

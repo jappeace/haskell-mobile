@@ -29,6 +29,8 @@
 
 #ifdef DEBUG_OOM
 #include <android/log.h>
+#include <sys/mman.h>
+#include <errno.h>
 
 static void log_memory_status(const char *label) {
     FILE *f = fopen("/proc/self/status", "r");
@@ -53,15 +55,11 @@ static void oom_debug_constructor(void) {
     log_memory_status("init_array");
 }
 
-/* malloc wrapper: intercept large allocations to find who asks for 1 GB.
- * Linked via -Wl,--wrap=malloc — the linker renames:
- *   malloc       → __wrap_malloc   (our function)
- *   __real_malloc → the real malloc (for chaining)
- */
+/* malloc wrapper: intercept large allocations.
+ * Linked via -Wl,--wrap=malloc */
 extern void *__real_malloc(size_t size);
 
 void *__wrap_malloc(size_t size) {
-    /* 512 MB threshold — anything this large is suspicious on 32-bit */
     if (size >= 512 * 1024 * 1024) {
         void *caller = __builtin_return_address(0);
         __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
@@ -70,6 +68,66 @@ void *__wrap_malloc(size_t size) {
         log_memory_status("large_malloc");
     }
     return __real_malloc(size);
+}
+
+/* mmap wrapper: intercept large/failed mmaps during hs_init.
+ * Linked via -Wl,--wrap=mmap — same rename trick as malloc.
+ * This is where GHC RTS allocates MBlocks on 32-bit. */
+extern void *__real_mmap(void *addr, size_t length, int prot,
+                         int flags, int fd, off_t offset);
+
+/* Track mmap activity during hs_init */
+static volatile int g_tracking_hs_init = 0;
+static volatile size_t g_mmap_total_bytes = 0;
+static volatile int g_mmap_call_count = 0;
+static volatile int g_mmap_fail_count = 0;
+
+void *__wrap_mmap(void *addr, size_t length, int prot,
+                  int flags, int fd, off_t offset) {
+    int saved_errno = errno;
+    void *result = __real_mmap(addr, length, prot, flags, fd, offset);
+    int mmap_errno = errno;
+
+    if (g_tracking_hs_init) {
+        g_mmap_call_count++;
+        if (result != MAP_FAILED) {
+            g_mmap_total_bytes += length;
+        }
+
+        /* Log any mmap >= 16 MB (suspicious on 32-bit) */
+        if (length >= 16 * 1024 * 1024) {
+            void *caller = __builtin_return_address(0);
+            __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
+                "LARGE mmap(%zu) = %zu MB, prot=%d flags=0x%x "
+                "caller=%p result=%p",
+                length, length / (1024*1024), prot, flags,
+                caller, result);
+        }
+
+        /* Log any mmap failure */
+        if (result == MAP_FAILED) {
+            g_mmap_fail_count++;
+            void *caller = __builtin_return_address(0);
+            __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
+                "FAILED mmap(%zu) = %zu MB, prot=%d flags=0x%x "
+                "caller=%p errno=%d (%s)",
+                length, length / (1024*1024), prot, flags,
+                caller, mmap_errno, strerror(mmap_errno));
+            log_memory_status("mmap_failed");
+        }
+
+        /* Periodic summary every 100 calls */
+        if (g_mmap_call_count % 100 == 0) {
+            __android_log_print(ANDROID_LOG_INFO, "HatterOOM",
+                "mmap progress: %d calls, %zu MB mapped, %d failures",
+                g_mmap_call_count,
+                g_mmap_total_bytes / (1024*1024),
+                g_mmap_fail_count);
+        }
+    }
+
+    errno = (result == MAP_FAILED) ? mmap_errno : saved_errno;
+    return result;
 }
 #endif /* DEBUG_OOM */
 
@@ -177,9 +235,19 @@ JNI_OnLoad(JavaVM *vm, void *reserved)
 {
 #ifdef DEBUG_OOM
     log_memory_status("jni_onload_entry");
+    g_tracking_hs_init = 1;
+    g_mmap_total_bytes = 0;
+    g_mmap_call_count = 0;
+    g_mmap_fail_count = 0;
 #endif
     hs_init(NULL, NULL);
 #ifdef DEBUG_OOM
+    g_tracking_hs_init = 0;
+    __android_log_print(ANDROID_LOG_INFO, "HatterOOM",
+        "hs_init DONE: %d mmap calls, %zu MB mapped, %d failures",
+        g_mmap_call_count,
+        g_mmap_total_bytes / (1024*1024),
+        g_mmap_fail_count);
     log_memory_status("after_hs_init");
 #endif
 
