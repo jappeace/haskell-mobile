@@ -62,17 +62,17 @@ static void oom_debug_constructor(void) {
  * whether any module has a corrupted n_entries field.
  * Linked via -Wl,--wrap=registerForeignExports
  *
- * ForeignExportsList is defined in rts/include/rts/ForeignExports.h:
+ * GHC 9.x struct layout (flexible array member):
  *   struct ForeignExportsList {
  *     struct ForeignExportsList *next;
- *     StgClosure **exports;
  *     int n_entries;
+ *     StgClosure *exports[];   // flexible array member
  *   };
  */
 struct ForeignExportsList {
     struct ForeignExportsList *next;
-    void **exports;
     int n_entries;
+    void *exports[];
 };
 
 extern void __real_registerForeignExports(struct ForeignExportsList *exports);
@@ -81,24 +81,42 @@ static int g_fexport_total_entries = 0;
 
 void __wrap_registerForeignExports(struct ForeignExportsList *exports) {
     g_fexport_list_count++;
+    int n = exports ? exports->n_entries : -1;
     __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
-        "registerForeignExports #%d: n_entries=%d exports=%p next=%p",
-        g_fexport_list_count,
-        exports ? exports->n_entries : -1,
-        exports ? (void*)exports->exports : NULL,
-        exports ? (void*)exports->next : NULL);
-    if (exports && exports->n_entries > 0 && exports->n_entries < 10000) {
-        g_fexport_total_entries += exports->n_entries;
-        for (int i = 0; i < exports->n_entries && i < 5; i++) {
+        "registerForeignExports #%d: n_entries=%d next=%p struct_at=%p",
+        g_fexport_list_count, n,
+        exports ? (void*)exports->next : NULL,
+        (void*)exports);
+    if (exports && n > 0 && n < 10000) {
+        g_fexport_total_entries += n;
+        for (int i = 0; i < n && i < 5; i++) {
             __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
                 "  export[%d] = %p", i, exports->exports[i]);
         }
-    } else if (exports && exports->n_entries >= 10000) {
+    } else if (exports && n >= 10000) {
         __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
-            "  SUSPICIOUS n_entries=%d (>= 10000)! Likely corrupted.",
-            exports->n_entries);
+            "  SUSPICIOUS n_entries=%d (>= 10000)! Likely corrupted.", n);
     }
     __real_registerForeignExports(exports);
+}
+
+/* getStablePtr wrapper: count calls during hs_init.
+ * If this fires millions of times, something is creating huge numbers
+ * of stable pointers beyond the ~21 foreign exports.
+ * Linked via -Wl,--wrap=getStablePtr */
+extern void *__real_getStablePtr(void *p);
+static volatile int g_stable_ptr_count = 0;
+
+void *__wrap_getStablePtr(void *p) {
+    g_stable_ptr_count++;
+    /* Log every power-of-2 to avoid flooding logcat */
+    if (g_stable_ptr_count <= 32 ||
+        (g_stable_ptr_count & (g_stable_ptr_count - 1)) == 0) {
+        __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
+            "getStablePtr #%d: closure=%p",
+            g_stable_ptr_count, p);
+    }
+    return __real_getStablePtr(p);
 }
 
 /* Stack unwinding for backtrace on ARM Android.
@@ -401,8 +419,9 @@ JNI_OnLoad(JavaVM *vm, void *reserved)
 #ifdef DEBUG_OOM
     log_memory_status("jni_onload_entry");
     __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
-        "Before hs_init: %d ForeignExportsList registered, %d total entries",
-        g_fexport_list_count, g_fexport_total_entries);
+        "Before hs_init: %d ForeignExportsList registered, %d total entries, "
+        "%d getStablePtr calls so far",
+        g_fexport_list_count, g_fexport_total_entries, g_stable_ptr_count);
     g_tracking_hs_init = 1;
     g_mmap_total_bytes = 0;
     g_mmap_call_count = 0;
@@ -411,8 +430,10 @@ JNI_OnLoad(JavaVM *vm, void *reserved)
     hs_init(NULL, NULL);
 #ifdef DEBUG_OOM
     g_tracking_hs_init = 0;
-    __android_log_print(ANDROID_LOG_INFO, "HatterOOM",
-        "hs_init DONE: %d mmap calls, %zu MB mapped, %d failures",
+    __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
+        "hs_init DONE: %d getStablePtr calls, %d mmap calls, "
+        "%zu MB mapped, %d failures",
+        g_stable_ptr_count,
         g_mmap_call_count,
         g_mmap_total_bytes / (1024*1024),
         g_mmap_fail_count);
