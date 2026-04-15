@@ -121,6 +121,23 @@ void *__wrap_malloc(size_t size) {
     return __real_malloc(size);
 }
 
+/* realloc wrapper: intercept large reallocations.
+ * GHC's stgReallocBytes calls realloc; this catches doubling patterns
+ * like enlargeStableNameTable that use stgReallocBytes.
+ * Linked via -Wl,--wrap=realloc */
+extern void *__real_realloc(void *ptr, size_t size);
+
+void *__wrap_realloc(void *ptr, size_t size) {
+    if (size >= 512 * 1024 * 1024) {
+        __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
+            "LARGE realloc(%p, %zu) = %zu MB",
+            ptr, size, size / (1024*1024));
+        log_backtrace("large_realloc");
+        log_memory_status("large_realloc");
+    }
+    return __real_realloc(ptr, size);
+}
+
 /* mmap/mmap64 wrapper: intercept large/failed mmaps during hs_init.
  *
  * On 32-bit Android, GHC RTS is compiled with _FILE_OFFSET_BITS=64
