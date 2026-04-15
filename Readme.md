@@ -76,7 +76,7 @@ main = do
     { maContext     = loggingMobileContext
     , maView        = \_userState -> do
         n <- readIORef counter
-        pure $ Column
+        pure $ column
           [ text $ "Count: " <> Text.pack (show n)
           , button "+" increment
           ]
