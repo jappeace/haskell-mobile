@@ -41,9 +41,12 @@ else
     EXIT_CODE=1
 fi
 
-# Swipe left to reveal Reached End button
+# Swipe left multiple times to reveal Reached End button (20 items to scroll past)
 echo "=== Swipe left to reveal Reached End ==="
-"$ADB" -s "$EMULATOR_SERIAL" shell input swipe 900 540 100 540
+for swipe_n in 1 2 3 4 5 6 7 8; do
+    "$ADB" -s "$EMULATOR_SERIAL" shell input swipe 900 540 100 540 300
+    sleep 1
+done
 sleep 3
 
 HSCROLL_DUMP2="$WORK_DIR/hscroll_ui2.xml"
