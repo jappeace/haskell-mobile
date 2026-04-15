@@ -106,33 +106,61 @@ static void log_backtrace(const char *label) {
     }
 }
 
-/* malloc wrapper: intercept large allocations.
+/* stgMallocBytes wrapper: intercept GHC RTS allocations.
+ * stgMallocBytes(size, msg) is GHC's universal malloc wrapper — every
+ * RTS subsystem goes through it, and each call site passes a descriptive
+ * string (e.g. "enlargeStablePtrTable", "initCapabilities").
+ * This gives us the CALLER NAME without needing backtraces.
+ * Linked via -Wl,--wrap=stgMallocBytes */
+extern void *__real_stgMallocBytes(size_t n, char *msg);
+
+void *__wrap_stgMallocBytes(size_t n, char *msg) {
+    if (n >= 1 * 1024 * 1024) {
+        __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
+            "stgMallocBytes(%zu, \"%s\") = %zu MB",
+            n, msg ? msg : "(null)", n / (1024*1024));
+        log_memory_status("stgMallocBytes");
+    }
+    return __real_stgMallocBytes(n, msg);
+}
+
+/* stgReallocBytes wrapper: same idea for realloc-based RTS allocations.
+ * Linked via -Wl,--wrap=stgReallocBytes */
+extern void *__real_stgReallocBytes(void *p, size_t n, char *msg);
+
+void *__wrap_stgReallocBytes(void *p, size_t n, char *msg) {
+    if (n >= 1 * 1024 * 1024) {
+        __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
+            "stgReallocBytes(%p, %zu, \"%s\") = %zu MB",
+            p, n, msg ? msg : "(null)", n / (1024*1024));
+        log_memory_status("stgReallocBytes");
+    }
+    return __real_stgReallocBytes(p, n, msg);
+}
+
+/* malloc wrapper: catch any large malloc NOT going through stgMallocBytes.
  * Linked via -Wl,--wrap=malloc */
 extern void *__real_malloc(size_t size);
 
 void *__wrap_malloc(size_t size) {
     if (size >= 512 * 1024 * 1024) {
         __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
-            "LARGE malloc(%zu) = %zu MB",
+            "LARGE malloc(%zu) = %zu MB (not via stgMallocBytes)",
             size, size / (1024*1024));
-        log_backtrace("large_malloc");
         log_memory_status("large_malloc");
     }
     return __real_malloc(size);
 }
 
-/* realloc wrapper: intercept large reallocations.
- * GHC's stgReallocBytes calls realloc; this catches doubling patterns
- * like enlargeStableNameTable that use stgReallocBytes.
+/* realloc wrapper: catch any large realloc NOT going through stgReallocBytes.
  * Linked via -Wl,--wrap=realloc */
 extern void *__real_realloc(void *ptr, size_t size);
 
 void *__wrap_realloc(void *ptr, size_t size) {
     if (size >= 512 * 1024 * 1024) {
         __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
-            "LARGE realloc(%p, %zu) = %zu MB",
+            "LARGE realloc(%p, %zu) = %zu MB (not via stgReallocBytes)",
             ptr, size, size / (1024*1024));
-        log_backtrace("large_realloc");
         log_memory_status("large_realloc");
     }
     return __real_realloc(ptr, size);
