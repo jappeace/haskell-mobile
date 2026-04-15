@@ -242,6 +242,17 @@ let
     name = "hatter-watchos-stack-simulator-app";
   };
 
+  animatedTypeChangeWatchos = import ./watchos.nix {
+    inherit sources;
+    mainModule = ../test/AnimatedTypeChangeDemoMain.hs;
+    simulator = true;
+  };
+  animatedTypeChangeSimApp = lib.mkWatchOSSimulatorApp {
+    watchosLib = animatedTypeChangeWatchos;
+    watchosSrc = ../watchos;
+    name = "hatter-watchos-animated-type-change-simulator-app";
+  };
+
   xcodegen = pkgs.xcodegen;
 
   testScripts = builtins.path { path = ../test; name = "test-scripts"; };
@@ -282,6 +293,7 @@ ANIMATION_SHARE_DIR="${animationSimApp}/share/watchos"
 FILES_DIR_SHARE_DIR="${filesDirSimApp}/share/watchos"
 TEXTINPUT_RERENDER_SHARE_DIR="${textinputRerenderSimApp}/share/watchos"
 STACK_SHARE_DIR="${stackSimApp}/share/watchos"
+ANIMATED_TYPE_CHANGE_SHARE_DIR="${animatedTypeChangeSimApp}/share/watchos"
 TEST_SCRIPTS="${testScripts}"
 
 # --- Temp working directory ---
@@ -304,6 +316,7 @@ PHASE12_OK=0
 PHASE14_OK=0
 PHASE15_OK=0
 PHASE16_OK=0
+PHASE18_OK=0
 
 cleanup() {
     echo ""
@@ -344,7 +357,8 @@ for share_dir in \
     "$NETWORK_STATUS_SHARE_DIR" \
     "$MAPVIEW_SHARE_DIR" \
     "$TEXTINPUT_RERENDER_SHARE_DIR" \
-    "$STACK_SHARE_DIR"; do
+    "$STACK_SHARE_DIR" \
+    "$ANIMATED_TYPE_CHANGE_SHARE_DIR"; do
     a_path="$share_dir/lib/libHatter.a"
     A_BYTES=$(stat -f %z "$a_path" 2>/dev/null || stat -c %s "$a_path" 2>/dev/null || echo 0)
     A_MB=$((A_BYTES / 1048576))
@@ -1250,6 +1264,30 @@ if [ -z "$STACK_APP" ]; then
 fi
 echo "Stack app: $STACK_APP"
 
+echo "=== Building Animated Type Change app ==="
+cp -r "$ANIMATED_TYPE_CHANGE_SHARE_DIR" "$WORK_DIR/animated-type-change-proj"
+chmod -R u+w "$WORK_DIR/animated-type-change-proj"
+cd "$WORK_DIR/animated-type-change-proj"
+${xcodegen}/bin/xcodegen generate
+xcodebuild build \
+    -project Hatter.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk watchsimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/animated-type-change-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+ANIMATED_TYPE_CHANGE_APP=$(find "$WORK_DIR/animated-type-change-build" -name "*.app" -type d | head -1)
+if [ -z "$ANIMATED_TYPE_CHANGE_APP" ]; then
+    echo "ERROR: Could not find animated-type-change .app bundle"
+    exit 1
+fi
+echo "Animated Type Change app: $ANIMATED_TYPE_CHANGE_APP"
+
 # --- Discover latest watchOS runtime ---
 echo "=== Discovering watchOS runtime ==="
 RUNTIME=$(xcrun simctl list runtimes -j \
@@ -1313,7 +1351,7 @@ sleep 5
 # ===========================================================================
 # Log subsystem differs from bundle ID for watchOS (bundle ID has .watchkitapp suffix)
 LOG_SUBSYSTEM="me.jappie.hatter"
-export SIM_UDID BUNDLE_ID LOG_SUBSYSTEM COUNTER_APP SCROLL_APP TEXTINPUT_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP PLATFORM_SIGN_IN_APP CAMERA_APP BOTTOM_SHEET_APP NETWORK_STATUS_APP MAPVIEW_APP ANIMATION_APP FILES_DIR_APP TEXTINPUT_RERENDER_APP STACK_APP WORK_DIR
+export SIM_UDID BUNDLE_ID LOG_SUBSYSTEM COUNTER_APP SCROLL_APP TEXTINPUT_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP PLATFORM_SIGN_IN_APP CAMERA_APP BOTTOM_SHEET_APP NETWORK_STATUS_APP MAPVIEW_APP ANIMATION_APP FILES_DIR_APP TEXTINPUT_RERENDER_APP STACK_APP ANIMATED_TYPE_CHANGE_APP WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -1332,6 +1370,7 @@ PHASE14_EXIT=0
 PHASE15_EXIT=0
 PHASE16_EXIT=0
 PHASE17_EXIT=0
+PHASE18_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -1405,6 +1444,8 @@ echo "--- textinput_rerender ---"
 run_with_retry "textinput_rerender" bash "$TEST_SCRIPTS/watchos/textinput_rerender.sh" || PHASE16_EXIT=1
 echo "--- stack ---"
 run_with_retry "stack" bash "$TEST_SCRIPTS/watchos/stack.sh" || PHASE17_EXIT=1
+echo "--- animated-type-change ---"
+run_with_retry "animated-type-change" bash "$TEST_SCRIPTS/watchos/animated-type-change.sh" || PHASE18_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -1575,6 +1616,16 @@ else
     echo "PHASE 17 FAILED"
 fi
 
+if [ $PHASE18_EXIT -eq 0 ]; then
+    PHASE18_OK=1
+    echo ""
+    echo "PHASE 18 PASSED"
+else
+    PHASE18_OK=0
+    echo ""
+    echo "PHASE 18 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -1701,6 +1752,13 @@ if [ $PHASE17_OK -eq 1 ]; then
     echo "PASS  Phase 17 — Stack demo app"
 else
     echo "FAIL  Phase 17 — Stack demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE18_OK -eq 1 ]; then
+    echo "PASS  Phase 18 — Animated type change reproducer"
+else
+    echo "FAIL  Phase 18 — Animated type change reproducer"
     FINAL_EXIT=1
 fi
 
