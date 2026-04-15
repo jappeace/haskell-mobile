@@ -693,6 +693,10 @@ run_with_retry() {
 echo ""
 echo "--- lifecycle ---"
 run_with_retry "lifecycle" bash "$TEST_SCRIPTS/android/lifecycle.sh" || PHASE1_EXIT=1
+# Capture counter app's HatterOOM data before logcat -c clears it (issue #163 baseline)
+echo "=== counter HatterOOM baseline (before logcat clear) ==="
+"$ADB" -s "$EMULATOR_SERIAL" logcat -d | grep "HatterOOM\|malloc.*failed" || echo "(no HatterOOM entries — DEBUG_OOM may not be enabled for counter)"
+echo "=== end counter HatterOOM baseline ==="
 echo "--- ui ---"
 run_with_retry "ui"        bash "$TEST_SCRIPTS/android/ui.sh"        || PHASE1_EXIT=1
 echo "--- buttons ---"
