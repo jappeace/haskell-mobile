@@ -263,6 +263,17 @@ let
     name = "hatter-stack-simulator-app";
   };
 
+  scrollviewMutationsIos = import ./ios.nix {
+    inherit sources;
+    mainModule = ../test/ScrollViewMutationsDemoMain.hs;
+    simulator = true;
+  };
+  scrollviewMutationsSimApp = lib.mkSimulatorApp {
+    iosLib = scrollviewMutationsIos;
+    iosSrc = ../ios;
+    name = "hatter-scrollview-mutations-simulator-app";
+  };
+
   xcodegen = pkgs.xcodegen;
 
   testScripts = builtins.path { path = ../test; name = "test-scripts"; };
@@ -305,6 +316,7 @@ ANIMATION_SHARE_DIR="${animationSimApp}/share/ios"
 FILES_DIR_SHARE_DIR="${filesDirSimApp}/share/ios"
 TEXTINPUT_RERENDER_SHARE_DIR="${textinputRerenderSimApp}/share/ios"
 STACK_SHARE_DIR="${stackSimApp}/share/ios"
+SCROLLVIEW_MUTATIONS_SHARE_DIR="${scrollviewMutationsSimApp}/share/ios"
 TEST_SCRIPTS="${testScripts}"
 
 # --- Temp working directory ---
@@ -328,6 +340,7 @@ PHASE13_OK=0
 PHASE14_OK=0
 PHASE15_OK=0
 PHASE16_OK=0
+PHASE17_OK=0
 
 cleanup() {
     echo ""
@@ -370,7 +383,8 @@ for share_dir in \
     "$HTTP_SHARE_DIR" \
     "$MAPVIEW_SHARE_DIR" \
     "$TEXTINPUT_RERENDER_SHARE_DIR" \
-    "$STACK_SHARE_DIR"; do
+    "$STACK_SHARE_DIR" \
+    "$SCROLLVIEW_MUTATIONS_SHARE_DIR"; do
     a_path="$share_dir/lib/libHatter.a"
     A_BYTES=$(stat -f %z "$a_path" 2>/dev/null || stat -c %s "$a_path" 2>/dev/null || echo 0)
     A_MB=$((A_BYTES / 1048576))
@@ -1387,6 +1401,30 @@ if [ -z "$STACK_APP" ]; then
 fi
 echo "Stack app: $STACK_APP"
 
+echo "=== Building ScrollView Mutations app ==="
+cp -r "$SCROLLVIEW_MUTATIONS_SHARE_DIR" "$WORK_DIR/scrollview-mutations-proj"
+chmod -R u+w "$WORK_DIR/scrollview-mutations-proj"
+cd "$WORK_DIR/scrollview-mutations-proj"
+${xcodegen}/bin/xcodegen generate
+xcodebuild build \
+    -project Hatter.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk iphonesimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/scrollview-mutations-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+SCROLLVIEW_MUTATIONS_APP=$(find "$WORK_DIR/scrollview-mutations-build" -name "*.app" -type d | head -1)
+if [ -z "$SCROLLVIEW_MUTATIONS_APP" ]; then
+    echo "ERROR: Could not find scrollview-mutations .app bundle"
+    exit 1
+fi
+echo "ScrollView Mutations app: $SCROLLVIEW_MUTATIONS_APP"
+
 # --- Discover latest iOS runtime ---
 echo "=== Discovering iOS runtime ==="
 RUNTIME=$(xcrun simctl list runtimes -j \
@@ -1448,7 +1486,7 @@ sleep 5
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP PLATFORM_SIGN_IN_APP CAMERA_APP BOTTOM_SHEET_APP HTTP_APP NETWORK_STATUS_APP MAPVIEW_APP ANIMATION_APP FILES_DIR_APP TEXTINPUT_RERENDER_APP STACK_APP WORK_DIR
+export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP PLATFORM_SIGN_IN_APP CAMERA_APP BOTTOM_SHEET_APP HTTP_APP NETWORK_STATUS_APP MAPVIEW_APP ANIMATION_APP FILES_DIR_APP TEXTINPUT_RERENDER_APP STACK_APP SCROLLVIEW_MUTATIONS_APP WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -1466,6 +1504,7 @@ PHASE13_EXIT=0
 PHASE14_EXIT=0
 PHASE15_EXIT=0
 PHASE16_EXIT=0
+PHASE17_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -1550,6 +1589,8 @@ echo "--- textinput_rerender ---"
 run_with_retry "textinput_rerender" bash "$TEST_SCRIPTS/ios/textinput_rerender.sh" || PHASE15_EXIT=1
 echo "--- stack ---"
 run_with_retry "stack" bash "$TEST_SCRIPTS/ios/stack.sh" || PHASE16_EXIT=1
+echo "--- scrollview-mutations ---"
+run_with_retry "scrollview-mutations" bash "$TEST_SCRIPTS/ios/scrollview-mutations.sh" || PHASE17_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -1710,6 +1751,16 @@ else
     echo "PHASE 16 FAILED"
 fi
 
+if [ $PHASE17_EXIT -eq 0 ]; then
+    PHASE17_OK=1
+    echo ""
+    echo "PHASE 17 PASSED"
+else
+    PHASE17_OK=0
+    echo ""
+    echo "PHASE 17 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -1829,6 +1880,13 @@ if [ $PHASE16_OK -eq 1 ]; then
     echo "PASS  Phase 16 — Stack demo app"
 else
     echo "FAIL  Phase 16 — Stack demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE17_OK -eq 1 ]; then
+    echo "PASS  Phase 17 — ScrollView child mutations reproducer"
+else
+    echo "FAIL  Phase 17 — ScrollView child mutations reproducer"
     FINAL_EXIT=1
 fi
 
