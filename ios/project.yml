@@ -31,3 +31,15 @@ targets:
         LIBRARY_SEARCH_PATHS: ["$(inherited)", "$(PROJECT_DIR)/lib"]
         HEADER_SEARCH_PATHS: ["$(inherited)", "$(PROJECT_DIR)/include"]
         OTHER_LDFLAGS: ["$(inherited)", "-lHatter", "-lz", "-liconv", "-lffi", "-lc++", "-framework", "AVFoundation", "-framework", "AuthenticationServices", "-framework", "Contacts", "-framework", "CoreLocation", "-framework", "CoreBluetooth", "-framework", "WebKit", "-framework", "MapKit", "-framework", "QuartzCore"]
+
+  HatterUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: HatterUITests
+        optional: true
+    dependencies:
+      - target: Hatter
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: me.jappie.hatter.uitests

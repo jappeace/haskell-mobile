@@ -26,3 +26,15 @@ targets:
         LIBRARY_SEARCH_PATHS: ["$(inherited)", "$(PROJECT_DIR)/lib"]
         HEADER_SEARCH_PATHS: ["$(inherited)", "$(PROJECT_DIR)/include"]
         OTHER_LDFLAGS: ["$(inherited)", "-lHatter", "-lz", "-liconv", "-lffi", "-lc++", "-framework", "AuthenticationServices"]
+
+  HatterUITests:
+    type: bundle.ui-testing
+    platform: watchOS
+    sources:
+      - path: HatterUITests
+        optional: true
+    dependencies:
+      - target: Hatter
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: me.jappie.hatter.watchkitapp.uitests

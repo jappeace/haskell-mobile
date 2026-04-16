@@ -367,6 +367,7 @@ PHASE16_OK=0
 PHASE17_OK=0
 PHASE18_OK=0
 PHASE19_OK=0
+PHASE20_OK=0
 
 cleanup() {
     echo ""
@@ -458,6 +459,7 @@ cp "$COUNTER_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/counter/include
 cp "$COUNTER_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/counter/include/"
 cp "$COUNTER_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/counter/include/"
 cp -r "$COUNTER_SHARE_DIR/Hatter" "$WORK_DIR/counter/"
+cp -r "$COUNTER_SHARE_DIR/HatterUITests" "$WORK_DIR/counter/"
 cp "$COUNTER_SHARE_DIR/project.yml" "$WORK_DIR/counter/"
 chmod -R u+w "$WORK_DIR/counter"
 
@@ -1603,6 +1605,7 @@ PHASE16_EXIT=0
 PHASE17_EXIT=0
 PHASE18_EXIT=0
 PHASE19_EXIT=0
+PHASE20_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -1693,6 +1696,16 @@ echo "--- horizontal-scroll ---"
 run_with_retry "horizontal-scroll" bash "$TEST_SCRIPTS/ios/horizontal-scroll.sh" || PHASE18_EXIT=1
 echo "--- redraw ---"
 run_with_retry "redraw" bash "$TEST_SCRIPTS/ios/redraw.sh" || PHASE19_EXIT=1
+
+echo "--- xcuitest-counter ---"
+run_with_retry "xcuitest-counter" xcodebuild test \
+    -project "$WORK_DIR/counter/Hatter.xcodeproj" \
+    -scheme "HatterUITests" \
+    -destination "platform=iOS Simulator,id=$SIM_UDID" \
+    -only-testing "HatterUITests/CounterUITests" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    || PHASE20_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -1883,6 +1896,16 @@ else
     echo "PHASE 19 FAILED"
 fi
 
+if [ $PHASE20_EXIT -eq 0 ]; then
+    PHASE20_OK=1
+    echo ""
+    echo "PHASE 20 PASSED"
+else
+    PHASE20_OK=0
+    echo ""
+    echo "PHASE 20 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -2023,6 +2046,13 @@ if [ $PHASE19_OK -eq 1 ]; then
     echo "PASS  Phase 19 — Redraw demo app (background thread re-render)"
 else
     echo "FAIL  Phase 19 — Redraw demo app (background thread re-render)"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE20_OK -eq 1 ]; then
+    echo "PASS  Phase 20 — XCUITest counter app"
+else
+    echo "FAIL  Phase 20 — XCUITest counter app"
     FINAL_EXIT=1
 fi
 
