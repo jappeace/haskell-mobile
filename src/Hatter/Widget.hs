@@ -333,7 +333,7 @@ data MapViewConfig = MapViewConfig
 -- | An opaque key used to match children across renders.
 -- Explicitly set by the user via 'keyedItem'.
 newtype WidgetKey = WidgetKey { unWidgetKey :: Int }
-  deriving stock (Show, Eq)
+  deriving (Show, Eq)
 
 -- | A keyed container child.  The key is used by the diff algorithm
 -- to match old and new children across renders, avoiding unnecessary
