@@ -27,12 +27,54 @@
 #include "AnimationBridge.h"
 #include "PlatformSignInBridge.h"
 
-#ifdef DEBUG_OOM
+/* Deduplicate registerForeignExports to prevent OOM on armv7a.
+ *
+ * When --whole-archive pulls in GHC boot libraries, duplicate .init_array
+ * entries can cause registerForeignExports to be called twice with the
+ * same ForeignExportsList struct.  The second call creates a self-referencing
+ * linked list (struct->next = &struct).  processForeignExports then loops
+ * infinitely, calling getStablePtr billions of times and doubling
+ * enlargeStablePtrTable until the 32-bit address space is exhausted.
+ *
+ * This wrapper is always active (not behind DEBUG_OOM) because the
+ * duplicate .init_array entry is a build-time artifact that affects
+ * every armv7a build linking extra packages (async, text, etc.).
+ * Linked via -Wl,--wrap=registerForeignExports (unconditional).
+ *
+ * See: https://github.com/jappeace/hatter/issues/163
+ */
 #include <android/log.h>
+
+struct ForeignExportsList {
+    struct ForeignExportsList *next;
+    int n_entries;
+    void *exports[];
+};
+
+extern void __real_registerForeignExports(struct ForeignExportsList *exports);
+
+static struct ForeignExportsList *g_seen_fexports[64];
+static int g_seen_fexports_count = 0;
+
+void __wrap_registerForeignExports(struct ForeignExportsList *exports) {
+    for (int i = 0; i < g_seen_fexports_count; i++) {
+        if (g_seen_fexports[i] == exports) {
+            __android_log_print(ANDROID_LOG_WARN, "HatterInit",
+                "registerForeignExports: duplicate struct %p — skipping",
+                (void*)exports);
+            return;
+        }
+    }
+    if (g_seen_fexports_count < 64) {
+        g_seen_fexports[g_seen_fexports_count++] = exports;
+    }
+    __real_registerForeignExports(exports);
+}
+
+#ifdef DEBUG_OOM
 #include <sys/mman.h>
 #include <errno.h>
 #include <dlfcn.h>
-#include <unwind.h>
 
 static void log_memory_status(const char *label) {
     FILE *f = fopen("/proc/self/status", "r");
@@ -42,7 +84,6 @@ static void log_memory_status(const char *label) {
         if (strncmp(line, "VmSize:", 7) == 0 ||
             strncmp(line, "VmRSS:",  6) == 0 ||
             strncmp(line, "VmPeak:", 7) == 0) {
-            /* trim newline */
             size_t len = strlen(line);
             if (len > 0 && line[len-1] == '\n') line[len-1] = '\0';
             __android_log_print(ANDROID_LOG_INFO, "HatterOOM",
@@ -57,136 +98,7 @@ static void oom_debug_constructor(void) {
     log_memory_status("init_array");
 }
 
-/* registerForeignExports wrapper: log each ForeignExportsList registration.
- * This runs during .init_array processing (before hs_init) and reveals
- * whether any module has a corrupted n_entries field.
- * Linked via -Wl,--wrap=registerForeignExports
- *
- * GHC 9.x struct layout (flexible array member):
- *   struct ForeignExportsList {
- *     struct ForeignExportsList *next;
- *     int n_entries;
- *     StgClosure *exports[];   // flexible array member
- *   };
- */
-struct ForeignExportsList {
-    struct ForeignExportsList *next;
-    int n_entries;
-    void *exports[];
-};
-
-extern void __real_registerForeignExports(struct ForeignExportsList *exports);
-static int g_fexport_list_count = 0;
-static int g_fexport_total_entries = 0;
-
-/* Track registered structs to detect duplicates.
- * A duplicate registration of the same struct creates a self-referencing
- * linked list (struct->next = &struct), causing processForeignExports
- * to loop infinitely and OOM via enlargeStablePtrTable. */
-static struct ForeignExportsList *g_seen_fexports[64];
-static int g_seen_fexports_count = 0;
-
-void __wrap_registerForeignExports(struct ForeignExportsList *exports) {
-    g_fexport_list_count++;
-
-    /* Check for duplicate registration */
-    for (int i = 0; i < g_seen_fexports_count; i++) {
-        if (g_seen_fexports[i] == exports) {
-            __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
-                "registerForeignExports #%d: DUPLICATE struct_at=%p — skipping!",
-                g_fexport_list_count, (void*)exports);
-            return;  /* Skip duplicate to prevent linked-list cycle */
-        }
-    }
-    if (g_seen_fexports_count < 64) {
-        g_seen_fexports[g_seen_fexports_count++] = exports;
-    }
-
-    int n = exports ? exports->n_entries : -1;
-    __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
-        "registerForeignExports #%d: n_entries=%d next=%p struct_at=%p",
-        g_fexport_list_count, n,
-        exports ? (void*)exports->next : NULL,
-        (void*)exports);
-    if (exports && n > 0 && n < 10000) {
-        g_fexport_total_entries += n;
-    }
-    __real_registerForeignExports(exports);
-}
-
-/* getStablePtr wrapper: count calls during hs_init.
- * If this fires millions of times, something is creating huge numbers
- * of stable pointers beyond the ~21 foreign exports.
- * Linked via -Wl,--wrap=getStablePtr */
-extern void *__real_getStablePtr(void *p);
-static volatile int g_stable_ptr_count = 0;
-
-void *__wrap_getStablePtr(void *p) {
-    g_stable_ptr_count++;
-    /* Log every power-of-2 to avoid flooding logcat */
-    if (g_stable_ptr_count <= 32 ||
-        (g_stable_ptr_count & (g_stable_ptr_count - 1)) == 0) {
-        __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
-            "getStablePtr #%d: closure=%p",
-            g_stable_ptr_count, p);
-    }
-    return __real_getStablePtr(p);
-}
-
-/* Stack unwinding for backtrace on ARM Android.
- * _Unwind_Backtrace is reliable on ARM (unlike __builtin_return_address(N>0))
- * because it uses .ARM.exidx unwind tables rather than frame pointers. */
-struct BacktraceState {
-    void **frames;
-    int frame_count;
-    int max_frames;
-};
-
-static _Unwind_Reason_Code unwind_callback(struct _Unwind_Context *context,
-                                            void *arg) {
-    struct BacktraceState *state = (struct BacktraceState *)arg;
-    uintptr_t pc = _Unwind_GetIP(context);
-    if (pc == 0) return _URC_END_OF_STACK;
-    if (state->frame_count < state->max_frames) {
-        state->frames[state->frame_count++] = (void *)pc;
-    }
-    return (state->frame_count >= state->max_frames)
-        ? _URC_END_OF_STACK : _URC_NO_REASON;
-}
-
-static void log_backtrace(const char *label) {
-    void *frames[16];
-    struct BacktraceState state = { frames, 0, 16 };
-    _Unwind_Backtrace(unwind_callback, &state);
-
-    __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
-        "%s backtrace (%d frames):", label, state.frame_count);
-    for (int i = 0; i < state.frame_count; i++) {
-        Dl_info info;
-        if (dladdr(frames[i], &info) && info.dli_sname) {
-            __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
-                "  #%d: %s+0x%lx (%s)",
-                i, info.dli_sname,
-                (unsigned long)((char*)frames[i] - (char*)info.dli_saddr),
-                info.dli_fname ? info.dli_fname : "???");
-        } else if (dladdr(frames[i], &info)) {
-            __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
-                "  #%d: %p (offset 0x%lx in %s)",
-                i, frames[i],
-                (unsigned long)((char*)frames[i] - (char*)info.dli_fbase),
-                info.dli_fname ? info.dli_fname : "???");
-        } else {
-            __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
-                "  #%d: %p (unknown)", i, frames[i]);
-        }
-    }
-}
-
 /* stgMallocBytes wrapper: intercept GHC RTS allocations.
- * stgMallocBytes(size, msg) is GHC's universal malloc wrapper — every
- * RTS subsystem goes through it, and each call site passes a descriptive
- * string (e.g. "enlargeStablePtrTable", "initCapabilities").
- * This gives us the CALLER NAME without needing backtraces.
  * Linked via -Wl,--wrap=stgMallocBytes */
 extern void *__real_stgMallocBytes(size_t n, char *msg);
 
@@ -200,7 +112,7 @@ void *__wrap_stgMallocBytes(size_t n, char *msg) {
     return __real_stgMallocBytes(n, msg);
 }
 
-/* stgReallocBytes wrapper: same idea for realloc-based RTS allocations.
+/* stgReallocBytes wrapper.
  * Linked via -Wl,--wrap=stgReallocBytes */
 extern void *__real_stgReallocBytes(void *p, size_t n, char *msg);
 
@@ -214,7 +126,7 @@ void *__wrap_stgReallocBytes(void *p, size_t n, char *msg) {
     return __real_stgReallocBytes(p, n, msg);
 }
 
-/* malloc wrapper: catch any large malloc NOT going through stgMallocBytes.
+/* malloc wrapper: catch large allocations not via stgMallocBytes.
  * Linked via -Wl,--wrap=malloc */
 extern void *__real_malloc(size_t size);
 
@@ -228,7 +140,7 @@ void *__wrap_malloc(size_t size) {
     return __real_malloc(size);
 }
 
-/* realloc wrapper: catch any large realloc NOT going through stgReallocBytes.
+/* realloc wrapper: catch large reallocations not via stgReallocBytes.
  * Linked via -Wl,--wrap=realloc */
 extern void *__real_realloc(void *ptr, size_t size);
 
@@ -240,91 +152,6 @@ void *__wrap_realloc(void *ptr, size_t size) {
         log_memory_status("large_realloc");
     }
     return __real_realloc(ptr, size);
-}
-
-/* mmap/mmap64 wrapper: intercept large/failed mmaps during hs_init.
- *
- * On 32-bit Android, GHC RTS is compiled with _FILE_OFFSET_BITS=64
- * (via AC_SYS_LARGEFILE in configure.ac).  Bionic's <sys/mman.h>
- * then renames mmap() → mmap64 via __asm__ symbol renaming.
- * So the actual linker symbol in the RTS .a is "mmap64", not "mmap".
- *
- * We wrap BOTH to catch all callers:
- *   -Wl,--wrap=mmap   catches code compiled without LFS
- *   -Wl,--wrap=mmap64 catches GHC RTS and LFS-enabled code
- */
-extern void *__real_mmap(void *addr, size_t length, int prot,
-                         int flags, int fd, off_t offset);
-extern void *__real_mmap64(void *addr, size_t length, int prot,
-                           int flags, int fd, off64_t offset);
-
-/* Track mmap activity during hs_init */
-static volatile int g_tracking_hs_init = 0;
-static volatile size_t g_mmap_total_bytes = 0;
-static volatile int g_mmap_call_count = 0;
-static volatile int g_mmap_fail_count = 0;
-
-static void track_mmap(const char *variant, size_t length, int prot,
-                       int flags, void *result, void *caller) {
-    int mmap_errno = errno;
-
-    g_mmap_call_count++;
-    if (result != MAP_FAILED) {
-        g_mmap_total_bytes += length;
-    }
-
-    /* Log any mmap >= 16 MB (suspicious on 32-bit) */
-    if (length >= 16 * 1024 * 1024) {
-        __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
-            "LARGE %s(%zu) = %zu MB, prot=%d flags=0x%x "
-            "caller=%p result=%p",
-            variant, length, length / (1024*1024), prot, flags,
-            caller, result);
-    }
-
-    /* Log any mmap failure */
-    if (result == MAP_FAILED) {
-        g_mmap_fail_count++;
-        __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
-            "FAILED %s(%zu) = %zu MB, prot=%d flags=0x%x "
-            "caller=%p errno=%d (%s)",
-            variant, length, length / (1024*1024), prot, flags,
-            caller, mmap_errno, strerror(mmap_errno));
-        log_memory_status("mmap_failed");
-    }
-
-    /* Periodic summary every 100 calls */
-    if (g_mmap_call_count % 100 == 0) {
-        __android_log_print(ANDROID_LOG_INFO, "HatterOOM",
-            "mmap progress: %d calls, %zu MB mapped, %d failures",
-            g_mmap_call_count,
-            g_mmap_total_bytes / (1024*1024),
-            g_mmap_fail_count);
-    }
-}
-
-void *__wrap_mmap(void *addr, size_t length, int prot,
-                  int flags, int fd, off_t offset) {
-    int saved_errno = errno;
-    void *result = __real_mmap(addr, length, prot, flags, fd, offset);
-    if (g_tracking_hs_init) {
-        track_mmap("mmap", length, prot, flags, result,
-                   __builtin_return_address(0));
-    }
-    if (result != MAP_FAILED) errno = saved_errno;
-    return result;
-}
-
-void *__wrap_mmap64(void *addr, size_t length, int prot,
-                    int flags, int fd, off64_t offset) {
-    int saved_errno = errno;
-    void *result = __real_mmap64(addr, length, prot, flags, fd, offset);
-    if (g_tracking_hs_init) {
-        track_mmap("mmap64", length, prot, flags, result,
-                   __builtin_return_address(0));
-    }
-    if (result != MAP_FAILED) errno = saved_errno;
-    return result;
 }
 #endif /* DEBUG_OOM */
 
@@ -432,25 +259,9 @@ JNI_OnLoad(JavaVM *vm, void *reserved)
 {
 #ifdef DEBUG_OOM
     log_memory_status("jni_onload_entry");
-    __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
-        "Before hs_init: %d ForeignExportsList registered, %d total entries, "
-        "%d getStablePtr calls so far",
-        g_fexport_list_count, g_fexport_total_entries, g_stable_ptr_count);
-    g_tracking_hs_init = 1;
-    g_mmap_total_bytes = 0;
-    g_mmap_call_count = 0;
-    g_mmap_fail_count = 0;
 #endif
     hs_init(NULL, NULL);
 #ifdef DEBUG_OOM
-    g_tracking_hs_init = 0;
-    __android_log_print(ANDROID_LOG_ERROR, "HatterOOM",
-        "hs_init DONE: %d getStablePtr calls, %d mmap calls, "
-        "%zu MB mapped, %d failures",
-        g_stable_ptr_count,
-        g_mmap_call_count,
-        g_mmap_total_bytes / (1024*1024),
-        g_mmap_fail_count);
     log_memory_status("after_hs_init");
 #endif
 

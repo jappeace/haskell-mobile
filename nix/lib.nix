@@ -430,7 +430,8 @@ in {
           -optl-Wl,-u,haskellOnHttpResult \
           -optl-Wl,-u,haskellOnNetworkStatusChange \
           -optl-Wl,-u,haskellLogLocale \
-          ${if debugOom then "-optl-Wl,--wrap=registerForeignExports -optl-Wl,--wrap=getStablePtr -optl-Wl,--wrap=stgMallocBytes -optl-Wl,--wrap=stgReallocBytes -optl-Wl,--wrap=malloc -optl-Wl,--wrap=realloc -optl-Wl,--wrap=mmap -optl-Wl,--wrap=mmap64" else ""} \
+          -optl-Wl,--wrap=registerForeignExports \
+          ${if debugOom then "-optl-Wl,--wrap=stgMallocBytes -optl-Wl,--wrap=stgReallocBytes -optl-Wl,--wrap=malloc -optl-Wl,--wrap=realloc" else ""} \
           -optl-Wl,--no-undefined \
           -optl-Wl,--whole-archive \
           -optl$RTS_LIB \
