@@ -20,7 +20,7 @@ import Hatter
   )
 import Hatter.AppContext (AppContext(..), derefAppContext)
 import Hatter.BottomSheet (BottomSheetConfig(..), BottomSheetState(..), showBottomSheet)
-import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
+import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..), column)
 
 main :: IO (Ptr AppContext)
 main = do
@@ -47,7 +47,7 @@ main = do
 
 -- | Builds a Column with a label and a "Show Actions" button.
 bottomSheetDemoView :: Action -> IO Widget
-bottomSheetDemoView onShowActions = pure $ Column
+bottomSheetDemoView onShowActions = pure $ column
   [ Text TextConfig { tcLabel = "BottomSheet Demo", tcFontConfig = Nothing }
   , Button ButtonConfig
       { bcLabel      = "Show Actions"

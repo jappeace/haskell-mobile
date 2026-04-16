@@ -20,7 +20,7 @@ import Hatter
   )
 import Hatter.AppContext (AppContext(..), derefAppContext)
 import Hatter.Permission (Permission(..), PermissionState(..), requestPermission)
-import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
+import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..), column)
 
 main :: IO (Ptr AppContext)
 main = do
@@ -43,7 +43,7 @@ main = do
 
 -- | Builds a Column with a label and a "Request Camera" button.
 permissionDemoView :: Action -> IO Widget
-permissionDemoView onRequestCamera = pure $ Column
+permissionDemoView onRequestCamera = pure $ column
   [ Text TextConfig { tcLabel = "Permission Demo", tcFontConfig = Nothing }
   , Button ButtonConfig
       { bcLabel      = "Request Camera"

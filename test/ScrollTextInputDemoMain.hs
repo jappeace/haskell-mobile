@@ -14,8 +14,8 @@ import Hatter
   )
 import Hatter.AppContext (AppContext)
 import Hatter.Widget
-  ( ButtonConfig(..), InputType(..), TextConfig(..)
-  , TextInputConfig(..), Widget(..)
+  ( ButtonConfig(..), InputType(..), LayoutSettings(..), TextConfig(..)
+  , TextInputConfig(..), Widget(..), row
   )
 
 main :: IO (Ptr AppContext)
@@ -34,10 +34,10 @@ main = do
     , maActionState = actionState
     }
 
--- | ScrollView containing TextInput widgets — reproduces the
+-- | Scrollable Column containing TextInput widgets — reproduces the
 -- prrrrrrrrr layout that triggers DeadObjectException.
 scrollTextInputView :: Action -> Action -> OnChange -> OnChange -> IO Widget
-scrollTextInputView save back onWeight onNotes = pure $ ScrollView
+scrollTextInputView save back onWeight onNotes = pure $ Column (LayoutSettings
   [ Text TextConfig { tcLabel = "Enter data", tcFontConfig = Nothing }
   , TextInput TextInputConfig
       { tiInputType  = InputNumber
@@ -55,10 +55,10 @@ scrollTextInputView save back onWeight onNotes = pure $ ScrollView
       , tiFontConfig = Nothing
       , tiAutoFocus  = False
       }
-  , Row
+  , row
     [ Button ButtonConfig
         { bcLabel = "Save", bcAction = save, bcFontConfig = Nothing }
     , Button ButtonConfig
         { bcLabel = "Back", bcAction = back, bcFontConfig = Nothing }
     ]
-  ]
+  ] True)

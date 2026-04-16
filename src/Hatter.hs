@@ -60,6 +60,7 @@ module Hatter
   , FontConfig(..)
   , TextInputConfig(..)
   , InputType(..)
+  , LayoutSettings(..)
   , ImageConfig(..)
   , ImageSource(..)
   , ResourceName(..)
@@ -72,6 +73,8 @@ module Hatter
   , colorToHex
     -- ** Smart constructors
   , button
+  , column
+  , row
   , text
     -- * Actions
   , Action(..)
@@ -159,6 +162,7 @@ import Hatter.Widget
   , ImageConfig(..)
   , ImageSource(..)
   , InputType(..)
+  , LayoutSettings(..)
   , MapViewConfig(..)
   , ResourceName(..)
   , ScaleType(..)
@@ -171,7 +175,9 @@ import Hatter.Widget
   , button
   , colorFromText
   , colorToHex
+  , column
   , defaultStyle
+  , row
   , text
   )
 
@@ -245,7 +251,7 @@ renderView ctxPtr = do
 -- The dismiss button uses a pre-registered 'Action' handle whose
 -- closure is populated by the exception handler.
 errorWidget :: Action -> SomeException -> Widget
-errorWidget dismissAction exc = Column
+errorWidget dismissAction exc = column
   [ Text TextConfig
       { tcLabel      = "An error occurred"
       , tcFontConfig = Just (FontConfig 20.0)

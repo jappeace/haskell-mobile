@@ -25,7 +25,7 @@ import Hatter
   )
 import Hatter.AppContext (AppContext(..), derefAppContext)
 import Hatter.NetworkStatus (NetworkStatusState(..), NetworkStatus(..), NetworkTransport(..), startNetworkMonitoring, stopNetworkMonitoring)
-import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
+import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..), column)
 
 main :: IO (Ptr AppContext)
 main = do
@@ -55,7 +55,7 @@ main = do
 
 -- | Builds a Column with a label and start/stop monitoring buttons.
 networkStatusDemoView :: Action -> Action -> IO Widget
-networkStatusDemoView onStartMonitoring onStopMonitoring = pure $ Column
+networkStatusDemoView onStartMonitoring onStopMonitoring = pure $ column
   [ Text TextConfig { tcLabel = "Network Status Demo", tcFontConfig = Nothing }
   , Button ButtonConfig
       { bcLabel = "Start Monitoring", bcAction = onStartMonitoring, bcFontConfig = Nothing }

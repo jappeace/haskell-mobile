@@ -23,6 +23,7 @@ import Hatter.Widget
   ( MapViewConfig(..)
   , TextConfig(..)
   , Widget(..)
+  , column
   )
 
 main :: IO (Ptr AppContext)
@@ -41,7 +42,7 @@ main = do
 -- | Builds a Column with a label and a MapView centered on Amsterdam.
 mapViewDemoView :: OnChange -> UserState -> IO Widget
 mapViewDemoView onRegionChange _userState =
-  pure $ Column
+  pure $ column
     [ Text TextConfig { tcLabel = "MapView Demo", tcFontConfig = Nothing }
     , MapView MapViewConfig
         { mvLatitude         = 52.3676

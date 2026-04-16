@@ -27,9 +27,11 @@ import Hatter.Animation
 import Hatter.Render (RenderState(..), RenderedNode(..), newRenderState, renderWidget)
 import Hatter.Widget
   ( Color(..)
+  , LayoutSettings(..)
   , Widget(..)
   , WidgetStyle(..)
   , TextConfig(..)
+  , column
   , defaultStyle
   , interpolateColor
   , lerpWord8
@@ -222,7 +224,7 @@ animatedWidgetRenderTests = testGroup "Animated widget rendering"
       actionState <- newActionState
       rs <- newRenderState actionState animState
       let child1 = Text TextConfig { tcLabel = "text", tcFontConfig = Nothing }
-          child2 = Column []
+          child2 = column []
           widget1 = Animated (AnimatedConfig 300 EaseOut) child1
           widget2 = Animated (AnimatedConfig 300 EaseOut) child2
       renderWidget rs widget1
@@ -261,18 +263,18 @@ normalizeAnimatedTests = testGroup "normalizeAnimated"
       let cfg = AnimatedConfig 300 EaseOut
           childA = Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }
           childB = Text TextConfig { tcLabel = "b", tcFontConfig = Nothing }
-          result = normalizeAnimated cfg (Column [childA, childB])
-      result @?= Column [Animated cfg childA, Animated cfg childB]
+          result = normalizeAnimated cfg (Column (LayoutSettings [childA, childB] False))
+      result @?= Column (LayoutSettings [Animated cfg childA, Animated cfg childB] False)
   , testCase "Distributes over Row children" $ do
       let cfg = AnimatedConfig 300 EaseOut
           childA = Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }
-          result = normalizeAnimated cfg (Row [childA])
-      result @?= Row [Animated cfg childA]
-  , testCase "Distributes over ScrollView children" $ do
+          result = normalizeAnimated cfg (Row (LayoutSettings [childA] False))
+      result @?= Row (LayoutSettings [Animated cfg childA] False)
+  , testCase "Distributes over scrollable Column children" $ do
       let cfg = AnimatedConfig 300 EaseOut
           childA = Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }
-          result = normalizeAnimated cfg (ScrollView [childA])
-      result @?= ScrollView [Animated cfg childA]
+          result = normalizeAnimated cfg (Column (LayoutSettings [childA] True))
+      result @?= Column (LayoutSettings [Animated cfg childA] True)
   , testCase "Inner Animated wins over outer" $ do
       let outerCfg = AnimatedConfig 500 EaseOut
           innerCfg = AnimatedConfig 100 EaseIn
@@ -286,11 +288,11 @@ normalizeAnimatedTests = testGroup "normalizeAnimated"
           leaf = Text TextConfig { tcLabel = "x", tcFontConfig = Nothing }
           explicitChild = Animated innerCfg leaf
           plainChild = Text TextConfig { tcLabel = "y", tcFontConfig = Nothing }
-          result = normalizeAnimated outerCfg (Column [explicitChild, plainChild])
+          result = normalizeAnimated outerCfg (Column (LayoutSettings [explicitChild, plainChild] False))
       -- Distribution wraps each child in outer Animated; the render engine
       -- then collapses the nested Animated (inner wins) during traversal.
-      result @?= Column [ Animated outerCfg (Animated innerCfg leaf)
-                         , Animated outerCfg plainChild ]
+      result @?= Column (LayoutSettings [ Animated outerCfg (Animated innerCfg leaf)
+                                        , Animated outerCfg plainChild ] False)
   , testCase "Styled returned unchanged" $ do
       let cfg = AnimatedConfig 300 EaseOut
           style = defaultStyle { wsPadding = Just 10 }
@@ -313,7 +315,7 @@ normalizeAnimatedTests = testGroup "normalizeAnimated"
                      Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }
           childB = Styled (defaultStyle { wsPadding = Just 20 }) $
                      Text TextConfig { tcLabel = "b", tcFontConfig = Nothing }
-          widget = Animated cfg (Column [childA, childB])
+          widget = Animated cfg (column [childA, childB])
       renderWidget rs widget
       renderedTree <- readIORef (rsRenderedTree rs)
       case renderedTree of
@@ -337,8 +339,8 @@ normalizeAnimatedTests = testGroup "normalizeAnimated"
           style1 = defaultStyle { wsPadding = Just 10 }
           style2 = defaultStyle { wsPadding = Just 50 }
           child = Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }
-          widget1 = Animated cfg (Column [Styled style1 child])
-          widget2 = Animated cfg (Column [Styled style2 child])
+          widget1 = Animated cfg (column [Styled style1 child])
+          widget2 = Animated cfg (column [Styled style2 child])
       renderWidget rs widget1
       Just tree1 <- readIORef (rsRenderedTree rs)
       let nodeId1 = renderedNodeIdSafe tree1

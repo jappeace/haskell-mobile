@@ -14,6 +14,7 @@
 #define UI_NODE_MAP_VIEW    7
 #define UI_NODE_WEBVIEW     8
 #define UI_NODE_STACK       9
+#define UI_NODE_HORIZONTAL_SCROLL_VIEW 10
 
 /* Property IDs for string properties */
 #define UI_PROP_TEXT            0

@@ -20,7 +20,7 @@ import Hatter
   )
 import Hatter.AppContext (AppContext(..), derefAppContext)
 import Hatter.SecureStorage (SecureStorageState(..), secureStorageWrite, secureStorageRead)
-import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
+import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..), column)
 
 main :: IO (Ptr AppContext)
 main = do
@@ -48,7 +48,7 @@ main = do
 
 -- | Builds a Column with a label, a "Store Token" button, and a "Read Token" button.
 secureStorageDemoView :: Action -> Action -> IO Widget
-secureStorageDemoView onStoreToken onReadToken = pure $ Column
+secureStorageDemoView onStoreToken onReadToken = pure $ column
   [ Text TextConfig { tcLabel = "SecureStorage Demo", tcFontConfig = Nothing }
   , Button ButtonConfig
       { bcLabel = "Store Token", bcAction = onStoreToken, bcFontConfig = Nothing }

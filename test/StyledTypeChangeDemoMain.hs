@@ -19,7 +19,7 @@ import Data.Word (Word8)
 import Foreign.Ptr (Ptr)
 import Hatter (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), newActionState, runActionM, createAction, Action)
 import Hatter.AppContext (AppContext)
-import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..), WidgetStyle(..), Color(..), defaultStyle)
+import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..), WidgetStyle(..), Color(..), column, defaultStyle)
 
 data Screen = ScreenA | ScreenB
   deriving (Show, Eq)
@@ -74,7 +74,7 @@ styledTypeChangeView screenState switchAction noopAction = do
             , bcAction = noopAction
             , bcFontConfig = Nothing
             })
-  pure $ Column
+  pure $ column
     [ Button ButtonConfig
         { bcLabel = "Switch screen"
         , bcAction = switchAction

@@ -20,7 +20,7 @@ import Hatter
   )
 import Hatter.AppContext (AppContext)
 import Hatter.FilesDir (getAppFilesDir)
-import Hatter.Widget (TextConfig(..), Widget(..))
+import Hatter.Widget (TextConfig(..), Widget(..), column)
 
 main :: IO (Ptr AppContext)
 main = do
@@ -58,7 +58,7 @@ main = do
 filesDirDemoView :: IO Widget
 filesDirDemoView = do
   filesDir <- getAppFilesDir
-  pure $ Column
+  pure $ column
     [ Text TextConfig { tcLabel = "FilesDir Demo", tcFontConfig = Nothing }
     , Text TextConfig { tcLabel = pack filesDir, tcFontConfig = Nothing }
     ]

@@ -23,6 +23,7 @@ import Hatter.Widget
   ( ButtonConfig(..)
   , TextConfig(..)
   , Widget(..)
+  , column
   )
 
 main :: IO (Ptr AppContext)
@@ -55,7 +56,7 @@ main = do
 
 -- | Builds a Column with a label and a "Start Login" button.
 authSessionDemoView :: Action -> IO Widget
-authSessionDemoView onStartLogin = pure $ Column
+authSessionDemoView onStartLogin = pure $ column
   [ Text TextConfig { tcLabel = "AuthSession Demo", tcFontConfig = Nothing }
   , Button ButtonConfig
       { bcLabel      = "Start Login"

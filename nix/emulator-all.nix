@@ -306,6 +306,17 @@ let
     name = "hatter-styled-type-change-apk";
   };
 
+  horizontalScrollAndroid = import ./android.nix {
+    inherit sources androidArch;
+    mainModule = ../test/HorizontalScrollDemoMain.hs;
+  };
+  horizontalScrollApk = lib.mkApk {
+    sharedLibs = [{ lib = horizontalScrollAndroid; inherit abiDir; }];
+    androidSrc = ../android;
+    apkName = "hatter-horizontal-scroll.apk";
+    name = "hatter-horizontal-scroll-apk";
+  };
+
   androidComposition = pkgs.androidenv.composeAndroidPackages {
     platformVersions = [ emulatorApiLevel ];
     includeEmulator = true;
@@ -369,6 +380,7 @@ TEXTINPUT_RERENDER_APK="${textinputRerenderApk}/hatter-textinput-rerender.apk"
 STACK_APK="${stackApk}/hatter-stack.apk"
 SCROLLVIEW_SWITCH_APK="${scrollviewSwitchApk}/hatter-scrollview-switch.apk"
 STYLED_TYPE_CHANGE_APK="${styledTypeChangeApk}/hatter-styled-type-change.apk"
+HORIZONTAL_SCROLL_APK="${horizontalScrollApk}/hatter-horizontal-scroll.apk"
 PACKAGE="me.jappie.hatter"
 ACTIVITY=".MainActivity"
 DEVICE_NAME="test_all"
@@ -402,7 +414,8 @@ for so_path in \
     "${filesDirAndroid}/lib/${abiDir}/libhatter.so" \
     "${textinputRerenderAndroid}/lib/${abiDir}/libhatter.so" \
     "${stackAndroid}/lib/${abiDir}/libhatter.so" \
-    "${styledTypeChangeAndroid}/lib/${abiDir}/libhatter.so"; do
+    "${styledTypeChangeAndroid}/lib/${abiDir}/libhatter.so" \
+    "${horizontalScrollAndroid}/lib/${abiDir}/libhatter.so"; do
     SO_BYTES=$(stat -c %s "$so_path")
     SO_MB=$((SO_BYTES / 1048576))
     SO_LABEL=$(echo "$so_path" | grep -oP '[^/]+(?=/lib/)')
@@ -473,6 +486,7 @@ PHASE14_OK=0
 PHASE15_OK=0
 PHASE16_OK=0
 PHASE18_OK=0
+PHASE19_OK=0
 
 cleanup() {
     echo ""
@@ -589,7 +603,7 @@ sleep 30
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK SCROLL_TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PLATFORM_SIGN_IN_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK FILES_DIR_APK TEXTINPUT_RERENDER_APK STACK_APK SCROLLVIEW_SWITCH_APK STYLED_TYPE_CHANGE_APK PACKAGE ACTIVITY WORK_DIR
+export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK SCROLL_TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PLATFORM_SIGN_IN_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK FILES_DIR_APK TEXTINPUT_RERENDER_APK STACK_APK SCROLLVIEW_SWITCH_APK STYLED_TYPE_CHANGE_APK HORIZONTAL_SCROLL_APK PACKAGE ACTIVITY WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -609,6 +623,7 @@ PHASE15_EXIT=0
 PHASE16_EXIT=0
 PHASE17_EXIT=0
 PHASE18_EXIT=0
+PHASE19_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -699,6 +714,8 @@ echo "--- scrollview-switch ---"
 run_with_retry "scrollview-switch" bash "$TEST_SCRIPTS/android/scrollview-switch.sh" || PHASE17_EXIT=1
 echo "--- styled-type-change ---"
 run_with_retry "styled-type-change" bash "$TEST_SCRIPTS/android/styled-type-change.sh" || PHASE18_EXIT=1
+echo "--- horizontal-scroll ---"
+run_with_retry "horizontal-scroll" bash "$TEST_SCRIPTS/android/horizontal-scroll.sh" || PHASE19_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -879,6 +896,16 @@ else
     echo "PHASE 18 FAILED"
 fi
 
+if [ $PHASE19_EXIT -eq 0 ]; then
+    PHASE19_OK=1
+    echo ""
+    echo "PHASE 19 PASSED"
+else
+    PHASE19_OK=0
+    echo ""
+    echo "PHASE 19 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -1012,6 +1039,13 @@ if [ $PHASE18_OK -eq 1 ]; then
     echo "PASS  Phase 18 — Styled + child type change (same style)"
 else
     echo "FAIL  Phase 18 — Styled + child type change (same style)"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE19_OK -eq 1 ]; then
+    echo "PASS  Phase 19 — Horizontal scroll demo app"
+else
+    echo "FAIL  Phase 19 — Horizontal scroll demo app"
     FINAL_EXIT=1
 fi
 

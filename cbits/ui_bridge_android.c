@@ -61,6 +61,7 @@ static jclass   g_class_Button;
 static jclass   g_class_EditText;
 static jclass   g_class_LinearLayout;
 static jclass   g_class_ScrollView;
+static jclass   g_class_HorizontalScrollView;
 static jclass   g_class_ImageView;
 static jclass   g_class_WebView;
 static jclass   g_class_FrameLayout;
@@ -75,6 +76,7 @@ static jmethodID g_ctor_Button;
 static jmethodID g_ctor_EditText;
 static jmethodID g_ctor_LinearLayout;
 static jmethodID g_ctor_ScrollView;
+static jmethodID g_ctor_HorizontalScrollView;
 static jmethodID g_ctor_ImageView;
 static jmethodID g_ctor_WebView;
 static jmethodID g_ctor_FrameLayout;
@@ -171,6 +173,10 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     if (!cls) return -1;
     g_class_ScrollView = (*env)->NewGlobalRef(env, cls);
 
+    cls = (*env)->FindClass(env, "android/widget/HorizontalScrollView");
+    if (!cls) return -1;
+    g_class_HorizontalScrollView = (*env)->NewGlobalRef(env, cls);
+
     cls = (*env)->FindClass(env, "android/widget/ImageView");
     if (!cls) return -1;
     g_class_ImageView = (*env)->NewGlobalRef(env, cls);
@@ -213,6 +219,8 @@ static int resolve_jni_ids(JNIEnv *env, jobject activity)
     g_ctor_LinearLayout = (*env)->GetMethodID(env, g_class_LinearLayout,
         "<init>", "(Landroid/content/Context;)V");
     g_ctor_ScrollView = (*env)->GetMethodID(env, g_class_ScrollView,
+        "<init>", "(Landroid/content/Context;)V");
+    g_ctor_HorizontalScrollView = (*env)->GetMethodID(env, g_class_HorizontalScrollView,
         "<init>", "(Landroid/content/Context;)V");
     g_ctor_ImageView = (*env)->GetMethodID(env, g_class_ImageView,
         "<init>", "(Landroid/content/Context;)V");
@@ -518,6 +526,20 @@ static int32_t android_create_node(int32_t nodeType)
         /* Stack: children overlap in z-order (first at bottom, last on top).
          * FrameLayout is already cached from MapView placeholder. */
         view = (*env)->NewObject(env, g_class_FrameLayout, g_ctor_FrameLayout, g_activity);
+        break;
+    }
+    case UI_NODE_HORIZONTAL_SCROLL_VIEW: {
+        view = (*env)->NewObject(env, g_class_HorizontalScrollView,
+            g_ctor_HorizontalScrollView, g_activity);
+        /* HorizontalScrollView only accepts one direct child.
+         * Create an inner horizontal LinearLayout so that multiple
+         * Haskell children can be added via addChild(). */
+        jobject innerLayout = (*env)->NewObject(env, g_class_LinearLayout,
+            g_ctor_LinearLayout, g_activity);
+        (*env)->CallVoidMethod(env, innerLayout, g_method_setOrientation,
+            ORIENTATION_HORIZONTAL);
+        (*env)->CallVoidMethod(env, view, g_method_addView, innerLayout);
+        (*env)->DeleteLocalRef(env, innerLayout);
         break;
     }
     default:
@@ -893,10 +915,11 @@ static void android_add_child(int32_t parentId, int32_t childId)
     jobject child  = get_node(childId);
     if (!parent || !child) return;
 
-    /* Android ScrollView only accepts one direct child.
-     * Redirect to the inner LinearLayout wrapper (child 0)
+    /* Android ScrollView / HorizontalScrollView only accept one direct
+     * child.  Redirect to the inner LinearLayout wrapper (child 0)
      * that was created in android_create_node. */
-    if ((*env)->IsInstanceOf(env, parent, g_class_ScrollView)) {
+    if ((*env)->IsInstanceOf(env, parent, g_class_ScrollView) ||
+        (*env)->IsInstanceOf(env, parent, g_class_HorizontalScrollView)) {
         jobject innerLayout = (*env)->CallObjectMethod(env, parent,
             g_method_getChildAt, (jint)0);
         if (innerLayout) {
@@ -916,8 +939,9 @@ static void android_remove_child(int32_t parentId, int32_t childId)
     jobject child  = get_node(childId);
     if (!parent || !child) return;
 
-    /* ScrollView: redirect to inner LinearLayout wrapper. */
-    if ((*env)->IsInstanceOf(env, parent, g_class_ScrollView)) {
+    /* ScrollView / HorizontalScrollView: redirect to inner LinearLayout wrapper. */
+    if ((*env)->IsInstanceOf(env, parent, g_class_ScrollView) ||
+        (*env)->IsInstanceOf(env, parent, g_class_HorizontalScrollView)) {
         jobject innerLayout = (*env)->CallObjectMethod(env, parent,
             g_method_getChildAt, (jint)0);
         if (innerLayout) {

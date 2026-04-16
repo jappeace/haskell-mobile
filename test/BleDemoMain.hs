@@ -24,7 +24,7 @@ import Hatter
   )
 import Hatter.AppContext (AppContext(..), derefAppContext)
 import Hatter.Ble (BleState(..), checkBleAdapter, startBleScan, stopBleScan)
-import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
+import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..), column)
 
 main :: IO (Ptr AppContext)
 main = do
@@ -56,7 +56,7 @@ main = do
 
 -- | Builds a Column with a label, adapter check button, and scan buttons.
 bleDemoView :: Action -> Action -> Action -> IO Widget
-bleDemoView onCheckAdapter onStartScan onStopScan = pure $ Column
+bleDemoView onCheckAdapter onStartScan onStopScan = pure $ column
   [ Text TextConfig { tcLabel = "BLE Demo", tcFontConfig = Nothing }
   , Button ButtonConfig
       { bcLabel = "Check Adapter", bcAction = onCheckAdapter, bcFontConfig = Nothing }

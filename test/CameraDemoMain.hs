@@ -27,6 +27,7 @@ import Hatter.Widget
   ( ButtonConfig(..)
   , TextConfig(..)
   , Widget(..)
+  , column
   )
 
 main :: IO (Ptr AppContext)
@@ -62,7 +63,7 @@ main = do
 
 -- | Builds a Column with a label and a "Capture Photo" button.
 cameraDemoView :: Action -> IO Widget
-cameraDemoView onCapturePhoto = pure $ Column
+cameraDemoView onCapturePhoto = pure $ column
   [ Text TextConfig { tcLabel = "Camera Demo", tcFontConfig = Nothing }
   , Button ButtonConfig
       { bcLabel      = "Capture Photo"

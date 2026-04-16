@@ -26,6 +26,7 @@ import Hatter.Widget
   ( ButtonConfig(..)
   , TextConfig(..)
   , Widget(..)
+  , column
   )
 
 main :: IO (Ptr AppContext)
@@ -64,7 +65,7 @@ main = do
 -- The button fires a GET request to http://localhost:8765/
 httpDemoView :: Action -> IO Widget
 httpDemoView onSendRequest = do
-  pure $ Column
+  pure $ column
     [ Text TextConfig { tcLabel = "HTTP Demo", tcFontConfig = Nothing }
     , Button ButtonConfig
         { bcLabel = "Send Request"

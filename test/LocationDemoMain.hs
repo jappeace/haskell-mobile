@@ -25,7 +25,7 @@ import Hatter
 import Hatter.AppContext (AppContext(..), derefAppContext)
 import Hatter.Location (LocationState(..), startLocationUpdates, stopLocationUpdates)
 import Hatter.Location (LocationData(..))
-import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
+import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..), column)
 
 main :: IO (Ptr AppContext)
 main = do
@@ -57,7 +57,7 @@ main = do
 
 -- | Builds a Column with a label and start/stop location buttons.
 locationDemoView :: Action -> Action -> IO Widget
-locationDemoView onStartLocation onStopLocation = pure $ Column
+locationDemoView onStartLocation onStopLocation = pure $ column
   [ Text TextConfig { tcLabel = "Location Demo", tcFontConfig = Nothing }
   , Button ButtonConfig
       { bcLabel = "Start Location", bcAction = onStartLocation, bcFontConfig = Nothing }

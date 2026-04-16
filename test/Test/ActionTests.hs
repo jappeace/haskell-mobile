@@ -26,6 +26,7 @@ import Hatter.Widget
   , TextInputConfig(..)
   , Widget(..)
   , WidgetStyle(..)
+  , column
   )
 import Hatter.Render
   ( RenderState(..)
@@ -101,9 +102,9 @@ widgetEqTests = testGroup "WidgetEq"
       assertBool "different labels means different widgets" (widgetA /= widgetB)
 
   , testCase "Column equality is structural" $ do
-      let widgetA = Column [Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }]
-          widgetB = Column [Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }]
-          widgetC = Column [Text TextConfig { tcLabel = "b", tcFontConfig = Nothing }]
+      let widgetA = column [Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }]
+          widgetB = column [Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }]
+          widgetC = column [Text TextConfig { tcLabel = "b", tcFontConfig = Nothing }]
       widgetA @?= widgetB
       assertBool "different children means different Column" (widgetA /= widgetC)
   ]
@@ -146,7 +147,7 @@ incrementalRenderTests = testGroup "Incremental rendering"
 
       , testCase "single child change updates in-place, preserving node IDs" $ do
           ((), rs) <- withActions (pure ())
-          let widget1 = Column
+          let widget1 = column
                 [ Text TextConfig { tcLabel = "stable", tcFontConfig = Nothing }
                 , Text TextConfig { tcLabel = "will change", tcFontConfig = Nothing }
                 ]
@@ -157,7 +158,7 @@ incrementalRenderTests = testGroup "Incremental rendering"
               [c0, c1] -> pure (nodeIdOf c0, nodeIdOf c1)
               _        -> assertFailure "expected 2 children" >> pure (-1, -1)
             Nothing -> assertFailure "expected rendered tree" >> pure (-1, -1)
-          let widget2 = Column
+          let widget2 = column
                 [ Text TextConfig { tcLabel = "stable", tcFontConfig = Nothing }
                 , Text TextConfig { tcLabel = "changed!", tcFontConfig = Nothing }
                 ]
@@ -228,7 +229,7 @@ incrementalRenderTests = testGroup "Incremental rendering"
 
       , testCase "adding a child to container" $ do
           ((), rs) <- withActions (pure ())
-          let widget1 = Column
+          let widget1 = column
                 [ Text TextConfig { tcLabel = "first", tcFontConfig = Nothing } ]
           renderWidget rs widget1
           tree1 <- readIORef (rsRenderedTree rs)
@@ -237,7 +238,7 @@ incrementalRenderTests = testGroup "Incremental rendering"
               [c0] -> pure (nodeIdOf c0)
               _    -> assertFailure "expected 1 child" >> pure (-1)
             Nothing -> assertFailure "expected rendered tree" >> pure (-1)
-          let widget2 = Column
+          let widget2 = column
                 [ Text TextConfig { tcLabel = "first", tcFontConfig = Nothing }
                 , Text TextConfig { tcLabel = "second", tcFontConfig = Nothing }
                 ]
@@ -256,12 +257,12 @@ incrementalRenderTests = testGroup "Incremental rendering"
 
       , testCase "removing a child from container" $ do
           ((), rs) <- withActions (pure ())
-          let widget1 = Column
+          let widget1 = column
                 [ Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }
                 , Text TextConfig { tcLabel = "b", tcFontConfig = Nothing }
                 ]
           renderWidget rs widget1
-          let widget2 = Column
+          let widget2 = column
                 [ Text TextConfig { tcLabel = "a", tcFontConfig = Nothing } ]
           renderWidget rs widget2
           tree2 <- readIORef (rsRenderedTree rs)
@@ -402,7 +403,7 @@ incrementalRenderTests = testGroup "Incremental rendering"
       , testCase "TextInput inside Column preserves node on value change" $ do
           (changeHandle, rs) <- withActions $
             createOnChange (\_ -> pure ())
-          let mkWidget value = Column
+          let mkWidget value = column
                 [ Text TextConfig { tcLabel = "header", tcFontConfig = Nothing }
                 , TextInput TextInputConfig
                     { tiInputType = InputNumber, tiHint = "% of 1RM", tiValue = value

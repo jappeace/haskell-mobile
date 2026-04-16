@@ -169,6 +169,16 @@ executable stack-demo
       hatter,
       text
 
+executable horizontal-scroll-demo
+  import: common-options
+  main-is: HorizontalScrollDemoMain.hs
+  ghc-options: -Wno-unused-packages -threaded
+  hs-source-dirs:
+      test
+  build-depends:
+      hatter,
+      text
+
 test-suite unit
   import: common-options
   type: exitcode-stdio-1.0

@@ -11,11 +11,11 @@ import Foreign.Ptr (Ptr)
 import Hatter (MobileApp(..), UserState(..), startMobileApp, newActionState)
 import Hatter.AppContext (AppContext)
 import Hatter.Lifecycle (loggingMobileContext)
-import Hatter.Widget (TextConfig(..), Widget(..))
+import Hatter.Widget (TextConfig(..), Widget(..), column)
 
 -- | Render 300 nodes: 1 Column parent + 299 Text children.
 nodePoolTestView :: UserState -> IO Widget
-nodePoolTestView _userState = pure $ Column $
+nodePoolTestView _userState = pure $ column $
   map (\itemNumber -> Text TextConfig
     { tcLabel = "Item " <> pack (show (itemNumber :: Int))
     , tcFontConfig = Nothing

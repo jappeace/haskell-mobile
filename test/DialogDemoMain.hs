@@ -20,7 +20,7 @@ import Hatter
   )
 import Hatter.AppContext (AppContext(..), derefAppContext)
 import Hatter.Dialog (DialogAction(..), DialogConfig(..), DialogState(..), showDialog)
-import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..))
+import Hatter.Widget (ButtonConfig(..), TextConfig(..), Widget(..), column)
 
 main :: IO (Ptr AppContext)
 main = do
@@ -65,7 +65,7 @@ main = do
 
 -- | Builds a Column with a label, a "Show Alert" button, and a "Show Confirm" button.
 dialogDemoView :: Action -> Action -> IO Widget
-dialogDemoView onShowAlert onShowConfirm = pure $ Column
+dialogDemoView onShowAlert onShowConfirm = pure $ column
   [ Text TextConfig { tcLabel = "Dialog Demo", tcFontConfig = Nothing }
   , Button ButtonConfig
       { bcLabel      = "Show Alert"

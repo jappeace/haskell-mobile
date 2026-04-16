@@ -30,6 +30,7 @@ import Hatter.Widget
   ( ButtonConfig(..)
   , TextConfig(..)
   , Widget(..)
+  , column
   )
 
 main :: IO (Ptr AppContext)
@@ -72,7 +73,7 @@ main = do
 
 -- | Builds a Column with a label and two sign-in buttons.
 platformSignInDemoView :: Action -> Action -> IO Widget
-platformSignInDemoView onAppleSignIn onGoogleSignIn = pure $ Column
+platformSignInDemoView onAppleSignIn onGoogleSignIn = pure $ column
   [ Text TextConfig { tcLabel = "PlatformSignIn Demo", tcFontConfig = Nothing }
   , Button ButtonConfig
       { bcLabel      = "Sign in with Apple"

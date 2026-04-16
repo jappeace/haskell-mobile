@@ -9,7 +9,7 @@ import Data.ByteString qualified as BS
 import Foreign.Ptr (Ptr)
 import Hatter (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), newActionState)
 import Hatter.AppContext (AppContext)
-import Hatter.Widget (ImageConfig(..), ImageSource(..), ResourceName(..), ScaleType(..), TextConfig(..), Widget(..))
+import Hatter.Widget (ImageConfig(..), ImageSource(..), ResourceName(..), ScaleType(..), TextConfig(..), Widget(..), column)
 
 main :: IO (Ptr AppContext)
 main = do
@@ -23,7 +23,7 @@ main = do
 
 -- | Builds a Column with a label and three Image widgets (resource, data, file).
 imageDemoView :: IO Widget
-imageDemoView = pure $ Column
+imageDemoView = pure $ column
   [ Text TextConfig { tcLabel = "Image Demo", tcFontConfig = Nothing }
   , Image ImageConfig
       { icSource    = ImageResource (ResourceName "ic_launcher")

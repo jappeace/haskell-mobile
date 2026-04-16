@@ -25,6 +25,7 @@ import Hatter.Widget
   , TextConfig(..)
   , WebViewConfig(..)
   , Widget(..)
+  , column
   )
 
 main :: IO (Ptr AppContext)
@@ -48,7 +49,7 @@ main = do
 webViewDemoView :: IORef String -> Action -> Action -> UserState -> IO Widget
 webViewDemoView urlRef onPageLoad onLoadExampleOrg _userState = do
   currentUrl <- readIORef urlRef
-  pure $ Column
+  pure $ column
     [ Text TextConfig { tcLabel = "WebView Demo", tcFontConfig = Nothing }
     , WebView WebViewConfig
         { wvUrl = pack currentUrl

@@ -33,6 +33,7 @@ import Hatter.Widget
   , ImageConfig(..)
   , ImageSource(..)
   , InputType(..)
+  , LayoutSettings(..)
   , MapViewConfig(..)
   , ResourceName(..)
   , ScaleType(..)
@@ -44,9 +45,11 @@ import Hatter.Widget
   , WidgetStyle(..)
   , colorFromText
   , colorToHex
+  , column
   , defaultStyle
+  , row
   )
-import Hatter.Render (renderWidget, dispatchEvent, dispatchTextEvent)
+import Hatter.Render (RenderState(..), RenderedNode(..), renderWidget, dispatchEvent, dispatchTextEvent)
 import Hatter.Permission (newPermissionState)
 import Hatter.SecureStorage (newSecureStorageState)
 import Hatter.Ble (newBleState)
@@ -80,7 +83,7 @@ uiTests = testGroup "UI"
         hA <- createAction (modifyIORef' refA (const True))
         hB <- createAction (modifyIORef' refB (const True))
         pure (hA, hB)
-      let widget = Row
+      let widget = row
             [ Button ButtonConfig
                 { bcLabel = "A", bcAction = handleA, bcFontConfig = Nothing }
             , Button ButtonConfig
@@ -124,12 +127,12 @@ uiTests = testGroup "UI"
         hA <- createAction (pure ())
         hB <- createAction (pure ())
         pure (hA, hB)
-      let widget = Column
+      let widget = column
             [ Text TextConfig { tcLabel = "header", tcFontConfig = Nothing }
-            , Row
+            , row
               [ Button ButtonConfig
                   { bcLabel = "a", bcAction = handleA, bcFontConfig = Nothing }
-              , Column
+              , column
                 [ Text TextConfig { tcLabel = "nested", tcFontConfig = Nothing }
                 , Button ButtonConfig
                     { bcLabel = "b", bcAction = handleB, bcFontConfig = Nothing }
@@ -177,62 +180,84 @@ uiTests = testGroup "UI"
         WebView _       -> assertFailure "expected Text, got WebView"
         MapView _       -> assertFailure "expected Text, got MapView"
         Row _           -> assertFailure "expected Text, got Row"
-        ScrollView _    -> assertFailure "expected Text, got ScrollView"
         Stack _         -> assertFailure "expected Text, got Stack"
         Styled _ _      -> assertFailure "expected Text, got Styled"
         Animated _ _    -> assertFailure "expected Text, got Animated"
   ]
 
--- | Tests for the ScrollView widget binding.
+-- | Tests for scrollable Column (formerly ScrollView).
 -- These exercise the Haskell render path shared by both Android and iOS —
 -- the platform bridge (JNI / UIKit) receives UI_NODE_SCROLL_VIEW (5) and
 -- is responsible for mapping it to a native scroll container.
 scrollViewTests :: TestTree
 scrollViewTests = testGroup "ScrollView"
-  [ testCase "ScrollView renders without error" $ do
+  [ testCase "scrollable Column renders without error" $ do
       ((), rs) <- withActions (pure ())
-      renderWidget rs (ScrollView
+      renderWidget rs (Column (LayoutSettings
         [ Text TextConfig { tcLabel = "item 1", tcFontConfig = Nothing }
         , Text TextConfig { tcLabel = "item 2", tcFontConfig = Nothing }
-        ])
+        ] True))
 
-  , testCase "button inside ScrollView fires its callback" $ do
+  , testCase "button inside scrollable Column fires its callback" $ do
       ref <- newIORef (0 :: Int)
       (clickHandle, rs) <- withActions $
         createAction (modifyIORef' ref (+ 1))
-      renderWidget rs $ ScrollView
+      renderWidget rs $ Column (LayoutSettings
         [ Button ButtonConfig
             { bcLabel = "press me", bcAction = clickHandle, bcFontConfig = Nothing } ]
+        True)
       dispatchEvent rs (actionId clickHandle)
       count <- readIORef ref
       count @?= 1
 
-  , testCase "ScrollView with nested Column renders and dispatches correctly" $ do
+  , testCase "scrollable Column with nested Column renders and dispatches correctly" $ do
       ref <- newIORef False
       (clickHandle, rs) <- withActions $
         createAction (modifyIORef' ref (const True))
-      renderWidget rs $ ScrollView
-        [ Column
+      renderWidget rs $ Column (LayoutSettings
+        [ column
           [ Text TextConfig { tcLabel = "header", tcFontConfig = Nothing }
           , Button ButtonConfig
               { bcLabel = "action", bcAction = clickHandle, bcFontConfig = Nothing }
           ]
-        ]
+        ] True)
       dispatchEvent rs (actionId clickHandle)
       fired <- readIORef ref
       fired @?= True
 
-  , testCase "re-render inside ScrollView preserves callbacks" $ do
+  , testCase "re-render inside scrollable Column preserves callbacks" $ do
       ref <- newIORef (0 :: Int)
       (clickHandle, rs) <- withActions $
         createAction (modifyIORef' ref (+ 1))
-      renderWidget rs $ ScrollView [Button ButtonConfig
-        { bcLabel = "old", bcAction = clickHandle, bcFontConfig = Nothing }]
-      renderWidget rs $ ScrollView [Button ButtonConfig
-        { bcLabel = "new", bcAction = clickHandle, bcFontConfig = Nothing }]
+      renderWidget rs $ Column (LayoutSettings [Button ButtonConfig
+        { bcLabel = "old", bcAction = clickHandle, bcFontConfig = Nothing }] True)
+      renderWidget rs $ Column (LayoutSettings [Button ButtonConfig
+        { bcLabel = "new", bcAction = clickHandle, bcFontConfig = Nothing }] True)
       dispatchEvent rs (actionId clickHandle)
       count <- readIORef ref
       count @?= 1
+
+  , testCase "scrollable flag change recreates native node" $ do
+      ((), rs) <- withActions (pure ())
+      let nonScrollable = column [Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }]
+      renderWidget rs nonScrollable
+      tree1 <- readIORef (rsRenderedTree rs)
+      let nodeId1 = case tree1 of
+            Just (RenderedContainer _ nid _) -> nid
+            Just (RenderedLeaf _ nid)        -> nid
+            Just (RenderedStyled _ _ _)      -> -1
+            Just (RenderedAnimated _ _)      -> -1
+            Nothing                          -> -1
+      let scrollable = Column (LayoutSettings [Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }] True)
+      renderWidget rs scrollable
+      tree2 <- readIORef (rsRenderedTree rs)
+      let nodeId2 = case tree2 of
+            Just (RenderedContainer _ nid _) -> nid
+            Just (RenderedLeaf _ nid)        -> nid
+            Just (RenderedStyled _ _ _)      -> -2
+            Just (RenderedAnimated _ _)      -> -2
+            Nothing                          -> -2
+      assertBool "node ID should change when scrollable changes" (nodeId1 /= nodeId2)
   ]
 
 -- | Tests for the Stack widget (z-order overlay container).
@@ -264,7 +289,7 @@ stackTests = testGroup "Stack"
         createAction (modifyIORef' ref (const True))
       renderWidget rs $ Stack
         [ Text TextConfig { tcLabel = "bg", tcFontConfig = Nothing }
-        , Column
+        , column
           [ Text TextConfig { tcLabel = "header", tcFontConfig = Nothing }
           , Button ButtonConfig
               { bcLabel = "action", bcAction = clickHandle, bcFontConfig = Nothing }
@@ -329,7 +354,7 @@ textInputTests = testGroup "TextInput"
         ch <- createAction (modifyIORef' clickRef (const True))
         th <- createOnChange (\t -> modifyIORef' textRef (const (show t)))
         pure (ch, th)
-      let widget = Column
+      let widget = column
             [ Button ButtonConfig
                 { bcLabel = "ok", bcAction = clickHandle, bcFontConfig = Nothing }
             , TextInput TextInputConfig
@@ -381,7 +406,7 @@ textInputTests = testGroup "TextInput"
         th <- createOnChange (\t -> modifyIORef' textRef (const (show t)))
         nh <- createOnChange (\t -> modifyIORef' numberRef (const (show t)))
         pure (th, nh)
-      let widget = Column
+      let widget = column
             [ TextInput TextInputConfig
                 { tiInputType = InputText, tiHint = "name", tiValue = ""
                 , tiOnChange = textHandle
@@ -421,7 +446,7 @@ imageTests = testGroup "Image"
 
   , testCase "Image inside Column renders" $ do
       ((), rs) <- withActions (pure ())
-      renderWidget rs $ Column
+      renderWidget rs $ column
         [ Text TextConfig { tcLabel = "header", tcFontConfig = Nothing }
         , Image ImageConfig
             { icSource = ImageResource (ResourceName "logo"), icScaleType = ScaleFit }
@@ -478,7 +503,7 @@ webViewTests = testGroup "WebView"
 
   , testCase "WebView inside Column renders" $ do
       ((), rs) <- withActions (pure ())
-      renderWidget rs $ Column
+      renderWidget rs $ column
         [ Text TextConfig { tcLabel = "header", tcFontConfig = Nothing }
         , WebView WebViewConfig
             { wvUrl = "https://example.com", wvOnPageLoad = Nothing }
@@ -516,7 +541,7 @@ styledTests = testGroup "Styled"
       (clickHandle, rs) <- withActions $
         createAction (modifyIORef' ref (const True))
       renderWidget rs $ Styled defaultStyle
-        (Column [ Text TextConfig { tcLabel = "info", tcFontConfig = Nothing }
+        (column [ Text TextConfig { tcLabel = "info", tcFontConfig = Nothing }
                 , Button ButtonConfig
                     { bcLabel = "go", bcAction = clickHandle, bcFontConfig = Nothing }
                 ])
@@ -675,7 +700,7 @@ mapViewTests = testGroup "MapView"
 
   , testCase "MapView inside Column renders" $ do
       ((), rs) <- withActions (pure ())
-      renderWidget rs $ Column
+      renderWidget rs $ column
         [ Text TextConfig { tcLabel = "header", tcFontConfig = Nothing }
         , MapView MapViewConfig
             { mvLatitude = 52.3676, mvLongitude = 4.9041

@@ -13,6 +13,7 @@ module Hatter.Widget
   (
     Widget(..)
   -- ** configs
+  , LayoutSettings(..)
   , WidgetStyle(..)
   , defaultStyle
   , ButtonConfig(..)
@@ -39,6 +40,8 @@ module Hatter.Widget
   , lerpWord8
   -- ** smart constructors
   , button
+  , column
+  , row
   , text
   )
 where
@@ -195,8 +198,8 @@ data Easing
 
 -- | Configuration for an 'Animated' widget wrapper.
 --
--- When 'Animated' wraps a container ('Column', 'Row', 'ScrollView'), the
--- config is distributed to each child:
+-- When 'Animated' wraps a container ('Column', 'Row'), the config is
+-- distributed to each child:
 --
 -- @
 -- Animated cfg (Column [a, b, c])  =  Column [Animated cfg a, Animated cfg b, Animated cfg c]
@@ -240,8 +243,7 @@ interpolateColor (Color r1 g1 b1 a1) (Color r2 g2 b2 a2) progress = Color
 
 -- | Normalize an 'Animated' wrapper before rendering.
 --
--- * Distributes 'Animated' over container children ('Column', 'Row',
---   'ScrollView').
+-- * Distributes 'Animated' over container children ('Column', 'Row').
 -- * Collapses nested 'Animated' — inner config wins.
 -- * All other widgets ('Styled', leaves) are returned unchanged;
 --   the render engine wraps them in @RenderedAnimated@ for tween
@@ -251,12 +253,10 @@ normalizeAnimated :: AnimatedConfig -> Widget -> Widget
 normalizeAnimated _outerConfig (Animated innerConfig child) =
   Animated innerConfig (normalizeAnimated innerConfig child)
 -- Distribute over containers.
-normalizeAnimated config (Column children) =
-  Column (map (Animated config) children)
-normalizeAnimated config (Row children) =
-  Row (map (Animated config) children)
-normalizeAnimated config (ScrollView children) =
-  ScrollView (map (Animated config) children)
+normalizeAnimated config (Column settings) =
+  Column settings { lsWidgets = map (Animated config) (lsWidgets settings) }
+normalizeAnimated config (Row settings) =
+  Row settings { lsWidgets = map (Animated config) (lsWidgets settings) }
 normalizeAnimated config (Stack children) =
   Stack (map (Animated config) children)
 -- Everything else (Styled, leaves): return unchanged.
@@ -317,11 +317,30 @@ data MapViewConfig = MapViewConfig
     -- Receives @\"lat,lon,zoom\"@ text encoding the new center and zoom.
   } deriving (Show, Eq)
 
+-- | Layout settings for container widgets ('Column', 'Row').
+--
+-- When 'lsScrollable' is 'True', the container renders as a native
+-- scroll view (vertical for 'Column', horizontal for 'Row').
+data LayoutSettings = LayoutSettings
+  { lsWidgets    :: [Widget]
+    -- ^ Child widgets inside the container.
+  , lsScrollable :: Bool
+    -- ^ Whether the container should be scrollable.
+  } deriving (Show, Eq)
+
 text :: Text -> Widget
 text txt = Text $ TextConfig { tcLabel =  txt, tcFontConfig = Nothing }
 
 button :: Text -> Action -> Widget
 button txt action = Button $ ButtonConfig { bcLabel = txt, bcAction = action, bcFontConfig = Nothing }
+
+-- | Build a non-scrollable vertical container.
+column :: [Widget] -> Widget
+column widgets = Column LayoutSettings { lsWidgets = widgets, lsScrollable = False }
+
+-- | Build a non-scrollable horizontal container.
+row :: [Widget] -> Widget
+row widgets = Row LayoutSettings { lsWidgets = widgets, lsScrollable = False }
 
 -- | A declarative description of a UI element.
 --
@@ -338,12 +357,12 @@ data Widget
     -- ^ A tappable button with a label and click handler.
   | TextInput TextInputConfig
     -- ^ A text input field.
-  | Column [Widget]
+  | Column LayoutSettings
     -- ^ A vertical container laying out children top-to-bottom.
-  | Row [Widget]
+    -- When @'lsScrollable' = 'True'@, renders as a vertically scrollable container.
+  | Row LayoutSettings
     -- ^ A horizontal container laying out children left-to-right.
-  | ScrollView [Widget]
-    -- ^ A vertically scrollable container.
+    -- When @'lsScrollable' = 'True'@, renders as a horizontally scrollable container.
   | Stack [Widget]
     -- ^ A z-order container: children overlap, first at bottom, last on top.
     -- Maps to FrameLayout (Android), plain UIView (iOS), ZStack (watchOS).
@@ -357,8 +376,7 @@ data Widget
     -- ^ Apply visual style overrides to a child widget.
   | Animated AnimatedConfig Widget
     -- ^ Animate property changes on the child widget over a duration.
-    -- When wrapping a container ('Column', 'Row', 'ScrollView'), the
-    -- animation is distributed to each child.  Nested 'Animated'
-    -- wrappers collapse: the innermost config wins.
-    -- See 'AnimatedConfig' for details.
+    -- When wrapping a container ('Column', 'Row'), the animation is
+    -- distributed to each child.  Nested 'Animated' wrappers collapse:
+    -- the innermost config wins.  See 'AnimatedConfig' for details.
   deriving (Show, Eq)

@@ -8,7 +8,7 @@ module Main where
 import Foreign.Ptr (Ptr)
 import Hatter (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), newActionState, runActionM, createOnChange, OnChange)
 import Hatter.AppContext (AppContext)
-import Hatter.Widget (InputType(..), TextConfig(..), TextInputConfig(..), Widget(..))
+import Hatter.Widget (InputType(..), TextConfig(..), TextInputConfig(..), Widget(..), column)
 
 main :: IO (Ptr AppContext)
 main = do
@@ -26,7 +26,7 @@ main = do
 
 -- | Builds a Column with a label and two TextInputs of different InputType.
 textInputDemoView :: OnChange -> OnChange -> IO Widget
-textInputDemoView onWeightChange onNameChange = pure $ Column
+textInputDemoView onWeightChange onNameChange = pure $ column
   [ Text TextConfig { tcLabel = "TextInput Demo", tcFontConfig = Nothing }
   , TextInput TextInputConfig
       { tiInputType  = InputNumber

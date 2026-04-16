@@ -16,7 +16,7 @@ import Hatter
   )
 import Hatter.AppContext (AppContext)
 import Hatter.Widget
-  ( InputType(..), TextConfig(..), TextInputConfig(..), Widget(..)
+  ( InputType(..), TextConfig(..), TextInputConfig(..), Widget(..), column
   )
 
 main :: IO (Ptr AppContext)
@@ -40,7 +40,7 @@ textInputReRenderView typedRef onChange = do
   typed <- readIORef typedRef
   let displayLabel = "Typed: " <> typed
   platformLog ("view rebuilt: " <> displayLabel)
-  pure $ Column
+  pure $ column
     [ TextInput TextInputConfig
         { tiInputType  = InputText
         , tiHint       = "type here"

@@ -359,6 +359,31 @@ static int32_t ios_create_node(int32_t nodeType)
         LOGI("createNode(type=%d) -> %d", nodeType, nodeId);
         return nodeId;
     }
+    case UI_NODE_HORIZONTAL_SCROLL_VIEW: {
+        UIScrollView *scrollView = [[UIScrollView alloc] init];
+        scrollView.translatesAutoresizingMaskIntoConstraints = NO;
+        /* Inner horizontal content stack */
+        UIStackView *contentStack = [[UIStackView alloc] init];
+        contentStack.axis = UILayoutConstraintAxisHorizontal;
+        contentStack.alignment = UIStackViewAlignmentFill;
+        contentStack.spacing = 0;
+        contentStack.translatesAutoresizingMaskIntoConstraints = NO;
+        [scrollView addSubview:contentStack];
+        UILayoutGuide *contentGuide = scrollView.contentLayoutGuide;
+        UILayoutGuide *frameGuide   = scrollView.frameLayoutGuide;
+        [NSLayoutConstraint activateConstraints:@[
+            [contentStack.topAnchor     constraintEqualToAnchor:contentGuide.topAnchor],
+            [contentStack.leadingAnchor constraintEqualToAnchor:contentGuide.leadingAnchor],
+            [contentStack.trailingAnchor constraintEqualToAnchor:contentGuide.trailingAnchor],
+            [contentStack.bottomAnchor  constraintEqualToAnchor:contentGuide.bottomAnchor],
+            [contentStack.heightAnchor  constraintEqualToAnchor:frameGuide.heightAnchor],
+        ]];
+        int32_t nodeId = g_next_node_id++;
+        g_nodes[nodeId]        = scrollView;
+        g_content_views[nodeId] = contentStack;
+        LOGI("createNode(type=%d) -> %d", nodeType, nodeId);
+        return nodeId;
+    }
     default:
         LOGE("Unknown node type: %d", nodeType);
         return 0;

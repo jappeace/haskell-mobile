@@ -26,7 +26,7 @@ import Data.Int (Int32)
 import Data.Text (Text, pack)
 import Hatter.Action (Action(..), ActionState, OnChange(..), lookupAction, lookupTextAction)
 import Hatter.Animation (AnimationState, registerTween)
-import Hatter.Widget (AnimatedConfig(..), ButtonConfig(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), MapViewConfig(..), ResourceName(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), WebViewConfig(..), Widget(..), WidgetStyle(..), colorToHex, normalizeAnimated)
+import Hatter.Widget (AnimatedConfig(..), ButtonConfig(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), LayoutSettings(..), MapViewConfig(..), ResourceName(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), WebViewConfig(..), Widget(..), WidgetStyle(..), colorToHex, normalizeAnimated)
 import Hatter.UIBridge qualified as Bridge
 import System.IO (hPutStrLn, stderr)
 
@@ -41,7 +41,7 @@ data RenderedNode
       Widget         -- ^ Widget value for equality comparison.
       Int32          -- ^ Native node ID from the platform bridge.
   | RenderedContainer
-      Widget         -- ^ Widget value (Column/Row/ScrollView with children).
+      Widget         -- ^ Widget value (Column/Row/Stack with children).
       Int32          -- ^ Native node ID.
       [RenderedNode] -- ^ Rendered children.
   | RenderedStyled
@@ -176,29 +176,27 @@ createRenderedNode _animState widget@(TextInput config) = do
   when (tiAutoFocus config) $
     Bridge.setNumProp nodeId Bridge.PropAutoFocus 1.0
   pure (RenderedLeaf widget nodeId)
-createRenderedNode animState widget@(Column children) = do
-  nodeId <- Bridge.createNode Bridge.NodeColumn
+createRenderedNode animState widget@(Column settings) = do
+  let nodeType = if lsScrollable settings
+        then Bridge.NodeScrollView
+        else Bridge.NodeColumn
+  nodeId <- Bridge.createNode nodeType
   childNodes <- mapM (\child -> do
     childNode <- createRenderedNode animState child
     Bridge.addChild nodeId (renderedNodeId childNode)
     pure childNode
-    ) children
+    ) (lsWidgets settings)
   pure (RenderedContainer widget nodeId childNodes)
-createRenderedNode animState widget@(Row children) = do
-  nodeId <- Bridge.createNode Bridge.NodeRow
+createRenderedNode animState widget@(Row settings) = do
+  let nodeType = if lsScrollable settings
+        then Bridge.NodeHorizontalScrollView
+        else Bridge.NodeRow
+  nodeId <- Bridge.createNode nodeType
   childNodes <- mapM (\child -> do
     childNode <- createRenderedNode animState child
     Bridge.addChild nodeId (renderedNodeId childNode)
     pure childNode
-    ) children
-  pure (RenderedContainer widget nodeId childNodes)
-createRenderedNode animState widget@(ScrollView children) = do
-  nodeId <- Bridge.createNode Bridge.NodeScrollView
-  childNodes <- mapM (\child -> do
-    childNode <- createRenderedNode animState child
-    Bridge.addChild nodeId (renderedNodeId childNode)
-    pure childNode
-    ) children
+    ) (lsWidgets settings)
   pure (RenderedContainer widget nodeId childNodes)
 createRenderedNode animState widget@(Stack children) = do
   nodeId <- Bridge.createNode Bridge.NodeStack
@@ -246,7 +244,6 @@ createRenderedNode animState (Animated config child) = do
     -- (each child is now individually wrapped in Animated).
     Column _     -> createRenderedNode animState normalized
     Row _        -> createRenderedNode animState normalized
-    ScrollView _ -> createRenderedNode animState normalized
     Stack _      -> createRenderedNode animState normalized
     -- Everything else (Styled, leaves): wrap in RenderedAnimated for tween interpolation.
     _            -> do
@@ -280,9 +277,8 @@ sameNodeType :: Widget -> Widget -> Bool
 sameNodeType (Text _)        (Text _)        = True
 sameNodeType (Button _)      (Button _)      = True
 sameNodeType (TextInput _)   (TextInput _)   = True
-sameNodeType (Column _)      (Column _)      = True
-sameNodeType (Row _)         (Row _)         = True
-sameNodeType (ScrollView _)  (ScrollView _)  = True
+sameNodeType (Column a)      (Column b)      = lsScrollable a == lsScrollable b
+sameNodeType (Row a)         (Row b)         = lsScrollable a == lsScrollable b
 sameNodeType (Stack _)       (Stack _)       = True
 sameNodeType (Image _)       (Image _)       = True
 sameNodeType (WebView _)     (WebView _)     = True
@@ -315,8 +311,6 @@ diffRenderNode _animState (Just oldNode) newWidget
 diffRenderNode animState maybeOld (Animated config child@(Column _)) =
   diffRenderNode animState maybeOld (normalizeAnimated config child)
 diffRenderNode animState maybeOld (Animated config child@(Row _)) =
-  diffRenderNode animState maybeOld (normalizeAnimated config child)
-diffRenderNode animState maybeOld (Animated config child@(ScrollView _)) =
   diffRenderNode animState maybeOld (normalizeAnimated config child)
 diffRenderNode animState maybeOld (Animated config child@(Stack _)) =
   diffRenderNode animState maybeOld (normalizeAnimated config child)
@@ -355,9 +349,8 @@ diffRenderNode animState (Just (RenderedStyled _ oldStyle oldChild)) (Styled new
 diffRenderNode animState (Just oldNode@(RenderedContainer _ containerNodeId oldChildren)) newWidget
   | sameNodeType (renderedWidget oldNode) newWidget =
     case newWidget of
-      Column newChildren     -> diffContainer animState containerNodeId oldChildren newChildren newWidget
-      Row newChildren        -> diffContainer animState containerNodeId oldChildren newChildren newWidget
-      ScrollView newChildren -> diffContainer animState containerNodeId oldChildren newChildren newWidget
+      Column settings        -> diffContainer animState containerNodeId oldChildren (lsWidgets settings) newWidget
+      Row settings           -> diffContainer animState containerNodeId oldChildren (lsWidgets settings) newWidget
       Stack newChildren      -> diffContainer animState containerNodeId oldChildren newChildren newWidget
       -- Non-container but same type at container level shouldn't happen,
       -- but fall through to destroy+create for safety.

@@ -44,6 +44,7 @@ data NodeType
   | NodeMapView
   | NodeWebView
   | NodeStack
+  | NodeHorizontalScrollView
   deriving (Show, Eq, Enum, Bounded)
 
 -- | Map a 'NodeType' to its C integer code.
@@ -58,6 +59,7 @@ nodeTypeToInt NodeImage      = 6
 nodeTypeToInt NodeMapView    = 7
 nodeTypeToInt NodeWebView    = 8
 nodeTypeToInt NodeStack      = 9
+nodeTypeToInt NodeHorizontalScrollView = 10
 
 -- | Property identifiers for 'setStrProp' and 'setNumProp'.
 data PropId

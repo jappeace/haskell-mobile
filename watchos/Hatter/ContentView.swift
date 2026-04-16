@@ -75,6 +75,14 @@ struct NodeView: View {
                     NodeView(node: child)
                 }
             }
+        case 10: // UI_NODE_HORIZONTAL_SCROLL_VIEW
+            ScrollView(.horizontal) {
+                HStack {
+                    ForEach(node.children) { child in
+                        NodeView(node: child)
+                    }
+                }
+            }
         default:
             EmptyView()
         }

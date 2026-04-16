@@ -29,6 +29,7 @@ import Hatter.Widget
   , ButtonConfig(..)
   , WidgetStyle(..)
   , defaultStyle
+  , column
   )
 
 main :: IO (Ptr AppContext)
@@ -43,7 +44,7 @@ main = do
   let viewFn :: UserState -> IO Widget
       viewFn _userState = do
         currentPadding <- readIORef paddingRef
-        pure $ Column
+        pure $ column
           [ Animated (AnimatedConfig 500 EaseInOut) $
               Styled (defaultStyle { wsPadding = Just currentPadding }) $
                 Text TextConfig

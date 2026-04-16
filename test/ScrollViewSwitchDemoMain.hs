@@ -15,7 +15,7 @@ import Data.Text qualified as Text
 import Foreign.Ptr (Ptr)
 import Hatter (startMobileApp, platformLog, loggingMobileContext, MobileApp(..), newActionState, runActionM, createAction, Action)
 import Hatter.AppContext (AppContext)
-import Hatter.Widget (ButtonConfig(..), Widget(..), text)
+import Hatter.Widget (ButtonConfig(..), LayoutSettings(..), Widget(..), column, text)
 
 data Screen = ScreenA | ScreenB
   deriving (Show, Eq)
@@ -53,7 +53,7 @@ switchDemoView screenState switchAction noopAction = do
   screen <- readIORef screenState
   platformLog ("Current screen: " <> Text.pack (show screen))
   let inner = case screen of
-        ScreenA -> ScrollView
+        ScreenA -> Column (LayoutSettings
           [ Button ButtonConfig
               { bcLabel = "SCREENA_BTN"
               , bcAction = noopAction
@@ -61,16 +61,16 @@ switchDemoView screenState switchAction noopAction = do
               }
           , text "SCREENA_TXT1"
           , text "SCREENA_TXT2"
-          ]
-        ScreenB -> ScrollView
+          ] True)
+        ScreenB -> Column (LayoutSettings
           [ text "SCREENB_TXT1"
           , Button ButtonConfig
               { bcLabel = "SCREENB_BTN"
               , bcAction = noopAction
               , bcFontConfig = Nothing
               }
-          ]
-  pure $ Column
+          ] True)
+  pure $ column
     [ Button ButtonConfig
         { bcLabel = "Switch screen"
         , bcAction = switchAction
