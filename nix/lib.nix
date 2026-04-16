@@ -789,6 +789,7 @@ open(sys.argv[1], "w").write(yml)
         mkdir -p $out/share/ios/lib $out/share/ios/include
 
         cp -r ${iosSrc}/Hatter $out/share/ios/
+        cp -r ${iosSrc}/HatterUITests $out/share/ios/
         cp ${iosSrc}/project.yml $out/share/ios/project.yml
         chmod u+w $out/share/ios/project.yml
 
@@ -987,6 +988,7 @@ open(sys.argv[1], "w").write(yml)
         mkdir -p $out/share/watchos/lib $out/share/watchos/include
 
         cp -r ${watchosSrc}/Hatter $out/share/watchos/
+        cp -r ${watchosSrc}/HatterUITests $out/share/watchos/
         cp ${watchosSrc}/project.yml $out/share/watchos/project.yml
 
         cp ${watchosLib}/lib/libHatter.a $out/share/watchos/lib/
