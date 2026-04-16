@@ -51,6 +51,7 @@ module Hatter.Widget
   , scrollColumn
   , scrollRow
   , text
+  , stack
   )
 where
 
@@ -376,6 +377,9 @@ keyedItem keyValue widget = LayoutItem { liKey = Just (WidgetKey keyValue), liWi
 -- | Build a non-scrollable vertical container.
 column :: [Widget] -> Widget
 column widgets = Column LayoutSettings { lsWidgets = map item widgets, lsScrollable = False }
+
+stack :: [Widget] -> Widget
+stack widgets = Stack $ item <$> widgets
 
 -- | Build a non-scrollable horizontal container.
 row :: [Widget] -> Widget
