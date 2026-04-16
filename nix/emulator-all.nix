@@ -317,6 +317,28 @@ let
     name = "hatter-horizontal-scroll-apk";
   };
 
+  # Async OOM regression test (issue #163).
+  # Without the registerForeignExports dedup fix, this app OOM-kills
+  # during hs_init due to a duplicate .init_array entry.
+  asyncOomAndroid = import ./android.nix {
+    inherit sources androidArch;
+    mainModule = ../test/AsyncOomDemoMain.hs;
+    consumerCabal2Nix =
+      { mkDerivation, base, lib, async, text }:
+      mkDerivation {
+        pname = "async-oom-test";
+        version = "0.1.0.0";
+        libraryHaskellDepends = [ base async text ];
+        license = lib.licenses.mit;
+      };
+  };
+  asyncOomApk = lib.mkApk {
+    sharedLibs = [{ lib = asyncOomAndroid; inherit abiDir; }];
+    androidSrc = ../android;
+    apkName = "hatter-async-oom.apk";
+    name = "hatter-async-oom-apk";
+  };
+
   androidComposition = pkgs.androidenv.composeAndroidPackages {
     platformVersions = [ emulatorApiLevel ];
     includeEmulator = true;
@@ -381,6 +403,7 @@ STACK_APK="${stackApk}/hatter-stack.apk"
 SCROLLVIEW_SWITCH_APK="${scrollviewSwitchApk}/hatter-scrollview-switch.apk"
 STYLED_TYPE_CHANGE_APK="${styledTypeChangeApk}/hatter-styled-type-change.apk"
 HORIZONTAL_SCROLL_APK="${horizontalScrollApk}/hatter-horizontal-scroll.apk"
+ASYNC_OOM_APK="${asyncOomApk}/hatter-async-oom.apk"
 PACKAGE="me.jappie.hatter"
 ACTIVITY=".MainActivity"
 DEVICE_NAME="test_all"
@@ -426,6 +449,16 @@ for so_path in \
         echo "OK    $SO_LABEL .so is ''${SO_MB} MB"
     fi
 done
+# Async OOM .so has a higher threshold — it pulls in 'async' and is known to be larger.
+ASYNC_OOM_SO="${asyncOomAndroid}/lib/${abiDir}/libhatter.so"
+ASYNC_OOM_SO_BYTES=$(stat -c %s "$ASYNC_OOM_SO")
+ASYNC_OOM_SO_MB=$((ASYNC_OOM_SO_BYTES / 1048576))
+if [ "$ASYNC_OOM_SO_MB" -gt 200 ]; then
+    echo "FAIL  async-oom-test .so is ''${ASYNC_OOM_SO_MB} MB (limit: 200 MB)"
+    SIZE_FAIL=1
+else
+    echo "OK    async-oom-test .so is ''${ASYNC_OOM_SO_MB} MB (limit: 200 MB)"
+fi
 if [ "$SIZE_FAIL" -eq 1 ]; then
     echo ""
     echo "FATAL: .so size limit exceeded. This usually means boot package .a files"
@@ -487,6 +520,7 @@ PHASE15_OK=0
 PHASE16_OK=0
 PHASE18_OK=0
 PHASE19_OK=0
+PHASE20_OK=0
 
 cleanup() {
     echo ""
@@ -603,7 +637,7 @@ sleep 30
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK SCROLL_TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PLATFORM_SIGN_IN_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK FILES_DIR_APK TEXTINPUT_RERENDER_APK STACK_APK SCROLLVIEW_SWITCH_APK STYLED_TYPE_CHANGE_APK HORIZONTAL_SCROLL_APK PACKAGE ACTIVITY WORK_DIR
+export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK SCROLL_TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PLATFORM_SIGN_IN_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK FILES_DIR_APK TEXTINPUT_RERENDER_APK STACK_APK SCROLLVIEW_SWITCH_APK STYLED_TYPE_CHANGE_APK HORIZONTAL_SCROLL_APK ASYNC_OOM_APK PACKAGE ACTIVITY WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -624,6 +658,7 @@ PHASE16_EXIT=0
 PHASE17_EXIT=0
 PHASE18_EXIT=0
 PHASE19_EXIT=0
+PHASE20_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -716,6 +751,8 @@ echo "--- styled-type-change ---"
 run_with_retry "styled-type-change" bash "$TEST_SCRIPTS/android/styled-type-change.sh" || PHASE18_EXIT=1
 echo "--- horizontal-scroll ---"
 run_with_retry "horizontal-scroll" bash "$TEST_SCRIPTS/android/horizontal-scroll.sh" || PHASE19_EXIT=1
+echo "--- async-oom ---"
+run_with_retry "async-oom" bash "$TEST_SCRIPTS/android/async_oom.sh" || PHASE20_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -906,6 +943,16 @@ else
     echo "PHASE 19 FAILED"
 fi
 
+if [ $PHASE20_EXIT -eq 0 ]; then
+    PHASE20_OK=1
+    echo ""
+    echo "PHASE 20 PASSED"
+else
+    PHASE20_OK=0
+    echo ""
+    echo "PHASE 20 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -1046,6 +1093,13 @@ if [ $PHASE19_OK -eq 1 ]; then
     echo "PASS  Phase 19 — Horizontal scroll demo app"
 else
     echo "FAIL  Phase 19 — Horizontal scroll demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE20_OK -eq 1 ]; then
+    echo "PASS  Phase 20 — Async OOM regression test (issue #163)"
+else
+    echo "FAIL  Phase 20 — Async OOM regression test (issue #163)"
     FINAL_EXIT=1
 fi
 

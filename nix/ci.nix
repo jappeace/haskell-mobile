@@ -16,6 +16,21 @@ let
     th-test = import ./test-th.nix { inherit sources; };
     readme-example = import ./test-readme-example.nix { inherit sources; };
     th-direct-test = import ./test-th-direct.nix { inherit sources; };
+    # async package cross-compilation regression test (issue #163).
+    # Without --wrap=registerForeignExports dedup, a duplicate .init_array
+    # entry causes infinite getStablePtr loop → OOM during hs_init.
+    async-oom-test = import ./android.nix {
+      inherit sources;
+      mainModule = ../test/AsyncOomDemoMain.hs;
+      consumerCabal2Nix =
+        { mkDerivation, base, lib, async, text }:
+        mkDerivation {
+          pname = "async-oom-test";
+          version = "0.1.0.0";
+          libraryHaskellDepends = [ base async text ];
+          license = lib.licenses.mit;
+        };
+    };
   } // (if isDarwin then {
     ios-lib = import ./ios.nix { inherit sources; };
     watchos-lib = import ./watchos.nix { inherit sources; };
