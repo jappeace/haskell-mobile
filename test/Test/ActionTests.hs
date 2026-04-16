@@ -426,5 +426,37 @@ incrementalRenderTests = testGroup "Incremental rendering"
                 Nothing -> -2
           -- TextInput node is preserved (not destroyed+recreated)
           inputNodeId1 @?= inputNodeId2
+
+      , testCase "inserting child at position 0 destroys TextInput (issue #186)" $ do
+          ((changeHandle, clickAction), rs) <- withActions $ do
+            ch <- createOnChange (\_ -> pure ())
+            ca <- createAction (pure ())
+            pure (ch, ca)
+          -- Render: [TextInput, Button]
+          let textInput = TextInput TextInputConfig
+                { tiInputType = InputText, tiHint = "enter text", tiValue = ""
+                , tiOnChange = changeHandle, tiFontConfig = Nothing, tiAutoFocus = False }
+              toggleBtn = Button ButtonConfig
+                { bcLabel = "toggle", bcAction = clickAction, bcFontConfig = Nothing }
+              widget1 = column [textInput, toggleBtn]
+          renderWidget rs widget1
+          tree1 <- readIORef (rsRenderedTree rs)
+          let inputNodeId1 = case tree1 of
+                Just node -> case childrenOf node of
+                  (inputNode : _) -> nodeIdOf inputNode
+                  _               -> -1
+                Nothing -> -1
+          -- Re-render: [Text "Banner", TextInput, Button]
+          let banner = Text TextConfig { tcLabel = "Banner", tcFontConfig = Nothing }
+              widget2 = column [banner, textInput, toggleBtn]
+          renderWidget rs widget2
+          tree2 <- readIORef (rsRenderedTree rs)
+          let inputNodeId2 = case tree2 of
+                Just node -> case childrenOf node of
+                  (_ : inputNode : _) -> nodeIdOf inputNode
+                  _                   -> -2
+                Nothing -> -2
+          -- TextInput should keep same native node ID (fails due to position-based diffing)
+          inputNodeId1 @?= inputNodeId2
       ]
   ]
