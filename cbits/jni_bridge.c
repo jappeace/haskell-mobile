@@ -11,6 +11,7 @@
 #include <jni.h>
 #include <stdlib.h>
 #include <string.h>
+#include <android/log.h>
 #include "HsFFI.h"
 #include "JniBridge.h"
 #include "PermissionBridge.h"
@@ -25,6 +26,45 @@
 #include "NetworkStatusBridge.h"
 #include "AnimationBridge.h"
 #include "PlatformSignInBridge.h"
+
+/* Deduplicate registerForeignExports to prevent OOM on armv7a.
+ *
+ * When --whole-archive pulls in GHC boot libraries, duplicate .init_array
+ * entries can cause registerForeignExports to be called twice with the
+ * same ForeignExportsList struct.  The second call creates a self-referencing
+ * linked list (struct->next = &struct).  processForeignExports then loops
+ * infinitely, calling getStablePtr billions of times and doubling
+ * enlargeStablePtrTable until the 32-bit address space is exhausted.
+ *
+ * Linked via -Wl,--wrap=registerForeignExports (unconditional in lib.nix).
+ *
+ * See: https://github.com/jappeace/hatter/issues/163
+ */
+struct ForeignExportsList {
+    struct ForeignExportsList *next;
+    int n_entries;
+    void *exports[];
+};
+
+extern void __real_registerForeignExports(struct ForeignExportsList *exports);
+
+static struct ForeignExportsList *g_seen_fexports[64];
+static int g_seen_fexports_count = 0;
+
+void __wrap_registerForeignExports(struct ForeignExportsList *exports) {
+    for (int i = 0; i < g_seen_fexports_count; i++) {
+        if (g_seen_fexports[i] == exports) {
+            __android_log_print(ANDROID_LOG_WARN, "HatterInit",
+                "registerForeignExports: duplicate struct %p — skipping",
+                (void*)exports);
+            return;
+        }
+    }
+    if (g_seen_fexports_count < 64) {
+        g_seen_fexports[g_seen_fexports_count++] = exports;
+    }
+    __real_registerForeignExports(exports);
+}
 
 /* Runs the user's Haskell main via RTS API (cbits/run_main.c).
  * Returns the opaque AppContext pointer. */
