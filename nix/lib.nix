@@ -741,6 +741,7 @@ in {
         cp ${hatterSrc}/include/HttpBridge.h $out/include/HttpBridge.h
         cp ${hatterSrc}/include/NetworkStatusBridge.h $out/include/NetworkStatusBridge.h
         cp ${hatterSrc}/include/AnimationBridge.h $out/include/AnimationBridge.h
+        cp ${hatterSrc}/include/RedrawBridge.h $out/include/RedrawBridge.h
       '';
     };
 
@@ -960,6 +961,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${hatterSrc}/include/HttpBridge.h $out/include/HttpBridge.h
         cp ${hatterSrc}/include/NetworkStatusBridge.h $out/include/NetworkStatusBridge.h
         cp ${hatterSrc}/include/AnimationBridge.h $out/include/AnimationBridge.h
+        cp ${hatterSrc}/include/RedrawBridge.h $out/include/RedrawBridge.h
       '';
     };
 
