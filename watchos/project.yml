@@ -31,7 +31,8 @@ targets:
     type: bundle.ui-testing
     platform: watchOS
     sources:
-      - HatterUITests
+      - path: HatterUITests
+        optional: true
     dependencies:
       - target: Hatter
     settings:

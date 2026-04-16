@@ -36,7 +36,8 @@ targets:
     type: bundle.ui-testing
     platform: iOS
     sources:
-      - HatterUITests
+      - path: HatterUITests
+        optional: true
     dependencies:
       - target: Hatter
     settings:
