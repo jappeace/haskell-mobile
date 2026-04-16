@@ -111,7 +111,9 @@ viewIsErrorWidget ctxPtr = do
         , userBottomSheetState   = acBottomSheetState appCtx
         , userHttpState          = acHttpState appCtx
         , userNetworkStatusState = acNetworkStatusState appCtx
-        , userAnimationState     = acAnimationState appCtx
+        , userAnimationState        = acAnimationState appCtx
+        , userPlatformSignInState  = acPlatformSignInState appCtx
+        , userRequestRedraw        = pure ()
         }
   widget <- viewFn userState
   case widget of

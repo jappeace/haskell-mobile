@@ -41,6 +41,10 @@ data UserState = UserState
   , userNetworkStatusState    :: NetworkStatusState
   , userAnimationState        :: AnimationState
   , userPlatformSignInState   :: PlatformSignInState
+  , userRequestRedraw         :: IO ()
+    -- ^ Request a UI re-render from a background thread.
+    -- On mobile, this posts to the main/UI thread; on desktop
+    -- it calls haskellRenderUI directly.
   }
 
 -- | Application definition record. Downstream apps create one of these

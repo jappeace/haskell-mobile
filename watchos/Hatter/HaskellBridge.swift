@@ -22,6 +22,7 @@ class HaskellBridge {
         setSystemLocale("en")  // watchOS default locale, before Haskell main
         context = haskellRunMain()
         haskellLogLocale()
+        setup_watchos_redraw_bridge(context)
     }
 
     /// Notify Haskell of a lifecycle event.

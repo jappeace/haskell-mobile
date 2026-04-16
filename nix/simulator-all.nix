@@ -285,6 +285,17 @@ let
     name = "hatter-horizontal-scroll-simulator-app";
   };
 
+  redrawIos = import ./ios.nix {
+    inherit sources;
+    mainModule = ../test/RedrawDemoMain.hs;
+    simulator = true;
+  };
+  redrawSimApp = lib.mkSimulatorApp {
+    iosLib = redrawIos;
+    iosSrc = ../ios;
+    name = "hatter-redraw-simulator-app";
+  };
+
   xcodegen = pkgs.xcodegen;
 
   testScripts = builtins.path { path = ../test; name = "test-scripts"; };
@@ -329,6 +340,7 @@ TEXTINPUT_RERENDER_SHARE_DIR="${textinputRerenderSimApp}/share/ios"
 STACK_SHARE_DIR="${stackSimApp}/share/ios"
 STYLED_TYPE_CHANGE_SHARE_DIR="${styledTypeChangeSimApp}/share/ios"
 HORIZONTAL_SCROLL_SHARE_DIR="${horizontalScrollSimApp}/share/ios"
+REDRAW_SHARE_DIR="${redrawSimApp}/share/ios"
 TEST_SCRIPTS="${testScripts}"
 
 # --- Temp working directory ---
@@ -354,6 +366,7 @@ PHASE15_OK=0
 PHASE16_OK=0
 PHASE17_OK=0
 PHASE18_OK=0
+PHASE19_OK=0
 
 cleanup() {
     echo ""
@@ -443,6 +456,7 @@ cp "$COUNTER_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/counter/include/"
 cp "$COUNTER_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/counter/include/"
 cp "$COUNTER_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/counter/include/"
 cp "$COUNTER_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/counter/include/"
+cp "$COUNTER_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/counter/include/"
 cp -r "$COUNTER_SHARE_DIR/Hatter" "$WORK_DIR/counter/"
 cp "$COUNTER_SHARE_DIR/project.yml" "$WORK_DIR/counter/"
 chmod -R u+w "$WORK_DIR/counter"
@@ -489,6 +503,7 @@ cp "$SCROLL_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/scroll/include/"
 cp "$SCROLL_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/scroll/include/"
 cp "$SCROLL_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/scroll/include/"
 cp "$SCROLL_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/scroll/include/"
+cp "$SCROLL_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/scroll/include/"
 cp -r "$SCROLL_SHARE_DIR/Hatter" "$WORK_DIR/scroll/"
 cp "$SCROLL_SHARE_DIR/project.yml" "$WORK_DIR/scroll/"
 chmod -R u+w "$WORK_DIR/scroll"
@@ -535,6 +550,7 @@ cp "$TEXTINPUT_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/textinput/inclu
 cp "$TEXTINPUT_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/textinput/include/"
 cp "$TEXTINPUT_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/textinput/include/"
 cp "$TEXTINPUT_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/textinput/include/"
+cp "$TEXTINPUT_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/textinput/include/"
 cp -r "$TEXTINPUT_SHARE_DIR/Hatter" "$WORK_DIR/textinput/"
 cp "$TEXTINPUT_SHARE_DIR/project.yml" "$WORK_DIR/textinput/"
 chmod -R u+w "$WORK_DIR/textinput"
@@ -581,6 +597,7 @@ cp "$PERMISSION_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/permission/inc
 cp "$PERMISSION_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/permission/include/"
 cp "$PERMISSION_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/permission/include/"
 cp "$PERMISSION_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/permission/include/"
+cp "$PERMISSION_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/permission/include/"
 cp -r "$PERMISSION_SHARE_DIR/Hatter" "$WORK_DIR/permission/"
 cp "$PERMISSION_SHARE_DIR/project.yml" "$WORK_DIR/permission/"
 chmod -R u+w "$WORK_DIR/permission"
@@ -627,6 +644,7 @@ cp "$SECURE_STORAGE_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/securestor
 cp "$SECURE_STORAGE_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/securestorage/include/"
 cp "$SECURE_STORAGE_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/securestorage/include/"
 cp "$SECURE_STORAGE_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/securestorage/include/"
+cp "$SECURE_STORAGE_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/securestorage/include/"
 cp -r "$SECURE_STORAGE_SHARE_DIR/Hatter" "$WORK_DIR/securestorage/"
 cp "$SECURE_STORAGE_SHARE_DIR/project.yml" "$WORK_DIR/securestorage/"
 chmod -R u+w "$WORK_DIR/securestorage"
@@ -673,6 +691,7 @@ cp "$IMAGE_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/image/include/"
 cp "$IMAGE_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/image/include/"
 cp "$IMAGE_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/image/include/"
 cp "$IMAGE_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/image/include/"
+cp "$IMAGE_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/image/include/"
 cp -r "$IMAGE_SHARE_DIR/Hatter" "$WORK_DIR/image/"
 cp "$IMAGE_SHARE_DIR/project.yml" "$WORK_DIR/image/"
 chmod -R u+w "$WORK_DIR/image"
@@ -719,6 +738,7 @@ cp "$NODEPOOL_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/nodepool/include
 cp "$NODEPOOL_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/nodepool/include/"
 cp "$NODEPOOL_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/nodepool/include/"
 cp "$NODEPOOL_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/nodepool/include/"
+cp "$NODEPOOL_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/nodepool/include/"
 cp -r "$NODEPOOL_SHARE_DIR/Hatter" "$WORK_DIR/nodepool/"
 cp "$NODEPOOL_SHARE_DIR/project.yml" "$WORK_DIR/nodepool/"
 chmod -R u+w "$WORK_DIR/nodepool"
@@ -765,6 +785,7 @@ cp "$BLE_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/ble/include/"
 cp "$BLE_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/ble/include/"
 cp "$BLE_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/ble/include/"
 cp "$BLE_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/ble/include/"
+cp "$BLE_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/ble/include/"
 cp -r "$BLE_SHARE_DIR/Hatter" "$WORK_DIR/ble/"
 cp "$BLE_SHARE_DIR/project.yml" "$WORK_DIR/ble/"
 chmod -R u+w "$WORK_DIR/ble"
@@ -811,6 +832,7 @@ cp "$DIALOG_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/dialog/include/"
 cp "$DIALOG_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/dialog/include/"
 cp "$DIALOG_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/dialog/include/"
 cp "$DIALOG_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/dialog/include/"
+cp "$DIALOG_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/dialog/include/"
 cp -r "$DIALOG_SHARE_DIR/Hatter" "$WORK_DIR/dialog/"
 cp "$DIALOG_SHARE_DIR/project.yml" "$WORK_DIR/dialog/"
 chmod -R u+w "$WORK_DIR/dialog"
@@ -857,6 +879,7 @@ cp "$LOCATION_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/location/include
 cp "$LOCATION_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/location/include/"
 cp "$LOCATION_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/location/include/"
 cp "$LOCATION_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/location/include/"
+cp "$LOCATION_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/location/include/"
 cp -r "$LOCATION_SHARE_DIR/Hatter" "$WORK_DIR/location/"
 cp "$LOCATION_SHARE_DIR/project.yml" "$WORK_DIR/location/"
 chmod -R u+w "$WORK_DIR/location"
@@ -903,6 +926,7 @@ cp "$WEBVIEW_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/webview/include/"
 cp "$WEBVIEW_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/webview/include/"
 cp "$WEBVIEW_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/webview/include/"
 cp "$WEBVIEW_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/webview/include/"
+cp "$WEBVIEW_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/webview/include/"
 cp -r "$WEBVIEW_SHARE_DIR/Hatter" "$WORK_DIR/webview/"
 cp "$WEBVIEW_SHARE_DIR/project.yml" "$WORK_DIR/webview/"
 chmod -R u+w "$WORK_DIR/webview"
@@ -949,6 +973,7 @@ cp "$AUTH_SESSION_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/authsession/
 cp "$AUTH_SESSION_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/authsession/include/"
 cp "$AUTH_SESSION_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/authsession/include/"
 cp "$AUTH_SESSION_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/authsession/include/"
+cp "$AUTH_SESSION_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/authsession/include/"
 cp -r "$AUTH_SESSION_SHARE_DIR/Hatter" "$WORK_DIR/authsession/"
 cp "$AUTH_SESSION_SHARE_DIR/project.yml" "$WORK_DIR/authsession/"
 chmod -R u+w "$WORK_DIR/authsession"
@@ -995,6 +1020,7 @@ cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/platform
 cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/platformsignin/include/"
 cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/platformsignin/include/"
 cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/platformsignin/include/"
+cp "$PLATFORM_SIGN_IN_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/platformsignin/include/"
 cp -r "$PLATFORM_SIGN_IN_SHARE_DIR/Hatter" "$WORK_DIR/platformsignin/"
 cp "$PLATFORM_SIGN_IN_SHARE_DIR/project.yml" "$WORK_DIR/platformsignin/"
 chmod -R u+w "$WORK_DIR/platformsignin"
@@ -1041,6 +1067,7 @@ cp "$CAMERA_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/camera/include/"
 cp "$CAMERA_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/camera/include/"
 cp "$CAMERA_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/camera/include/"
 cp "$CAMERA_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/camera/include/"
+cp "$CAMERA_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/camera/include/"
 cp -r "$CAMERA_SHARE_DIR/Hatter" "$WORK_DIR/camera/"
 cp "$CAMERA_SHARE_DIR/project.yml" "$WORK_DIR/camera/"
 chmod -R u+w "$WORK_DIR/camera"
@@ -1087,6 +1114,7 @@ cp "$BOTTOM_SHEET_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/bottomsheet/
 cp "$BOTTOM_SHEET_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/bottomsheet/include/"
 cp "$BOTTOM_SHEET_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/bottomsheet/include/"
 cp "$BOTTOM_SHEET_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/bottomsheet/include/"
+cp "$BOTTOM_SHEET_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/bottomsheet/include/"
 cp -r "$BOTTOM_SHEET_SHARE_DIR/Hatter" "$WORK_DIR/bottomsheet/"
 cp "$BOTTOM_SHEET_SHARE_DIR/project.yml" "$WORK_DIR/bottomsheet/"
 chmod -R u+w "$WORK_DIR/bottomsheet"
@@ -1133,6 +1161,7 @@ cp "$HTTP_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/http/include/"
 cp "$HTTP_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/http/include/"
 cp "$HTTP_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/http/include/"
 cp "$HTTP_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/http/include/"
+cp "$HTTP_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/http/include/"
 cp -r "$HTTP_SHARE_DIR/Hatter" "$WORK_DIR/http/"
 cp "$HTTP_SHARE_DIR/project.yml" "$WORK_DIR/http/"
 chmod -R u+w "$WORK_DIR/http"
@@ -1179,6 +1208,7 @@ cp "$NETWORK_STATUS_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/networksta
 cp "$NETWORK_STATUS_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/networkstatus/include/"
 cp "$NETWORK_STATUS_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/networkstatus/include/"
 cp "$NETWORK_STATUS_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/networkstatus/include/"
+cp "$NETWORK_STATUS_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/networkstatus/include/"
 cp -r "$NETWORK_STATUS_SHARE_DIR/Hatter" "$WORK_DIR/networkstatus/"
 cp "$NETWORK_STATUS_SHARE_DIR/project.yml" "$WORK_DIR/networkstatus/"
 chmod -R u+w "$WORK_DIR/networkstatus"
@@ -1225,6 +1255,7 @@ cp "$MAPVIEW_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/mapview/include/"
 cp "$MAPVIEW_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/mapview/include/"
 cp "$MAPVIEW_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/mapview/include/"
 cp "$MAPVIEW_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/mapview/include/"
+cp "$MAPVIEW_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/mapview/include/"
 cp -r "$MAPVIEW_SHARE_DIR/Hatter" "$WORK_DIR/mapview/"
 cp "$MAPVIEW_SHARE_DIR/project.yml" "$WORK_DIR/mapview/"
 chmod -R u+w "$WORK_DIR/mapview"
@@ -1271,6 +1302,7 @@ cp "$ANIMATION_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/animation/inclu
 cp "$ANIMATION_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/animation/include/"
 cp "$ANIMATION_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/animation/include/"
 cp "$ANIMATION_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/animation/include/"
+cp "$ANIMATION_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/animation/include/"
 cp -r "$ANIMATION_SHARE_DIR/Hatter" "$WORK_DIR/animation/"
 cp "$ANIMATION_SHARE_DIR/project.yml" "$WORK_DIR/animation/"
 chmod -R u+w "$WORK_DIR/animation"
@@ -1317,6 +1349,7 @@ cp "$FILES_DIR_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/filesdir/includ
 cp "$FILES_DIR_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/filesdir/include/"
 cp "$FILES_DIR_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/filesdir/include/"
 cp "$FILES_DIR_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/filesdir/include/"
+cp "$FILES_DIR_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/filesdir/include/"
 cp -r "$FILES_DIR_SHARE_DIR/Hatter" "$WORK_DIR/filesdir/"
 cp "$FILES_DIR_SHARE_DIR/project.yml" "$WORK_DIR/filesdir/"
 chmod -R u+w "$WORK_DIR/filesdir"
@@ -1363,6 +1396,7 @@ cp "$TEXTINPUT_RERENDER_SHARE_DIR/include/BottomSheetBridge.h" "$WORK_DIR/textin
 cp "$TEXTINPUT_RERENDER_SHARE_DIR/include/HttpBridge.h" "$WORK_DIR/textinput-rerender/include/"
 cp "$TEXTINPUT_RERENDER_SHARE_DIR/include/NetworkStatusBridge.h" "$WORK_DIR/textinput-rerender/include/"
 cp "$TEXTINPUT_RERENDER_SHARE_DIR/include/AnimationBridge.h" "$WORK_DIR/textinput-rerender/include/"
+cp "$TEXTINPUT_RERENDER_SHARE_DIR/include/RedrawBridge.h" "$WORK_DIR/textinput-rerender/include/"
 cp -r "$TEXTINPUT_RERENDER_SHARE_DIR/Hatter" "$WORK_DIR/textinput-rerender/"
 cp "$TEXTINPUT_RERENDER_SHARE_DIR/project.yml" "$WORK_DIR/textinput-rerender/"
 chmod -R u+w "$WORK_DIR/textinput-rerender"
@@ -1463,6 +1497,30 @@ if [ -z "$HORIZONTAL_SCROLL_APP" ]; then
 fi
 echo "Horizontal Scroll app: $HORIZONTAL_SCROLL_APP"
 
+echo "=== Building Redraw app ==="
+cp -r "$REDRAW_SHARE_DIR" "$WORK_DIR/redraw-proj"
+chmod -R u+w "$WORK_DIR/redraw-proj"
+cd "$WORK_DIR/redraw-proj"
+${xcodegen}/bin/xcodegen generate
+xcodebuild build \
+    -project Hatter.xcodeproj \
+    -scheme "$SCHEME" \
+    -sdk iphonesimulator \
+    -configuration Release \
+    -derivedDataPath "$WORK_DIR/redraw-build" \
+    CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_ALLOWED=NO \
+    ARCHS=arm64 \
+    ONLY_ACTIVE_ARCH=NO \
+    | tail -20
+
+REDRAW_APP=$(find "$WORK_DIR/redraw-build" -name "*.app" -type d | head -1)
+if [ -z "$REDRAW_APP" ]; then
+    echo "ERROR: Could not find redraw .app bundle"
+    exit 1
+fi
+echo "Redraw app: $REDRAW_APP"
+
 # --- Discover latest iOS runtime ---
 echo "=== Discovering iOS runtime ==="
 RUNTIME=$(xcrun simctl list runtimes -j \
@@ -1524,7 +1582,7 @@ sleep 5
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP PLATFORM_SIGN_IN_APP CAMERA_APP BOTTOM_SHEET_APP HTTP_APP NETWORK_STATUS_APP MAPVIEW_APP ANIMATION_APP FILES_DIR_APP TEXTINPUT_RERENDER_APP STACK_APP STYLED_TYPE_CHANGE_APP HORIZONTAL_SCROLL_APP WORK_DIR
+export SIM_UDID BUNDLE_ID COUNTER_APP SCROLL_APP TEXTINPUT_APP PERMISSION_APP SECURE_STORAGE_APP IMAGE_APP NODEPOOL_APP BLE_APP DIALOG_APP LOCATION_APP WEBVIEW_APP AUTH_SESSION_APP PLATFORM_SIGN_IN_APP CAMERA_APP BOTTOM_SHEET_APP HTTP_APP NETWORK_STATUS_APP MAPVIEW_APP ANIMATION_APP FILES_DIR_APP TEXTINPUT_RERENDER_APP STACK_APP STYLED_TYPE_CHANGE_APP HORIZONTAL_SCROLL_APP REDRAW_APP WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -1544,6 +1602,7 @@ PHASE15_EXIT=0
 PHASE16_EXIT=0
 PHASE17_EXIT=0
 PHASE18_EXIT=0
+PHASE19_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -1632,6 +1691,8 @@ echo "--- styled-type-change ---"
 run_with_retry "styled-type-change" bash "$TEST_SCRIPTS/ios/styled-type-change.sh" || PHASE17_EXIT=1
 echo "--- horizontal-scroll ---"
 run_with_retry "horizontal-scroll" bash "$TEST_SCRIPTS/ios/horizontal-scroll.sh" || PHASE18_EXIT=1
+echo "--- redraw ---"
+run_with_retry "redraw" bash "$TEST_SCRIPTS/ios/redraw.sh" || PHASE19_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -1812,6 +1873,16 @@ else
     echo "PHASE 18 FAILED"
 fi
 
+if [ $PHASE19_EXIT -eq 0 ]; then
+    PHASE19_OK=1
+    echo ""
+    echo "PHASE 19 PASSED"
+else
+    PHASE19_OK=0
+    echo ""
+    echo "PHASE 19 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -1945,6 +2016,13 @@ if [ $PHASE18_OK -eq 1 ]; then
     echo "PASS  Phase 18 — Horizontal scroll demo app"
 else
     echo "FAIL  Phase 18 — Horizontal scroll demo app"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE19_OK -eq 1 ]; then
+    echo "PASS  Phase 19 — Redraw demo app (background thread re-render)"
+else
+    echo "FAIL  Phase 19 — Redraw demo app (background thread re-render)"
     FINAL_EXIT=1
 fi
 

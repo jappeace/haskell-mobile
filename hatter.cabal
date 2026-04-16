@@ -135,6 +135,7 @@ library
       cbits/http_bridge.c
       cbits/network_status_bridge.c
       cbits/animation_bridge.c
+      cbits/redraw_bridge.c
       cbits/files_dir.c
   include-dirs:
       include
@@ -172,6 +173,16 @@ executable stack-demo
 executable horizontal-scroll-demo
   import: common-options
   main-is: HorizontalScrollDemoMain.hs
+  ghc-options: -Wno-unused-packages -threaded
+  hs-source-dirs:
+      test
+  build-depends:
+      hatter,
+      text
+
+executable redraw-demo
+  import: common-options
+  main-is: RedrawDemoMain.hs
   ghc-options: -Wno-unused-packages -threaded
   hs-source-dirs:
       test

@@ -50,6 +50,10 @@ void setup_ios_network_status_bridge(void *haskellCtx);
 /* iOS animation bridge setup — called from Swift during initialisation */
 void setup_ios_animation_bridge(void *haskellCtx);
 
+#include "RedrawBridge.h"
+/* iOS redraw bridge setup — called from Swift during initialisation */
+void setup_ios_redraw_bridge(void *haskellCtx);
+
 #include "PlatformSignInBridge.h"
 /* iOS platform sign-in bridge setup — called from Swift during initialisation */
 void setup_ios_platform_sign_in_bridge(void *haskellCtx);

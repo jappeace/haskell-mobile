@@ -339,6 +339,17 @@ let
     name = "hatter-async-oom-apk";
   };
 
+  redrawAndroid = import ./android.nix {
+    inherit sources androidArch;
+    mainModule = ../test/RedrawDemoMain.hs;
+  };
+  redrawApk = lib.mkApk {
+    sharedLibs = [{ lib = redrawAndroid; inherit abiDir; }];
+    androidSrc = ../android;
+    apkName = "hatter-redraw.apk";
+    name = "hatter-redraw-apk";
+  };
+
   androidComposition = pkgs.androidenv.composeAndroidPackages {
     platformVersions = [ emulatorApiLevel ];
     includeEmulator = true;
@@ -404,6 +415,7 @@ SCROLLVIEW_SWITCH_APK="${scrollviewSwitchApk}/hatter-scrollview-switch.apk"
 STYLED_TYPE_CHANGE_APK="${styledTypeChangeApk}/hatter-styled-type-change.apk"
 HORIZONTAL_SCROLL_APK="${horizontalScrollApk}/hatter-horizontal-scroll.apk"
 ASYNC_OOM_APK="${asyncOomApk}/hatter-async-oom.apk"
+REDRAW_APK="${redrawApk}/hatter-redraw.apk"
 PACKAGE="me.jappie.hatter"
 ACTIVITY=".MainActivity"
 DEVICE_NAME="test_all"
@@ -438,7 +450,8 @@ for so_path in \
     "${textinputRerenderAndroid}/lib/${abiDir}/libhatter.so" \
     "${stackAndroid}/lib/${abiDir}/libhatter.so" \
     "${styledTypeChangeAndroid}/lib/${abiDir}/libhatter.so" \
-    "${horizontalScrollAndroid}/lib/${abiDir}/libhatter.so"; do
+    "${horizontalScrollAndroid}/lib/${abiDir}/libhatter.so" \
+    "${redrawAndroid}/lib/${abiDir}/libhatter.so"; do
     SO_BYTES=$(stat -c %s "$so_path")
     SO_MB=$((SO_BYTES / 1048576))
     SO_LABEL=$(echo "$so_path" | grep -oP '[^/]+(?=/lib/)')
@@ -521,6 +534,7 @@ PHASE16_OK=0
 PHASE18_OK=0
 PHASE19_OK=0
 PHASE20_OK=0
+PHASE21_OK=0
 
 cleanup() {
     echo ""
@@ -637,7 +651,7 @@ sleep 30
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK SCROLL_TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PLATFORM_SIGN_IN_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK FILES_DIR_APK TEXTINPUT_RERENDER_APK STACK_APK SCROLLVIEW_SWITCH_APK STYLED_TYPE_CHANGE_APK HORIZONTAL_SCROLL_APK ASYNC_OOM_APK PACKAGE ACTIVITY WORK_DIR
+export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK SCROLL_TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PLATFORM_SIGN_IN_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK FILES_DIR_APK TEXTINPUT_RERENDER_APK STACK_APK SCROLLVIEW_SWITCH_APK STYLED_TYPE_CHANGE_APK HORIZONTAL_SCROLL_APK ASYNC_OOM_APK REDRAW_APK PACKAGE ACTIVITY WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -659,6 +673,7 @@ PHASE17_EXIT=0
 PHASE18_EXIT=0
 PHASE19_EXIT=0
 PHASE20_EXIT=0
+PHASE21_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -753,6 +768,8 @@ echo "--- horizontal-scroll ---"
 run_with_retry "horizontal-scroll" bash "$TEST_SCRIPTS/android/horizontal-scroll.sh" || PHASE19_EXIT=1
 echo "--- async-oom ---"
 run_with_retry "async-oom" bash "$TEST_SCRIPTS/android/async_oom.sh" || PHASE20_EXIT=1
+echo "--- redraw ---"
+run_with_retry "redraw" bash "$TEST_SCRIPTS/android/redraw.sh" || PHASE21_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -953,6 +970,16 @@ else
     echo "PHASE 20 FAILED"
 fi
 
+if [ $PHASE21_EXIT -eq 0 ]; then
+    PHASE21_OK=1
+    echo ""
+    echo "PHASE 21 PASSED"
+else
+    PHASE21_OK=0
+    echo ""
+    echo "PHASE 21 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -1100,6 +1127,13 @@ if [ $PHASE20_OK -eq 1 ]; then
     echo "PASS  Phase 20 — Async OOM regression test (issue #163)"
 else
     echo "FAIL  Phase 20 — Async OOM regression test (issue #163)"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE21_OK -eq 1 ]; then
+    echo "PASS  Phase 21 — Redraw demo app (background thread re-render)"
+else
+    echo "FAIL  Phase 21 — Redraw demo app (background thread re-render)"
     FINAL_EXIT=1
 fi
 

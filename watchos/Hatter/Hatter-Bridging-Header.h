@@ -11,6 +11,10 @@
 #include "NetworkStatusBridge.h"
 #include "AnimationBridge.h"
 #include "PlatformSignInBridge.h"
+#include "RedrawBridge.h"
+
+/* watchOS redraw bridge setup — called from Swift during initialisation */
+void setup_watchos_redraw_bridge(void *haskellCtx);
 
 /* Dispatch a text change event to Haskell.
  * Not declared in Hatter.h but exported via foreign export ccall. */

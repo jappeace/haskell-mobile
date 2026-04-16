@@ -25,6 +25,7 @@
 #include "HttpBridge.h"
 #include "NetworkStatusBridge.h"
 #include "AnimationBridge.h"
+#include "RedrawBridge.h"
 #include "PlatformSignInBridge.h"
 
 /* Deduplicate registerForeignExports to prevent OOM on armv7a.
@@ -150,6 +151,9 @@ extern void setup_android_network_status_bridge(JNIEnv *env, jobject activity, v
 /* Android animation bridge (from animation_bridge_android.c) */
 extern void setup_android_animation_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
 
+/* Android redraw bridge (from redraw_bridge_android.c) */
+extern void setup_android_redraw_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
+
 /* Android platform sign-in bridge (from platform_sign_in_android.c) */
 extern void setup_android_platform_sign_in_bridge(JNIEnv *env, jobject activity, void *haskellCtx);
 
@@ -241,6 +245,7 @@ JNI_METHOD(renderUI)(JNIEnv *env, jobject thiz)
     setup_android_http_bridge(env, thiz, g_haskell_ctx);
     setup_android_network_status_bridge(env, thiz, g_haskell_ctx);
     setup_android_animation_bridge(env, thiz, g_haskell_ctx);
+    setup_android_redraw_bridge(env, thiz, g_haskell_ctx);
     setup_android_platform_sign_in_bridge(env, thiz, g_haskell_ctx);
     haskellRenderUI(g_haskell_ctx);
 }

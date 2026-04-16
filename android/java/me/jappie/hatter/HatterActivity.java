@@ -1153,4 +1153,18 @@ public class HatterActivity extends Activity implements View.OnClickListener {
             animationFrameCallback = null;
         }
     }
+
+    /**
+     * Request a UI re-render from any thread. Posts renderUI() to the
+     * main/UI thread so that JNI env and UI operations are safe.
+     * Called from native code via JNI (redraw_bridge_android.c).
+     */
+    public void requestRedraw() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                renderUI();
+            }
+        });
+    }
 }
