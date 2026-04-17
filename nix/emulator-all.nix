@@ -251,6 +251,17 @@ let
     name = "hatter-animation-apk";
   };
 
+  easeInTranslateAndroid = import ./android.nix {
+    inherit sources androidArch;
+    mainModule = ../test/EaseInTranslateDemoMain.hs;
+  };
+  easeInTranslateApk = lib.mkApk {
+    sharedLibs = [{ lib = easeInTranslateAndroid; inherit abiDir; }];
+    androidSrc = ../android;
+    apkName = "hatter-ease-in-translate.apk";
+    name = "hatter-ease-in-translate-apk";
+  };
+
   filesDirAndroid = import ./android.nix {
     inherit sources androidArch;
     mainModule = ../test/FilesDirDemoMain.hs;
@@ -408,6 +419,7 @@ HTTP_APK="${httpApk}/hatter-http.apk"
 NETWORK_STATUS_APK="${networkStatusApk}/hatter-networkstatus.apk"
 MAPVIEW_APK="${mapviewApk}/hatter-mapview.apk"
 ANIMATION_APK="${animationApk}/hatter-animation.apk"
+EASE_IN_TRANSLATE_APK="${easeInTranslateApk}/hatter-ease-in-translate.apk"
 FILES_DIR_APK="${filesDirApk}/hatter-filesdir.apk"
 TEXTINPUT_RERENDER_APK="${textinputRerenderApk}/hatter-textinput-rerender.apk"
 STACK_APK="${stackApk}/hatter-stack.apk"
@@ -446,6 +458,7 @@ for so_path in \
     "${networkStatusAndroid}/lib/${abiDir}/libhatter.so" \
     "${mapviewAndroid}/lib/${abiDir}/libhatter.so" \
     "${animationAndroid}/lib/${abiDir}/libhatter.so" \
+    "${easeInTranslateAndroid}/lib/${abiDir}/libhatter.so" \
     "${filesDirAndroid}/lib/${abiDir}/libhatter.so" \
     "${textinputRerenderAndroid}/lib/${abiDir}/libhatter.so" \
     "${stackAndroid}/lib/${abiDir}/libhatter.so" \
@@ -535,6 +548,7 @@ PHASE18_OK=0
 PHASE19_OK=0
 PHASE20_OK=0
 PHASE21_OK=0
+PHASE22_OK=0
 
 cleanup() {
     echo ""
@@ -651,7 +665,7 @@ sleep 30
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK SCROLL_TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PLATFORM_SIGN_IN_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK FILES_DIR_APK TEXTINPUT_RERENDER_APK STACK_APK SCROLLVIEW_SWITCH_APK STYLED_TYPE_CHANGE_APK HORIZONTAL_SCROLL_APK ASYNC_OOM_APK REDRAW_APK PACKAGE ACTIVITY WORK_DIR
+export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK SCROLL_TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PLATFORM_SIGN_IN_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK EASE_IN_TRANSLATE_APK FILES_DIR_APK TEXTINPUT_RERENDER_APK STACK_APK SCROLLVIEW_SWITCH_APK STYLED_TYPE_CHANGE_APK HORIZONTAL_SCROLL_APK ASYNC_OOM_APK REDRAW_APK PACKAGE ACTIVITY WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -674,6 +688,7 @@ PHASE18_EXIT=0
 PHASE19_EXIT=0
 PHASE20_EXIT=0
 PHASE21_EXIT=0
+PHASE22_EXIT=0
 
 # run_with_retry LABEL COMMAND [ARGS...]
 # Runs the command up to 10 times. Succeeds on first pass, fails only if all 10 fail.
@@ -770,6 +785,8 @@ echo "--- async-oom ---"
 run_with_retry "async-oom" bash "$TEST_SCRIPTS/android/async_oom.sh" || PHASE20_EXIT=1
 echo "--- redraw ---"
 run_with_retry "redraw" bash "$TEST_SCRIPTS/android/redraw.sh" || PHASE21_EXIT=1
+echo "--- ease-in-translate ---"
+run_with_retry "ease-in-translate" bash "$TEST_SCRIPTS/android/ease-in-translate.sh" || PHASE22_EXIT=1
 
 # --- Phase results ---
 if [ $PHASE1_EXIT -eq 0 ]; then
@@ -980,6 +997,16 @@ else
     echo "PHASE 21 FAILED"
 fi
 
+if [ $PHASE22_EXIT -eq 0 ]; then
+    PHASE22_OK=1
+    echo ""
+    echo "PHASE 22 PASSED"
+else
+    PHASE22_OK=0
+    echo ""
+    echo "PHASE 22 FAILED"
+fi
+
 # ===========================================================================
 # Final report
 # ===========================================================================
@@ -1134,6 +1161,13 @@ if [ $PHASE21_OK -eq 1 ]; then
     echo "PASS  Phase 21 — Redraw demo app (background thread re-render)"
 else
     echo "FAIL  Phase 21 — Redraw demo app (background thread re-render)"
+    FINAL_EXIT=1
+fi
+
+if [ $PHASE22_OK -eq 1 ]; then
+    echo "PASS  Phase 22 — EaseIn translate animation"
+else
+    echo "FAIL  Phase 22 — EaseIn translate animation"
     FINAL_EXIT=1
 fi
 
