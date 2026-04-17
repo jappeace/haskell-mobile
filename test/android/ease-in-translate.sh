@@ -35,9 +35,9 @@ assert_logcat "$LOGCAT_FILE" "EaseInTranslateDemoMain started" "Demo app started
 # Assert position change was logged
 assert_logcat "$LOGCAT_FILE" "Moved to position B" "Position B logged"
 
-# Assert the bridge received translate property updates
-assert_logcat "$LOGCAT_FILE" "setNumProp.*translateX" "translateX setNumProp called"
-assert_logcat "$LOGCAT_FILE" "setNumProp.*translateY" "translateY setNumProp called"
+# Assert the bridge received translate property updates with correct final position
+assert_logcat "$LOGCAT_FILE" "setNumProp.*translateX=120.0" "translateX reached 120.0"
+assert_logcat "$LOGCAT_FILE" "setNumProp.*translateY=80.0" "translateY reached 80.0"
 
 # Verify no crash
 LOGCAT_ERR="$WORK_DIR/ease_in_translate_err.txt"
