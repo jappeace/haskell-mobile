@@ -686,6 +686,8 @@ run_with_retry() {
     local output_file="$WORK_DIR/retry_''${label}.log"
     while [ $attempt -le $max_attempts ]; do
         echo "[$label] attempt $attempt/$max_attempts"
+        "$ADB" -s "$EMULATOR_SERIAL" shell am force-stop "$PACKAGE" 2>/dev/null || true
+        "$ADB" -s "$EMULATOR_SERIAL" logcat -c 2>/dev/null || true
         if "$@" 2>&1 | tee "$output_file"; then
             echo "[$label] PASSED on attempt $attempt"
             return 0
@@ -696,10 +698,6 @@ run_with_retry() {
         fi
         echo "[$label] attempt $attempt FAILED"
         attempt=$((attempt + 1))
-        if [ $attempt -le $max_attempts ]; then
-            echo "[$label] retrying in 5s..."
-            sleep 5
-        fi
     done
     echo "[$label] FAILED after $max_attempts attempts"
     return 1
