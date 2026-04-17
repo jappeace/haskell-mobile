@@ -32,6 +32,10 @@ collect_logcat "ease-in-translate"
 # Assert the app started
 assert_logcat "$LOGCAT_FILE" "EaseInTranslateDemoMain started" "Demo app started"
 
+# Assert initial position was set on first render
+assert_logcat "$LOGCAT_FILE" "setNumProp.*translateX=0.0" "initial translateX=0.0"
+assert_logcat "$LOGCAT_FILE" "setNumProp.*translateY=0.0" "initial translateY=0.0"
+
 # Assert position change was logged
 assert_logcat "$LOGCAT_FILE" "Moved to position B" "Position B logged"
 
