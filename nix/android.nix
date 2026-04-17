@@ -13,8 +13,12 @@ let
   crossDeps = import ./cross-deps.nix {
     inherit sources androidArch consumerCabalFile consumerCabal2Nix hpkgs;
   };
+  # Pre-compile hatter library objects once.  Nix caches the result by
+  # (hatterSrc, androidArch), so all apps sharing the same hatter source
+  # reuse the same compilation — no per-app redundant GHC work.
+  hatterObjs = lib.mkHatterObjs { hatterSrc = ../.; };
 in
 lib.mkAndroidLib {
   hatterSrc = ../.;
-  inherit mainModule crossDeps maxNodes dynamicNodePool;
+  inherit mainModule crossDeps maxNodes dynamicNodePool hatterObjs;
 }
