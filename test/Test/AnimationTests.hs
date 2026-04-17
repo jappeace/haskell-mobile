@@ -27,7 +27,6 @@ import Hatter.Animation
 import Hatter.Render (RenderState(..), RenderedNode(..), newRenderState, renderWidget)
 import Hatter.Widget
   ( Color(..)
-  , LayoutItem(..)
   , LayoutSettings(..)
   , Widget(..)
   , WidgetStyle(..)
@@ -38,6 +37,7 @@ import Hatter.Widget
   , item
   , lerpWord8
   , normalizeAnimated
+  , zeroAnimationOrigin
   )
 
 animationTests :: TestTree
@@ -49,6 +49,8 @@ animationTests = testGroup "Animation"
   , animatedWidgetRenderTests
   , normalizeAnimatedTests
   , translateAnimationTests
+  , zeroAnimationOriginTests
+  , firstRenderAnimationTests
   ]
 
 -- ---------------------------------------------------------------------------
@@ -253,12 +255,12 @@ animatedWidgetRenderTests = testGroup "Animated widget rendering"
           widgetA = Animated (AnimatedConfig 500 Linear) styledA
           widgetB = Animated (AnimatedConfig 500 Linear) styledB
 
-      -- Render 1: initial state (padding=10)
+      -- Render 1: initial state (padding=10) — tween from zero origin (0→10)
       renderWidget rs widgetA
       tweensAfter1 <- readIORef (ansTweens animState)
-      assertBool "No tween after first render" (IntMap.null tweensAfter1)
+      assertBool "Tween registered after first render (0→10)" (not (IntMap.null tweensAfter1))
 
-      -- Render 2: change to padding=50 — tween should be registered
+      -- Render 2: change to padding=50 — tween replaced (10→50)
       renderWidget rs widgetB
       tweensAfter2 <- readIORef (ansTweens animState)
       assertBool "Tween registered after padding change (10→50)" (not (IntMap.null tweensAfter2))
@@ -348,6 +350,7 @@ normalizeAnimatedTests = testGroup "normalizeAnimated"
   , testCase "Animated Column renders as RenderedContainer with RenderedAnimated children" $ do
       animState <- newAnimationState
       writeIORef (ansContextPtr animState) nullPtr
+      writeIORef (ansLoopActive animState) True
       actionState <- newActionState
       rs <- newRenderState actionState animState
       let cfg = AnimatedConfig 300 EaseOut
@@ -425,4 +428,85 @@ translateAnimationTests = testGroup "Translate animation"
       rs <- newRenderState actionState animState
       renderWidget rs $ Styled (defaultStyle { wsTranslateX = Just 10.5, wsTranslateY = Just (-20.0) })
         (Text TextConfig { tcLabel = "offset", tcFontConfig = Nothing })
+  ]
+
+-- ---------------------------------------------------------------------------
+-- zeroAnimationOrigin
+-- ---------------------------------------------------------------------------
+
+zeroAnimationOriginTests :: TestTree
+zeroAnimationOriginTests = testGroup "zeroAnimationOrigin"
+  [ testCase "Zeroes padding in Styled" $ do
+      let style = defaultStyle { wsPadding = Just 42 }
+          child = Text TextConfig { tcLabel = "x", tcFontConfig = Nothing }
+          result = zeroAnimationOrigin (Styled style child)
+      result @?= Styled (defaultStyle { wsPadding = Just 0 }) child
+  , testCase "Zeroes translateX and translateY in Styled" $ do
+      let style = defaultStyle { wsTranslateX = Just 100, wsTranslateY = Just 50 }
+          child = Text TextConfig { tcLabel = "x", tcFontConfig = Nothing }
+          result = zeroAnimationOrigin (Styled style child)
+      result @?= Styled (defaultStyle { wsTranslateX = Just 0, wsTranslateY = Just 0 }) child
+  , testCase "Preserves Nothing fields" $ do
+      let style = defaultStyle { wsTranslateX = Just 10 }
+          child = Text TextConfig { tcLabel = "x", tcFontConfig = Nothing }
+          result = zeroAnimationOrigin (Styled style child)
+          expected = defaultStyle { wsTranslateX = Just 0 }
+      result @?= Styled expected child
+  , testCase "Preserves color fields unchanged" $ do
+      let color = Color 255 0 0 255
+          style = defaultStyle { wsTextColor = Just color, wsTranslateX = Just 50 }
+          child = Text TextConfig { tcLabel = "x", tcFontConfig = Nothing }
+          result = zeroAnimationOrigin (Styled style child)
+          expected = defaultStyle { wsTextColor = Just color, wsTranslateX = Just 0 }
+      result @?= Styled expected child
+  , testCase "Non-Styled widget returned unchanged" $ do
+      let leaf = Text TextConfig { tcLabel = "hello", tcFontConfig = Nothing }
+      zeroAnimationOrigin leaf @?= leaf
+  ]
+
+-- ---------------------------------------------------------------------------
+-- First-render animation
+-- ---------------------------------------------------------------------------
+
+firstRenderAnimationTests :: TestTree
+firstRenderAnimationTests = testGroup "First-render animation"
+  [ testCase "Animated Styled with translate registers tween on first render" $ do
+      animState <- newAnimationState
+      writeIORef (ansContextPtr animState) nullPtr
+      writeIORef (ansLoopActive animState) True
+      actionState <- newActionState
+      rs <- newRenderState actionState animState
+      let style = defaultStyle { wsTranslateX = Just 120, wsTranslateY = Just 50 }
+          child = Text TextConfig { tcLabel = "*", tcFontConfig = Nothing }
+          widget = Animated (AnimatedConfig 1200 EaseOut) (Styled style child)
+      renderWidget rs widget
+      tweens <- readIORef (ansTweens animState)
+      assertBool "Tween registered on first render for translate" (not (IntMap.null tweens))
+  , testCase "Animated plain Text has no tween on first render" $ do
+      animState <- newAnimationState
+      writeIORef (ansContextPtr animState) nullPtr
+      actionState <- newActionState
+      rs <- newRenderState actionState animState
+      let widget = Animated (AnimatedConfig 300 EaseOut)
+                     (Text TextConfig { tcLabel = "hello", tcFontConfig = Nothing })
+      renderWidget rs widget
+      tweens <- readIORef (ansTweens animState)
+      assertBool "No tween for plain Text (no animatable properties)" (IntMap.null tweens)
+  , testCase "First-render tween animates from zero to target" $ do
+      animState <- newAnimationState
+      writeIORef (ansContextPtr animState) nullPtr
+      writeIORef (ansLoopActive animState) True
+      actionState <- newActionState
+      rs <- newRenderState actionState animState
+      let style = defaultStyle { wsPadding = Just 20, wsTranslateX = Just 100 }
+          child = Text TextConfig { tcLabel = "x", tcFontConfig = Nothing }
+          widget = Animated (AnimatedConfig 500 Linear) (Styled style child)
+      renderWidget rs widget
+      tweens <- readIORef (ansTweens animState)
+      -- Verify the tween goes from zero to target
+      case IntMap.elems tweens of
+        [tween] -> do
+          atFromWidget tween @?= Styled (defaultStyle { wsPadding = Just 0, wsTranslateX = Just 0 }) child
+          atToWidget tween @?= Styled style child
+        other -> assertFailure ("Expected exactly one tween, got " ++ show (length other))
   ]

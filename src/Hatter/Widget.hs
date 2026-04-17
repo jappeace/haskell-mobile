@@ -38,6 +38,7 @@ module Hatter.Widget
   , Easing(..)
   , AnimatedConfig(..)
   , normalizeAnimated
+  , zeroAnimationOrigin
   , interpolateColor
   , lerpWord8
   -- ** key resolution
@@ -276,6 +277,27 @@ normalizeAnimated _config other = other
 -- | Wrap a 'LayoutItem''s widget in 'Animated', preserving the key.
 wrapLayoutItemAnimated :: AnimatedConfig -> LayoutItem -> LayoutItem
 wrapLayoutItemAnimated config li = li { liWidget = Animated config (liWidget li) }
+
+-- | Produce the animation starting point for a first render.
+--
+-- Zeroes numeric style properties (padding, translateX, translateY) so
+-- the first render can animate FROM zero TO the target position.
+-- Non-numeric properties (colors, text-align, touch-passthrough) and
+-- non-'Styled' widgets are returned unchanged — they have no meaningful
+-- numeric zero to animate from.
+zeroAnimationOrigin :: Widget -> Widget
+zeroAnimationOrigin (Styled style child) = Styled (zeroNumericStyle style) child
+zeroAnimationOrigin other = other
+
+-- | Zero the numeric style properties that support interpolation.
+-- Replaces each 'Just' value with @Just 0@; leaves 'Nothing' fields
+-- unchanged so the interpolation engine correctly skips them.
+zeroNumericStyle :: WidgetStyle -> WidgetStyle
+zeroNumericStyle style = style
+  { wsPadding    = fmap (const 0) (wsPadding style)
+  , wsTranslateX = fmap (const 0) (wsTranslateX style)
+  , wsTranslateY = fmap (const 0) (wsTranslateY style)
+  }
 
 -- | How an image should be scaled within its bounds.
 data ScaleType

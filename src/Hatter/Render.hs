@@ -30,7 +30,7 @@ import Data.IntSet qualified as IntSet
 import Data.Text (Text, pack)
 import Hatter.Action (Action(..), ActionState, OnChange(..), lookupAction, lookupTextAction)
 import Hatter.Animation (AnimationState, registerTween)
-import Hatter.Widget (AnimatedConfig(..), ButtonConfig(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), LayoutItem(..), LayoutSettings(..), MapViewConfig(..), ResourceName(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), WebViewConfig(..), Widget(..), WidgetStyle(..), colorToHex, normalizeAnimated, resolveKeyAtIndex)
+import Hatter.Widget (AnimatedConfig(..), ButtonConfig(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), LayoutItem(..), LayoutSettings(..), MapViewConfig(..), ResourceName(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), WebViewConfig(..), Widget(..), WidgetStyle(..), colorToHex, normalizeAnimated, resolveKeyAtIndex, zeroAnimationOrigin)
 
 import Hatter.UIBridge qualified as Bridge
 import System.IO (hPutStrLn, stderr)
@@ -269,10 +269,22 @@ createRenderedNode animState (Animated config child) = do
     Row _        -> createRenderedNode animState normalized
     Stack _      -> createRenderedNode animState normalized
     -- Everything else (Styled, leaves): wrap in RenderedAnimated for tween interpolation.
+    -- Create the native node at the zero-origin position and register a tween
+    -- from zero to the target, so the first render animates into place.
     _            -> do
       let finalWidget = Animated config normalized
-      childNode <- createRenderedNode animState normalized
-      pure (RenderedAnimated finalWidget childNode)
+          zeroOrigin = zeroAnimationOrigin normalized
+      childNode <- createRenderedNode animState zeroOrigin
+      if zeroOrigin /= normalized
+        then do
+          registerTween animState (renderedNodeId childNode)
+            zeroOrigin normalized (anDuration config) (anEasing config)
+          -- Store the target widget (not zero) so subsequent diffs see
+          -- the correct post-animation state.
+          let targetChildNode = updateRenderedTarget normalized childNode
+          pure (RenderedAnimated finalWidget targetChildNode)
+        else
+          pure (RenderedAnimated finalWidget childNode)
 
 -- ---------------------------------------------------------------------------
 -- Destroying rendered subtrees
