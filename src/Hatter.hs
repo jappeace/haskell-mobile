@@ -92,8 +92,17 @@ module Hatter
   , newActionState
   , runActionM
     -- * Animation
-  , Easing(..)
+  , KeyframeAt
+  , mkKeyframeAt
+  , unKeyframeAt
+  , Keyframe(..)
   , AnimatedConfig(..)
+  , linearAnimation
+  , easeInAnimation
+  , easeOutAnimation
+  , easeInOutAnimation
+  , andThen
+  , lerpStyle
     -- * Lifecycle
   , LifecycleEvent(..)
   , MobileContext(..)
@@ -164,11 +173,12 @@ import Hatter.Widget
   ( AnimatedConfig(..)
   , ButtonConfig(..)
   , Color(..)
-  , Easing(..)
   , FontConfig(..)
   , ImageConfig(..)
   , ImageSource(..)
   , InputType(..)
+  , Keyframe(..)
+  , KeyframeAt
   , LayoutItem(..)
   , LayoutSettings(..)
   , MapViewConfig(..)
@@ -181,17 +191,25 @@ import Hatter.Widget
   , Widget(..)
   , WidgetKey(..)
   , WidgetStyle(..)
+  , andThen
   , button
+  , easeInAnimation
+  , easeInOutAnimation
+  , easeOutAnimation
   , colorFromText
   , colorToHex
   , column
   , defaultStyle
   , item
   , keyedItem
+  , linearAnimation
+  , lerpStyle
+  , mkKeyframeAt
   , row
   , scrollColumn
   , scrollRow
   , text
+  , unKeyframeAt
   )
 
 -- | Create an 'AppContext' from a 'MobileApp' and return it as a typed

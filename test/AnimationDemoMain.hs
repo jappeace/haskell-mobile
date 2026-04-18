@@ -1,10 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- | Self-contained animation demo app.
 --
--- A button toggles padding between 10 and 50, wrapped in
--- @Animated 500 EaseInOut@.  The desktop stub fires test frames
--- synchronously (0ms, 16.67ms, 1000ms), which exercises the
--- tween interpolation path and logs progress to stderr.
+-- A button toggles padding between 10 and 50, using a linear
+-- animation over 0.5 seconds.  The desktop stub fires test frames
+-- synchronously, which exercises the tween interpolation path and
+-- logs progress to stderr.
 module Main where
 
 import Data.IORef (newIORef, readIORef, writeIORef)
@@ -13,8 +13,7 @@ import Foreign.Ptr (Ptr)
 import Hatter
   ( MobileApp(..)
   , UserState(..)
-  , AnimatedConfig(..)
-  , Easing(..)
+  , linearAnimation
   , startMobileApp
   , newActionState
   , runActionM
@@ -44,8 +43,11 @@ main = do
   let viewFn :: UserState -> IO Widget
       viewFn _userState = do
         currentPadding <- readIORef paddingRef
+        let config = linearAnimation 0.5
+                       (defaultStyle { wsPadding = Just 0 })
+                       (defaultStyle { wsPadding = Just currentPadding })
         pure $ column
-          [ Animated (AnimatedConfig 500 EaseInOut) $
+          [ Animated config $
               Styled (defaultStyle { wsPadding = Just currentPadding }) $
                 Text TextConfig
                   { tcLabel = "Animated padding"

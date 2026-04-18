@@ -1,18 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
--- | Reproducer for confetti animation bug.
+-- | Confetti animation demo using easeOut smart constructor.
 --
--- The prrrrrrrrr confetti pattern creates particles at their final
--- scattered positions on first render.  Because the Animated wrapper
--- only triggers tweens on property *changes* between renders (in
--- diffRenderNode), the first render goes through createRenderedNode
--- which places nodes at their target positions immediately — no
--- "from" state exists to animate from.
---
--- Expected: particles fly outward from centre over 1200ms.
--- Actual:   particles appear instantly at final positions.
---
--- To verify the bug, check logcat for the absence of
--- setNumProp.*translateX calls — no tween is ever registered.
+-- Each particle gets its own Animated wrapper with easeOut:
+-- origin (0,0) -> target (offsetX, offsetY) over 1.2 seconds.
 module Main where
 
 import Data.IORef (newIORef, readIORef, writeIORef)
@@ -20,8 +10,7 @@ import Foreign.Ptr (Ptr)
 import Hatter
   ( MobileApp(..)
   , UserState(..)
-  , AnimatedConfig(..)
-  , Easing(..)
+  , easeOutAnimation
   , startMobileApp
   , newActionState
   , runActionM
@@ -39,20 +28,22 @@ import Hatter.Widget
   , column
   )
 
--- | A confetti particle: a styled "*" with translateX/Y offsets.
+-- | A confetti particle with an easeOut animation from origin to target.
 confettiParticle :: Double -> Double -> Widget
 confettiParticle offsetX offsetY =
-  Styled (defaultStyle { wsTranslateX = Just offsetX
-                       , wsTranslateY = Just offsetY
-                       }) $
-    Text TextConfig
-      { tcLabel = "*"
-      , tcFontConfig = Nothing
-      }
+  let config = easeOutAnimation 1.2
+                 (defaultStyle { wsTranslateX = Just 0, wsTranslateY = Just 0 })
+                 (defaultStyle { wsTranslateX = Just offsetX, wsTranslateY = Just offsetY })
+  in Animated config $
+       Styled (defaultStyle { wsTranslateX = Just offsetX
+                            , wsTranslateY = Just offsetY
+                            }) $
+         Text TextConfig
+           { tcLabel = "*"
+           , tcFontConfig = Nothing
+           }
 
--- | Five confetti particles with fixed "random-ish" offsets.
--- Mimics the prrrrrrrrr pattern: particles are created at their
--- final scattered positions wrapped in a single Animated node.
+-- | Five confetti particles with fixed offsets.
 confettiParticles :: [Widget]
 confettiParticles =
   [ confettiParticle 120.0 50.0
@@ -76,14 +67,13 @@ main = do
         isShowing <- readIORef showConfetti
         pure $ if isShowing
           then column
-            [ Animated (AnimatedConfig 1200 EaseOut) $
-                column confettiParticles
-            , Button ButtonConfig
+            ( confettiParticles ++
+            [ Button ButtonConfig
                 { bcLabel = "Confetti Active"
                 , bcAction = triggerAction
                 , bcFontConfig = Nothing
                 }
-            ]
+            ])
           else column
             [ Button ButtonConfig
                 { bcLabel = "Trigger Confetti"

@@ -1,8 +1,9 @@
 {-# LANGUAGE ImportQualifiedPost #-}
--- | Tests for the animation engine: easing, interpolation,
+-- | Tests for the animation engine: keyframes, interpolation,
 -- tween registration, and the Animated widget diff behaviour.
 module Test.AnimationTests (animationTests) where
 
+import Data.Fixed (Fixed, E6)
 import Data.IORef (readIORef, writeIORef)
 import Data.Int (Int32)
 import Data.IntMap.Strict qualified as IntMap
@@ -12,15 +13,25 @@ import Test.Tasty.HUnit
 
 import Hatter
   ( AnimatedConfig(..)
-  , Easing(..)
+  , Keyframe(..)
+  , KeyframeAt
+  , andThen
+  , easeInAnimation
+  , easeInOutAnimation
+  , easeOutAnimation
+  , linearAnimation
+  , lerpStyle
+  , mkKeyframeAt
+  , unKeyframeAt
   , newActionState
   )
 import Hatter.Animation
   ( ActiveTween(..)
   , AnimationState(..)
-  , applyEasing
+  , bracketKeyframes
   , dispatchAnimationFrame
   , interpolateDouble
+  , interpolateStyle
   , newAnimationState
   , registerTween
   )
@@ -37,58 +48,58 @@ import Hatter.Widget
   , item
   , lerpWord8
   , normalizeAnimated
-  , zeroAnimationOrigin
   )
 
 animationTests :: TestTree
 animationTests = testGroup "Animation"
-  [ easingTests
+  [ keyframeAtTests
   , interpolationTests
   , colorInterpolationTests
+  , keyframeBracketingTests
   , tweenRegistryTests
   , animatedWidgetRenderTests
   , normalizeAnimatedTests
   , translateAnimationTests
-  , zeroAnimationOriginTests
   , firstRenderAnimationTests
+  , smartConstructorTests
   ]
 
+-- | Unsafely create a KeyframeAt for test convenience.
+unsafeKfAt :: Rational -> KeyframeAt
+unsafeKfAt value = case mkKeyframeAt (fromRational value) of
+  Just kfAt -> kfAt
+  Nothing   -> error ("Invalid keyframe position: " ++ show value)
+
+-- | Make a simple 2-keyframe AnimatedConfig for tests.
+twoKeyframeConfig :: Double -> WidgetStyle -> WidgetStyle -> AnimatedConfig
+twoKeyframeConfig durationSec fromStyle toStyle = AnimatedConfig
+  { anDuration  = realToFrac durationSec
+  , anKeyframes =
+      [ Keyframe (unsafeKfAt 0) fromStyle
+      , Keyframe (unsafeKfAt 1) toStyle
+      ]
+  }
+
 -- ---------------------------------------------------------------------------
--- Easing
+-- KeyframeAt validation
 -- ---------------------------------------------------------------------------
 
-easingTests :: TestTree
-easingTests = testGroup "Easing"
-  [ testCase "Linear at 0 and 1" $ do
-      applyEasing Linear 0.0 @?= 0.0
-      applyEasing Linear 1.0 @?= 1.0
-  , testCase "Linear midpoint" $
-      applyEasing Linear 0.5 @?= 0.5
-  , testCase "EaseIn at boundaries" $ do
-      applyEasing EaseIn 0.0 @?= 0.0
-      applyEasing EaseIn 1.0 @?= 1.0
-  , testCase "EaseIn slower at 0.25" $ do
-      let easeInVal = applyEasing EaseIn 0.25
-          linearVal = applyEasing Linear 0.25
-      assertBool "EaseIn at 0.25 should be slower than Linear"
-        (easeInVal < linearVal)
-  , testCase "EaseOut at boundaries" $ do
-      applyEasing EaseOut 0.0 @?= 0.0
-      applyEasing EaseOut 1.0 @?= 1.0
-  , testCase "EaseOut faster at 0.25" $ do
-      let easeOutVal = applyEasing EaseOut 0.25
-          linearVal  = applyEasing Linear 0.25
-      assertBool "EaseOut at 0.25 should be faster than Linear"
-        (easeOutVal > linearVal)
-  , testCase "EaseInOut at boundaries" $ do
-      applyEasing EaseInOut 0.0 @?= 0.0
-      applyEasing EaseInOut 1.0 @?= 1.0
-  , testCase "EaseInOut symmetry around midpoint" $ do
-      let valAt025 = applyEasing EaseInOut 0.25
-          valAt075 = applyEasing EaseInOut 0.75
-      -- EaseInOut is symmetric: f(0.25) + f(0.75) ≈ 1.0
-      assertBool "EaseInOut symmetric"
-        (abs (valAt025 + valAt075 - 1.0) < 0.01)
+keyframeAtTests :: TestTree
+keyframeAtTests = testGroup "KeyframeAt"
+  [ testCase "Valid values accepted" $ do
+      assertBool "0.0 is valid" (mkKeyframeAt 0 /= Nothing)
+      assertBool "0.5 is valid" (mkKeyframeAt 0.5 /= Nothing)
+      assertBool "1.0 is valid" (mkKeyframeAt 1 /= Nothing)
+  , testCase "Invalid values rejected" $ do
+      mkKeyframeAt (-0.1) @?= Nothing
+      mkKeyframeAt 1.1 @?= Nothing
+      mkKeyframeAt 2.0 @?= Nothing
+  , testCase "Boundary values" $ do
+      assertBool "0.0 accepted" (mkKeyframeAt 0 /= Nothing)
+      assertBool "1.0 accepted" (mkKeyframeAt 1 /= Nothing)
+  , testCase "unKeyframeAt round-trips" $ do
+      let Just kf = mkKeyframeAt 0.5
+      unKeyframeAt kf @?= (0.5 :: Fixed E6)
   ]
 
 -- ---------------------------------------------------------------------------
@@ -133,6 +144,65 @@ colorInterpolationTests = testGroup "Color interpolation"
   ]
 
 -- ---------------------------------------------------------------------------
+-- Keyframe bracketing
+-- ---------------------------------------------------------------------------
+
+keyframeBracketingTests :: TestTree
+keyframeBracketingTests = testGroup "Keyframe bracketing"
+  [ testCase "2-point bracket at start" $ do
+      let kfs = [ Keyframe (unsafeKfAt 0) (defaultStyle { wsPadding = Just 0 })
+                , Keyframe (unsafeKfAt 1) (defaultStyle { wsPadding = Just 100 })
+                ]
+          (fromStyle, _toStyle, segProgress) = bracketKeyframes kfs 0.0
+      wsPadding fromStyle @?= Just 0
+      assertBool "segProgress at start is 0" (segProgress == 0.0)
+  , testCase "2-point bracket at end" $ do
+      let kfs = [ Keyframe (unsafeKfAt 0) (defaultStyle { wsPadding = Just 0 })
+                , Keyframe (unsafeKfAt 1) (defaultStyle { wsPadding = Just 100 })
+                ]
+          (fromStyle, _toStyle, segProgress) = bracketKeyframes kfs 1.0
+      wsPadding fromStyle @?= Just 100
+      assertBool "segProgress at end is 0 (clamped)" (segProgress == 0.0)
+  , testCase "2-point bracket at midpoint" $ do
+      let kfs = [ Keyframe (unsafeKfAt 0) (defaultStyle { wsPadding = Just 0 })
+                , Keyframe (unsafeKfAt 1) (defaultStyle { wsPadding = Just 100 })
+                ]
+          (fromStyle, toStyle, segProgress) = bracketKeyframes kfs 0.5
+      wsPadding fromStyle @?= Just 0
+      wsPadding toStyle @?= Just 100
+      assertBool "segProgress at 0.5 is 0.5" (abs (segProgress - 0.5) < 0.001)
+  , testCase "3-point bracket in first segment" $ do
+      let kfs = [ Keyframe (unsafeKfAt 0) (defaultStyle { wsTranslateX = Just 0 })
+                , Keyframe (unsafeKfAt 0.5) (defaultStyle { wsTranslateX = Just 200 })
+                , Keyframe (unsafeKfAt 1) (defaultStyle { wsTranslateX = Just 200 })
+                ]
+          (fromStyle, toStyle, segProgress) = bracketKeyframes kfs 0.25
+      wsTranslateX fromStyle @?= Just 0
+      wsTranslateX toStyle @?= Just 200
+      assertBool "segProgress at 0.25 in [0,0.5] segment is 0.5" (abs (segProgress - 0.5) < 0.001)
+  , testCase "3-point bracket in second segment" $ do
+      let kfs = [ Keyframe (unsafeKfAt 0) (defaultStyle { wsTranslateY = Just 0 })
+                , Keyframe (unsafeKfAt 0.5) (defaultStyle { wsTranslateY = Just 100 })
+                , Keyframe (unsafeKfAt 1) (defaultStyle { wsTranslateY = Just 0 })
+                ]
+          (fromStyle, toStyle, segProgress) = bracketKeyframes kfs 0.75
+      wsTranslateY fromStyle @?= Just 100
+      wsTranslateY toStyle @?= Just 0
+      assertBool "segProgress at 0.75 in [0.5,1.0] segment is 0.5" (abs (segProgress - 0.5) < 0.001)
+  , testCase "Progress before first keyframe clamps to first" $ do
+      let kfs = [ Keyframe (unsafeKfAt 0.2) (defaultStyle { wsPadding = Just 10 })
+                , Keyframe (unsafeKfAt 0.8) (defaultStyle { wsPadding = Just 50 })
+                ]
+          (fromStyle, _toStyle, segProgress) = bracketKeyframes kfs 0.0
+      wsPadding fromStyle @?= Just 10
+      segProgress @?= 0.0
+  , testCase "Empty keyframes returns default" $ do
+      let (fromStyle, _toStyle, segProgress) = bracketKeyframes [] 0.5
+      wsPadding fromStyle @?= Nothing
+      segProgress @?= 0.0
+  ]
+
+-- ---------------------------------------------------------------------------
 -- Tween registry
 -- ---------------------------------------------------------------------------
 
@@ -140,31 +210,31 @@ tweenRegistryTests :: TestTree
 tweenRegistryTests = testGroup "Tween registry"
   [ testCase "Register and dispatch tween" $ do
       animState <- newAnimationState
-      -- Prevent the C stub from calling haskellOnAnimationFrame
-      -- by pre-setting ansLoopActive so ensureLoopStarted is a no-op.
       writeIORef (ansContextPtr animState) nullPtr
       writeIORef (ansLoopActive animState) True
-      let fromWidget = Text TextConfig { tcLabel = "old", tcFontConfig = Nothing }
-          toWidget   = Text TextConfig { tcLabel = "new", tcFontConfig = Nothing }
-      registerTween animState 42 fromWidget toWidget 500.0 Linear
+      let keyframes =
+            [ Keyframe (unsafeKfAt 0) (defaultStyle { wsPadding = Just 0 })
+            , Keyframe (unsafeKfAt 1) (defaultStyle { wsPadding = Just 100 })
+            ]
+      registerTween animState 42 keyframes 0.5
       tweens <- readIORef (ansTweens animState)
       assertBool "Tween should be registered" (not (IntMap.null tweens))
   , testCase "Completed tween is removed" $ do
       animState <- newAnimationState
       writeIORef (ansContextPtr animState) nullPtr
       writeIORef (ansLoopActive animState) True
-      let fromWidget = Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }
-          toWidget   = Text TextConfig { tcLabel = "b", tcFontConfig = Nothing }
+      let keyframes =
+            [ Keyframe (unsafeKfAt 0) (defaultStyle { wsPadding = Just 0 })
+            , Keyframe (unsafeKfAt 1) (defaultStyle { wsPadding = Just 100 })
+            ]
           tween = ActiveTween
             { atStartTime  = Just 0.0
-            , atFromWidget = fromWidget
-            , atToWidget   = toWidget
+            , atKeyframes  = keyframes
             , atNodeId     = 1
-            , atDuration   = 100.0
-            , atEasing     = Linear
+            , atDuration   = 0.1  -- 100ms
             }
       writeIORef (ansTweens animState) (IntMap.singleton 1 tween)
-      -- Dispatch at t=200 (past duration) — tween should complete
+      -- Dispatch at t=200 (past 100ms duration) — tween should complete
       dispatchAnimationFrame animState 200.0
       tweens <- readIORef (ansTweens animState)
       assertBool "Tween should be removed after completion" (IntMap.null tweens)
@@ -181,10 +251,14 @@ animatedWidgetRenderTests = testGroup "Animated widget rendering"
   [ testCase "First render creates RenderedAnimated" $ do
       animState <- newAnimationState
       writeIORef (ansContextPtr animState) nullPtr
+      writeIORef (ansLoopActive animState) True
       actionState <- newActionState
       rs <- newRenderState actionState animState
       let child = Text TextConfig { tcLabel = "hello", tcFontConfig = Nothing }
-          widget = Animated (AnimatedConfig 300 EaseOut) child
+          config = twoKeyframeConfig 0.3
+                     (defaultStyle { wsPadding = Just 0 })
+                     (defaultStyle { wsPadding = Just 10 })
+          widget = Animated config child
       renderWidget rs widget
       renderedTree <- readIORef (rsRenderedTree rs)
       case renderedTree of
@@ -193,14 +267,17 @@ animatedWidgetRenderTests = testGroup "Animated widget rendering"
   , testCase "Same widget reuses node (Eq match)" $ do
       animState <- newAnimationState
       writeIORef (ansContextPtr animState) nullPtr
+      writeIORef (ansLoopActive animState) True
       actionState <- newActionState
       rs <- newRenderState actionState animState
       let child = Text TextConfig { tcLabel = "hello", tcFontConfig = Nothing }
-          widget = Animated (AnimatedConfig 300 EaseOut) child
+          config = twoKeyframeConfig 0.3
+                     (defaultStyle { wsPadding = Just 0 })
+                     (defaultStyle { wsPadding = Just 10 })
+          widget = Animated config child
       renderWidget rs widget
       Just firstTree <- readIORef (rsRenderedTree rs)
       let firstNodeId = renderedNodeIdSafe firstTree
-      -- Render same widget again — should reuse
       renderWidget rs widget
       Just secondTree <- readIORef (rsRenderedTree rs)
       let secondNodeId = renderedNodeIdSafe secondTree
@@ -211,10 +288,16 @@ animatedWidgetRenderTests = testGroup "Animated widget rendering"
       writeIORef (ansLoopActive animState) True
       actionState <- newActionState
       rs <- newRenderState actionState animState
-      let child1 = Styled (defaultStyle { wsPadding = Just 10 }) (Text TextConfig { tcLabel = "x", tcFontConfig = Nothing })
+      let config1 = twoKeyframeConfig 0.3
+                      (defaultStyle { wsPadding = Just 0 })
+                      (defaultStyle { wsPadding = Just 10 })
+          config2 = twoKeyframeConfig 0.3
+                      (defaultStyle { wsPadding = Just 0 })
+                      (defaultStyle { wsPadding = Just 50 })
+          child1 = Styled (defaultStyle { wsPadding = Just 10 }) (Text TextConfig { tcLabel = "x", tcFontConfig = Nothing })
           child2 = Styled (defaultStyle { wsPadding = Just 50 }) (Text TextConfig { tcLabel = "x", tcFontConfig = Nothing })
-          widget1 = Animated (AnimatedConfig 300 EaseOut) child1
-          widget2 = Animated (AnimatedConfig 300 EaseOut) child2
+          widget1 = Animated config1 child1
+          widget2 = Animated config2 child2
       renderWidget rs widget1
       Just firstTree <- readIORef (rsRenderedTree rs)
       let firstNodeId = renderedNodeIdSafe firstTree
@@ -225,59 +308,62 @@ animatedWidgetRenderTests = testGroup "Animated widget rendering"
   , testCase "Different node type destroys and recreates" $ do
       animState <- newAnimationState
       writeIORef (ansContextPtr animState) nullPtr
+      writeIORef (ansLoopActive animState) True
       actionState <- newActionState
       rs <- newRenderState actionState animState
-      let child1 = Text TextConfig { tcLabel = "text", tcFontConfig = Nothing }
+      let config = twoKeyframeConfig 0.3
+                     (defaultStyle { wsPadding = Just 0 })
+                     (defaultStyle { wsPadding = Just 10 })
+          child1 = Text TextConfig { tcLabel = "text", tcFontConfig = Nothing }
           child2 = column []
-          widget1 = Animated (AnimatedConfig 300 EaseOut) child1
-          widget2 = Animated (AnimatedConfig 300 EaseOut) child2
+          widget1 = Animated config child1
+          widget2 = Animated config child2
       renderWidget rs widget1
       Just firstTree <- readIORef (rsRenderedTree rs)
       let firstNodeId = renderedNodeIdSafe firstTree
       renderWidget rs widget2
       Just secondTree <- readIORef (rsRenderedTree rs)
       let secondNodeId = renderedNodeIdSafe secondTree
-      -- Different node type means different node ID
       assertBool "Node ID should change for different node types"
         (firstNodeId /= secondNodeId)
   , testCase "Toggle-back registers tween after animation completes" $ do
-      -- Hypothesis: after animation A→B completes, toggling B→A should
-      -- register a new tween. If oldChildNode is never updated to reflect
-      -- the post-animation state, the diff sees oldChild==newChild and
-      -- skips the tween, leaving the native view stuck at B.
       animState <- newAnimationState
       writeIORef (ansContextPtr animState) nullPtr
       writeIORef (ansLoopActive animState) True
       actionState <- newActionState
       rs <- newRenderState actionState animState
-      let styledA = Styled (defaultStyle { wsPadding = Just 10 }) (Text TextConfig { tcLabel = "x", tcFontConfig = Nothing })
+      let configA = twoKeyframeConfig 0.5
+                      (defaultStyle { wsPadding = Just 0 })
+                      (defaultStyle { wsPadding = Just 10 })
+          configB = twoKeyframeConfig 0.5
+                      (defaultStyle { wsPadding = Just 0 })
+                      (defaultStyle { wsPadding = Just 50 })
+          styledA = Styled (defaultStyle { wsPadding = Just 10 }) (Text TextConfig { tcLabel = "x", tcFontConfig = Nothing })
           styledB = Styled (defaultStyle { wsPadding = Just 50 }) (Text TextConfig { tcLabel = "x", tcFontConfig = Nothing })
-          widgetA = Animated (AnimatedConfig 500 Linear) styledA
-          widgetB = Animated (AnimatedConfig 500 Linear) styledB
+          widgetA = Animated configA styledA
+          widgetB = Animated configB styledB
 
-      -- Render 1: initial state (padding=10) — tween from zero origin (0→10)
+      -- Render 1: initial state
       renderWidget rs widgetA
       tweensAfter1 <- readIORef (ansTweens animState)
-      assertBool "Tween registered after first render (0→10)" (not (IntMap.null tweensAfter1))
+      assertBool "Tween registered after first render" (not (IntMap.null tweensAfter1))
 
-      -- Render 2: change to padding=50 — tween replaced (10→50)
+      -- Render 2: change
       renderWidget rs widgetB
       tweensAfter2 <- readIORef (ansTweens animState)
-      assertBool "Tween registered after padding change (10→50)" (not (IntMap.null tweensAfter2))
+      assertBool "Tween registered after change" (not (IntMap.null tweensAfter2))
 
-      -- Complete the animation: first dispatch sets startTime, second completes it
-      dispatchAnimationFrame animState 0.0    -- initialises startTime=0
-      dispatchAnimationFrame animState 1000.0 -- elapsed=1000 > duration=500 → done
+      -- Complete the animation
+      dispatchAnimationFrame animState 0.0
+      dispatchAnimationFrame animState 1000.0
       tweensAfterDispatch <- readIORef (ansTweens animState)
       assertBool "Tween completed after dispatch" (IntMap.null tweensAfterDispatch)
 
-      -- Render 3: toggle back to padding=10 — tween MUST be registered again
-      -- BUG: if oldChildNode still records padding=10 (pre-animation state),
-      -- the diff sees oldChild==newChild and skips the tween.
+      -- Render 3: toggle back — tween MUST be registered again
       writeIORef (ansLoopActive animState) True
       renderWidget rs widgetA
       tweensAfter3 <- readIORef (ansTweens animState)
-      assertBool "Tween registered after toggle-back (50→10)" (not (IntMap.null tweensAfter3))
+      assertBool "Tween registered after toggle-back" (not (IntMap.null tweensAfter3))
   ]
 
 -- | Helper: get the native node ID from a RenderedNode, following through
@@ -302,48 +388,49 @@ renderedNodeSummary (RenderedAnimated _ child)     = "RenderedAnimated -> " ++ r
 normalizeAnimatedTests :: TestTree
 normalizeAnimatedTests = testGroup "normalizeAnimated"
   [ testCase "Distributes over Column children" $ do
-      let cfg = AnimatedConfig 300 EaseOut
+      let cfg = twoKeyframeConfig 0.3
+                  (defaultStyle { wsPadding = Just 0 })
+                  (defaultStyle { wsPadding = Just 10 })
           childA = Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }
           childB = Text TextConfig { tcLabel = "b", tcFontConfig = Nothing }
           result = normalizeAnimated cfg (Column (LayoutSettings [item childA, item childB] False))
       result @?= Column (LayoutSettings [item (Animated cfg childA), item (Animated cfg childB)] False)
   , testCase "Distributes over Row children" $ do
-      let cfg = AnimatedConfig 300 EaseOut
+      let cfg = twoKeyframeConfig 0.3
+                  (defaultStyle { wsPadding = Just 0 })
+                  (defaultStyle { wsPadding = Just 10 })
           childA = Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }
           result = normalizeAnimated cfg (Row (LayoutSettings [item childA] False))
       result @?= Row (LayoutSettings [item (Animated cfg childA)] False)
   , testCase "Distributes over scrollable Column children" $ do
-      let cfg = AnimatedConfig 300 EaseOut
+      let cfg = twoKeyframeConfig 0.3
+                  (defaultStyle { wsPadding = Just 0 })
+                  (defaultStyle { wsPadding = Just 10 })
           childA = Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }
           result = normalizeAnimated cfg (Column (LayoutSettings [item childA] True))
       result @?= Column (LayoutSettings [item (Animated cfg childA)] True)
   , testCase "Inner Animated wins over outer" $ do
-      let outerCfg = AnimatedConfig 500 EaseOut
-          innerCfg = AnimatedConfig 100 EaseIn
+      let outerCfg = twoKeyframeConfig 0.5
+                       (defaultStyle { wsPadding = Just 0 })
+                       (defaultStyle { wsPadding = Just 10 })
+          innerCfg = twoKeyframeConfig 0.1
+                       (defaultStyle { wsPadding = Just 0 })
+                       (defaultStyle { wsPadding = Just 20 })
           leaf = Text TextConfig { tcLabel = "x", tcFontConfig = Nothing }
           result = normalizeAnimated outerCfg (Animated innerCfg leaf)
-      -- Inner config is preserved, leaf is normalized under inner config
       result @?= Animated innerCfg leaf
-  , testCase "Inner wins when distributed over Column" $ do
-      let outerCfg = AnimatedConfig 500 EaseOut
-          innerCfg = AnimatedConfig 100 EaseIn
-          leaf = Text TextConfig { tcLabel = "x", tcFontConfig = Nothing }
-          explicitChild = Animated innerCfg leaf
-          plainChild = Text TextConfig { tcLabel = "y", tcFontConfig = Nothing }
-          result = normalizeAnimated outerCfg (Column (LayoutSettings [item explicitChild, item plainChild] False))
-      -- Distribution wraps each child in outer Animated; the render engine
-      -- then collapses the nested Animated (inner wins) during traversal.
-      result @?= Column (LayoutSettings [ item (Animated outerCfg (Animated innerCfg leaf))
-                                        , item (Animated outerCfg plainChild) ] False)
   , testCase "Styled returned unchanged" $ do
-      let cfg = AnimatedConfig 300 EaseOut
+      let cfg = twoKeyframeConfig 0.3
+                  (defaultStyle { wsPadding = Just 0 })
+                  (defaultStyle { wsPadding = Just 10 })
           style = defaultStyle { wsPadding = Just 10 }
           child = Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }
           result = normalizeAnimated cfg (Styled style child)
-      -- Styled is animatable as a unit, so normalizeAnimated doesn't modify it
       result @?= Styled style child
   , testCase "Leaf widget unchanged" $ do
-      let cfg = AnimatedConfig 300 EaseOut
+      let cfg = twoKeyframeConfig 0.3
+                  (defaultStyle { wsPadding = Just 0 })
+                  (defaultStyle { wsPadding = Just 10 })
           leaf = Text TextConfig { tcLabel = "hi", tcFontConfig = Nothing }
           result = normalizeAnimated cfg leaf
       result @?= leaf
@@ -353,7 +440,9 @@ normalizeAnimatedTests = testGroup "normalizeAnimated"
       writeIORef (ansLoopActive animState) True
       actionState <- newActionState
       rs <- newRenderState actionState animState
-      let cfg = AnimatedConfig 300 EaseOut
+      let cfg = twoKeyframeConfig 0.3
+                  (defaultStyle { wsPadding = Just 0 })
+                  (defaultStyle { wsPadding = Just 10 })
           childA = Styled (defaultStyle { wsPadding = Just 10 }) $
                      Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }
           childB = Styled (defaultStyle { wsPadding = Just 20 }) $
@@ -364,7 +453,6 @@ normalizeAnimatedTests = testGroup "normalizeAnimated"
       case renderedTree of
         Just (RenderedContainer (Column _) _ keyedChildren) -> do
           assertEqual "Should have 2 children" 2 (length keyedChildren)
-          -- Each child should be RenderedAnimated wrapping RenderedStyled
           mapM_ (\(_key, child) -> case child of
             RenderedAnimated _ (RenderedStyled _ _ _) -> pure ()
             other -> assertFailure ("Expected RenderedAnimated(RenderedStyled), got: "
@@ -378,7 +466,9 @@ normalizeAnimatedTests = testGroup "normalizeAnimated"
       writeIORef (ansLoopActive animState) True
       actionState <- newActionState
       rs <- newRenderState actionState animState
-      let cfg = AnimatedConfig 300 EaseOut
+      let cfg = twoKeyframeConfig 0.3
+                  (defaultStyle { wsPadding = Just 0 })
+                  (defaultStyle { wsPadding = Just 10 })
           style1 = defaultStyle { wsPadding = Just 10 }
           style2 = defaultStyle { wsPadding = Just 50 }
           child = Text TextConfig { tcLabel = "a", tcFontConfig = Nothing }
@@ -390,7 +480,6 @@ normalizeAnimatedTests = testGroup "normalizeAnimated"
       renderWidget rs widget2
       Just tree2 <- readIORef (rsRenderedTree rs)
       let nodeId2 = renderedNodeIdSafe tree2
-      -- Container node ID should be the same (diff, not destroy+create)
       nodeId1 @?= nodeId2
   ]
 
@@ -406,12 +495,18 @@ translateAnimationTests = testGroup "Translate animation"
       writeIORef (ansLoopActive animState) True
       actionState <- newActionState
       rs <- newRenderState actionState animState
-      let child1 = Styled (defaultStyle { wsTranslateX = Just 0, wsTranslateY = Just 0 })
+      let config1 = twoKeyframeConfig 0.3
+                      (defaultStyle { wsTranslateX = Just 0, wsTranslateY = Just 0 })
+                      (defaultStyle { wsTranslateX = Just 100, wsTranslateY = Just 50 })
+          config2 = twoKeyframeConfig 0.3
+                      (defaultStyle { wsTranslateX = Just 0, wsTranslateY = Just 0 })
+                      (defaultStyle { wsTranslateX = Just 200, wsTranslateY = Just 100 })
+          child1 = Styled (defaultStyle { wsTranslateX = Just 0, wsTranslateY = Just 0 })
                      (Text TextConfig { tcLabel = "t", tcFontConfig = Nothing })
           child2 = Styled (defaultStyle { wsTranslateX = Just 100, wsTranslateY = Just 50 })
                      (Text TextConfig { tcLabel = "t", tcFontConfig = Nothing })
-          widget1 = Animated (AnimatedConfig 300 EaseOut) child1
-          widget2 = Animated (AnimatedConfig 300 EaseOut) child2
+          widget1 = Animated config1 child1
+          widget2 = Animated config2 child2
       renderWidget rs widget1
       Just firstTree <- readIORef (rsRenderedTree rs)
       let firstNodeId = renderedNodeIdSafe firstTree
@@ -431,82 +526,164 @@ translateAnimationTests = testGroup "Translate animation"
   ]
 
 -- ---------------------------------------------------------------------------
--- zeroAnimationOrigin
--- ---------------------------------------------------------------------------
-
-zeroAnimationOriginTests :: TestTree
-zeroAnimationOriginTests = testGroup "zeroAnimationOrigin"
-  [ testCase "Zeroes padding in Styled" $ do
-      let style = defaultStyle { wsPadding = Just 42 }
-          child = Text TextConfig { tcLabel = "x", tcFontConfig = Nothing }
-          result = zeroAnimationOrigin (Styled style child)
-      result @?= Styled (defaultStyle { wsPadding = Just 0 }) child
-  , testCase "Zeroes translateX and translateY in Styled" $ do
-      let style = defaultStyle { wsTranslateX = Just 100, wsTranslateY = Just 50 }
-          child = Text TextConfig { tcLabel = "x", tcFontConfig = Nothing }
-          result = zeroAnimationOrigin (Styled style child)
-      result @?= Styled (defaultStyle { wsTranslateX = Just 0, wsTranslateY = Just 0 }) child
-  , testCase "Preserves Nothing fields" $ do
-      let style = defaultStyle { wsTranslateX = Just 10 }
-          child = Text TextConfig { tcLabel = "x", tcFontConfig = Nothing }
-          result = zeroAnimationOrigin (Styled style child)
-          expected = defaultStyle { wsTranslateX = Just 0 }
-      result @?= Styled expected child
-  , testCase "Preserves color fields unchanged" $ do
-      let color = Color 255 0 0 255
-          style = defaultStyle { wsTextColor = Just color, wsTranslateX = Just 50 }
-          child = Text TextConfig { tcLabel = "x", tcFontConfig = Nothing }
-          result = zeroAnimationOrigin (Styled style child)
-          expected = defaultStyle { wsTextColor = Just color, wsTranslateX = Just 0 }
-      result @?= Styled expected child
-  , testCase "Non-Styled widget returned unchanged" $ do
-      let leaf = Text TextConfig { tcLabel = "hello", tcFontConfig = Nothing }
-      zeroAnimationOrigin leaf @?= leaf
-  ]
-
--- ---------------------------------------------------------------------------
 -- First-render animation
 -- ---------------------------------------------------------------------------
 
 firstRenderAnimationTests :: TestTree
 firstRenderAnimationTests = testGroup "First-render animation"
-  [ testCase "Animated Styled with translate registers tween on first render" $ do
+  [ testCase "Animated with 2 keyframes registers tween on first render" $ do
       animState <- newAnimationState
       writeIORef (ansContextPtr animState) nullPtr
       writeIORef (ansLoopActive animState) True
       actionState <- newActionState
       rs <- newRenderState actionState animState
-      let style = defaultStyle { wsTranslateX = Just 120, wsTranslateY = Just 50 }
+      let config = twoKeyframeConfig 1.2
+                     (defaultStyle { wsTranslateX = Just 0, wsTranslateY = Just 0 })
+                     (defaultStyle { wsTranslateX = Just 120, wsTranslateY = Just 50 })
+          style = defaultStyle { wsTranslateX = Just 120, wsTranslateY = Just 50 }
           child = Text TextConfig { tcLabel = "*", tcFontConfig = Nothing }
-          widget = Animated (AnimatedConfig 1200 EaseOut) (Styled style child)
+          widget = Animated config (Styled style child)
       renderWidget rs widget
       tweens <- readIORef (ansTweens animState)
       assertBool "Tween registered on first render for translate" (not (IntMap.null tweens))
-  , testCase "Animated plain Text has no tween on first render" $ do
+  , testCase "Animated with 1 keyframe has no tween on first render" $ do
       animState <- newAnimationState
       writeIORef (ansContextPtr animState) nullPtr
       actionState <- newActionState
       rs <- newRenderState actionState animState
-      let widget = Animated (AnimatedConfig 300 EaseOut)
+      let config = AnimatedConfig
+            { anDuration = 0.3
+            , anKeyframes = [Keyframe (unsafeKfAt 0) (defaultStyle { wsPadding = Just 10 })]
+            }
+          widget = Animated config
                      (Text TextConfig { tcLabel = "hello", tcFontConfig = Nothing })
       renderWidget rs widget
       tweens <- readIORef (ansTweens animState)
-      assertBool "No tween for plain Text (no animatable properties)" (IntMap.null tweens)
-  , testCase "First-render tween animates from zero to target" $ do
+      assertBool "No tween for single keyframe" (IntMap.null tweens)
+  , testCase "Animated with empty keyframes has no tween" $ do
+      animState <- newAnimationState
+      writeIORef (ansContextPtr animState) nullPtr
+      actionState <- newActionState
+      rs <- newRenderState actionState animState
+      let config = AnimatedConfig { anDuration = 0.3, anKeyframes = [] }
+          widget = Animated config
+                     (Text TextConfig { tcLabel = "hello", tcFontConfig = Nothing })
+      renderWidget rs widget
+      tweens <- readIORef (ansTweens animState)
+      assertBool "No tween for empty keyframes" (IntMap.null tweens)
+  , testCase "3-keyframe animation registers tween on first render" $ do
       animState <- newAnimationState
       writeIORef (ansContextPtr animState) nullPtr
       writeIORef (ansLoopActive animState) True
       actionState <- newActionState
       rs <- newRenderState actionState animState
-      let style = defaultStyle { wsPadding = Just 20, wsTranslateX = Just 100 }
-          child = Text TextConfig { tcLabel = "x", tcFontConfig = Nothing }
-          widget = Animated (AnimatedConfig 500 Linear) (Styled style child)
+      let config = AnimatedConfig
+            { anDuration = 2.0
+            , anKeyframes =
+                [ Keyframe (unsafeKfAt 0) (defaultStyle { wsTranslateX = Just 0, wsTranslateY = Just 0 })
+                , Keyframe (unsafeKfAt 0.5) (defaultStyle { wsTranslateX = Just 200, wsTranslateY = Just 100 })
+                , Keyframe (unsafeKfAt 1) (defaultStyle { wsTranslateX = Just 200, wsTranslateY = Just 0 })
+                ]
+            }
+          child = Text TextConfig { tcLabel = "*", tcFontConfig = Nothing }
+          widget = Animated config (Styled (defaultStyle { wsTranslateX = Just 200, wsTranslateY = Just 0 }) child)
       renderWidget rs widget
       tweens <- readIORef (ansTweens animState)
-      -- Verify the tween goes from zero to target
-      case IntMap.elems tweens of
-        [tween] -> do
-          atFromWidget tween @?= Styled (defaultStyle { wsPadding = Just 0, wsTranslateX = Just 0 }) child
-          atToWidget tween @?= Styled style child
-        other -> assertFailure ("Expected exactly one tween, got " ++ show (length other))
+      assertBool "Tween registered for 3-keyframe animation" (not (IntMap.null tweens))
+  ]
+
+-- ---------------------------------------------------------------------------
+-- Smart constructors
+-- ---------------------------------------------------------------------------
+
+smartConstructorTests :: TestTree
+smartConstructorTests = testGroup "Smart constructors"
+  [ testCase "linearAnimation produces 2 keyframes at 0 and 1" $ do
+      let cfg = linearAnimation 0.5
+                  (defaultStyle { wsPadding = Just 0 })
+                  (defaultStyle { wsPadding = Just 100 })
+      length (anKeyframes cfg) @?= 2
+      anDuration cfg @?= 0.5
+      let [kf0, kf1] = anKeyframes cfg
+      unKeyframeAt (kfAt kf0) @?= 0
+      unKeyframeAt (kfAt kf1) @?= 1
+      wsPadding (kfStyle kf0) @?= Just 0
+      wsPadding (kfStyle kf1) @?= Just 100
+  , testCase "easeInAnimation produces 5 keyframes" $ do
+      let cfg = easeInAnimation 1.0
+                  (defaultStyle { wsTranslateX = Just 0 })
+                  (defaultStyle { wsTranslateX = Just 100 })
+      length (anKeyframes cfg) @?= 5
+      anDuration cfg @?= 1.0
+      -- First keyframe should be at 0 with from-style
+      let firstKf = head (anKeyframes cfg)
+      unKeyframeAt (kfAt firstKf) @?= 0
+      wsTranslateX (kfStyle firstKf) @?= Just 0
+      -- Midpoint should be < 50 (ease-in is slow at start)
+      let midKf = anKeyframes cfg !! 2
+      case wsTranslateX (kfStyle midKf) of
+        Just midVal -> assertBool "ease-in midpoint < 50" (midVal < 50)
+        Nothing     -> assertFailure "midpoint should have translateX"
+  , testCase "easeOutAnimation midpoint > 50" $ do
+      let cfg = easeOutAnimation 1.0
+                  (defaultStyle { wsTranslateX = Just 0 })
+                  (defaultStyle { wsTranslateX = Just 100 })
+      let midKf = anKeyframes cfg !! 2
+      case wsTranslateX (kfStyle midKf) of
+        Just midVal -> assertBool "ease-out midpoint > 50" (midVal > 50)
+        Nothing     -> assertFailure "midpoint should have translateX"
+  , testCase "easeInOutAnimation endpoints match from/to" $ do
+      let from = defaultStyle { wsPadding = Just 10 }
+          to   = defaultStyle { wsPadding = Just 90 }
+          cfg  = easeInOutAnimation 0.8 from to
+          kfs  = anKeyframes cfg
+      wsPadding (kfStyle (head kfs)) @?= Just 10
+      wsPadding (kfStyle (last kfs)) @?= Just 90
+  , testCase "andThen combines durations" $ do
+      let cfgA = linearAnimation 0.3
+                   (defaultStyle { wsPadding = Just 0 })
+                   (defaultStyle { wsPadding = Just 50 })
+          cfgB = linearAnimation 0.7
+                   (defaultStyle { wsPadding = Just 50 })
+                   (defaultStyle { wsPadding = Just 100 })
+          combined = andThen cfgA cfgB
+      anDuration combined @?= 1.0
+      length (anKeyframes combined) @?= 4  -- 2 from A + 2 from B
+  , testCase "andThen rescales keyframe positions correctly" $ do
+      let cfgA = linearAnimation 1.0
+                   (defaultStyle { wsTranslateX = Just 0 })
+                   (defaultStyle { wsTranslateX = Just 100 })
+          cfgB = linearAnimation 1.0
+                   (defaultStyle { wsTranslateX = Just 100 })
+                   (defaultStyle { wsTranslateX = Just 200 })
+          combined = andThen cfgA cfgB
+          positions = map (realToFrac . unKeyframeAt . kfAt) (anKeyframes combined) :: [Double]
+      -- A's [0,1] maps to [0,0.5], B's [0,1] maps to [0.5,1]
+      length positions @?= 4
+      assertBool "First position is 0" (abs (positions !! 0) < 0.001)
+      assertBool "Second position is 0.5" (abs (positions !! 1 - 0.5) < 0.001)
+      assertBool "Third position is 0.5" (abs (positions !! 2 - 0.5) < 0.001)
+      assertBool "Fourth position is 1.0" (abs (positions !! 3 - 1.0) < 0.001)
+  , testCase "lerpStyle interpolates numeric fields" $ do
+      let from = defaultStyle { wsPadding = Just 0, wsTranslateX = Just 10 }
+          to   = defaultStyle { wsPadding = Just 100, wsTranslateX = Just 50 }
+          mid  = lerpStyle 0.5 from to
+      wsPadding mid @?= Just 50
+      wsTranslateX mid @?= Just 30
+  , testCase "lerpStyle at boundaries" $ do
+      let from = defaultStyle { wsPadding = Just 10 }
+          to   = defaultStyle { wsPadding = Just 90 }
+      wsPadding (lerpStyle 0.0 from to) @?= Just 10
+      wsPadding (lerpStyle 1.0 from to) @?= Just 90
+  , testCase "lerpStyle interpolates colors" $ do
+      let red  = Color 255 0 0 255
+          blue = Color 0 0 255 255
+          from = defaultStyle { wsTextColor = Just red }
+          to   = defaultStyle { wsTextColor = Just blue }
+          mid  = lerpStyle 0.5 from to
+      case wsTextColor mid of
+        Just c  -> do
+          colorRed c @?= 128
+          colorBlue c @?= 128
+        Nothing -> assertFailure "Expected interpolated color"
   ]
