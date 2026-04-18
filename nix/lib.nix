@@ -464,7 +464,7 @@ in {
         # source tree, then add hatterObjs for pre-compiled interfaces and
         # current dir for consumer modules from extraModuleCopy.
         echo "=== Compiling Main.hs (using pre-compiled hatter objects) ==="
-        ${ghcCmd} -c -O2 \
+        ${ghcCmd} -c -O2 -split-sections \
           -I${hatterSrc}/include \
           ${builtins.concatStringsSep " " (map (d: "-I${d}") extraGhcIncludeDirs)} \
           ${if crossDeps != null then "-package-db ${crossDeps}/pkgdb -i${crossDeps}/hi" else ""} \
@@ -484,6 +484,7 @@ in {
           -optl-lffi \
           -optl-llog \
           -optl-Wl,-z,max-page-size=16384 \
+          -optl-Wl,--gc-sections \
           -optl$(pwd)/jni_bridge.o \
           -optl$(pwd)/ui_bridge_android.o \
           -optl$(pwd)/permission_bridge_android.o \
@@ -540,7 +541,7 @@ in {
           ${if crossDeps != null then "$(for a in ${crossDeps}/lib/*.a; do echo -n \"-optl$a \"; done)" else ""} \
           ${if crossDeps != null && builtins.pathExists "${crossDeps}/lib-boot" then "$(for a in ${crossDeps}/lib-boot/*.a; do echo -n \"-optl$a \"; done)" else ""}
         '' else ''
-        ${ghcCmd} -shared -O2 \
+        ${ghcCmd} -shared -O2 -split-sections \
           -o ${soName} \
           -I${hatterSrc}/include \
           ${builtins.concatStringsSep " " (map (d: "-I${d}") extraGhcIncludeDirs)} \
@@ -554,6 +555,7 @@ in {
           -optl-lffi \
           -optl-llog \
           -optl-Wl,-z,max-page-size=16384 \
+          -optl-Wl,--gc-sections \
           -optl$(pwd)/jni_bridge.o \
           -optl$(pwd)/ui_bridge_android.o \
           -optl$(pwd)/permission_bridge_android.o \

@@ -73,7 +73,7 @@ common common-options
       ImportQualifiedPost
 
   ghc-options:
-    -O2 -Wall -Wincomplete-uni-patterns
+    -O2 -Wall -split-sections -Wincomplete-uni-patterns
     -Wincomplete-record-updates -Widentities -Wredundant-constraints
     -Wcpp-undef -fwarn-tabs -Wpartial-fields
     -fdefer-diagnostics -Wunused-packages
