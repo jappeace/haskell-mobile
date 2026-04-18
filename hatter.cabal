@@ -118,7 +118,8 @@ library
       text < 3,
       containers < 1,
       bytestring < 1,
-      transformers < 0.7
+      transformers < 0.7,
+      time
   c-sources:
       cbits/android_stubs.c
       cbits/platform_log.c
@@ -211,6 +212,17 @@ executable device-info-demo
   build-depends:
       hatter,
       text
+
+executable keyframe-demo
+  import: common-options
+  main-is: KeyframeDemoMain.hs
+  ghc-options: -Wno-unused-packages -threaded
+  hs-source-dirs:
+      test
+  build-depends:
+      hatter,
+      text,
+      time
 
 test-suite unit
   import: common-options

@@ -29,8 +29,10 @@ import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Data.Text (Text, pack)
 import Hatter.Action (Action(..), ActionState, OnChange(..), lookupAction, lookupTextAction)
+import Data.List (sortBy)
+import Data.Ord (comparing)
 import Hatter.Animation (AnimationState, registerTween)
-import Hatter.Widget (AnimatedConfig(..), ButtonConfig(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), LayoutItem(..), LayoutSettings(..), MapViewConfig(..), ResourceName(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), WebViewConfig(..), Widget(..), WidgetStyle(..), colorToHex, normalizeAnimated, resolveKeyAtIndex, zeroAnimationOrigin)
+import Hatter.Widget (AnimatedConfig(..), ButtonConfig(..), FontConfig(..), ImageConfig(..), ImageSource(..), InputType(..), Keyframe(..), LayoutItem(..), LayoutSettings(..), MapViewConfig(..), ResourceName(..), ScaleType(..), TextAlignment(..), TextConfig(..), TextInputConfig(..), WebViewConfig(..), Widget(..), WidgetStyle(..), colorToHex, normalizeAnimated, resolveKeyAtIndex)
 
 import Hatter.UIBridge qualified as Bridge
 import System.IO (hPutStrLn, stderr)
@@ -269,22 +271,22 @@ createRenderedNode animState (Animated config child) = do
     Row _        -> createRenderedNode animState normalized
     Stack _      -> createRenderedNode animState normalized
     -- Everything else (Styled, leaves): wrap in RenderedAnimated for tween interpolation.
-    -- Create the native node at the zero-origin position and register a tween
-    -- from zero to the target, so the first render animates into place.
+    -- Apply first keyframe's style, register tween if >1 keyframe.
     _            -> do
       let finalWidget = Animated config normalized
-          zeroOrigin = zeroAnimationOrigin normalized
-      childNode <- createRenderedNode animState zeroOrigin
-      if zeroOrigin /= normalized
-        then do
+          sortedKeyframes = sortBy (comparing kfAt) (anKeyframes config)
+      childNode <- createRenderedNode animState normalized
+      -- Apply the first keyframe's style as the initial visual state
+      case sortedKeyframes of
+        (firstKf : _) -> applyStyle (renderedNodeId childNode) (kfStyle firstKf)
+        []            -> pure ()
+      -- Register tween if there are at least 2 keyframes
+      case sortedKeyframes of
+        (_ : _ : _) ->
           registerTween animState (renderedNodeId childNode)
-            zeroOrigin normalized (anDuration config) (anEasing config)
-          -- Store the target widget (not zero) so subsequent diffs see
-          -- the correct post-animation state.
-          let targetChildNode = updateRenderedTarget normalized childNode
-          pure (RenderedAnimated finalWidget targetChildNode)
-        else
-          pure (RenderedAnimated finalWidget childNode)
+            sortedKeyframes (anDuration config)
+        _ -> pure ()
+      pure (RenderedAnimated finalWidget childNode)
 
 -- ---------------------------------------------------------------------------
 -- Destroying rendered subtrees
@@ -356,12 +358,16 @@ diffRenderNode animState maybeOld (Animated _outerConfig child@(Animated _ _)) =
 -- Case: Both are Animated (leaf) — diff the child, possibly registering a tween.
 diffRenderNode animState (Just (RenderedAnimated _ oldChildNode)) (Animated newConfig newChild) = do
   let oldChildWidget = renderedWidget oldChildNode
+      sortedKeyframes = sortBy (comparing kfAt) (anKeyframes newConfig)
   if sameNodeType oldChildWidget newChild
     then do
       -- Same child node type: keep native node, register tween if properties differ
       if oldChildWidget /= newChild
-        then registerTween animState (renderedNodeId oldChildNode)
-               oldChildWidget newChild (anDuration newConfig) (anEasing newConfig)
+        then case sortedKeyframes of
+               (_ : _ : _) ->
+                 registerTween animState (renderedNodeId oldChildNode)
+                   sortedKeyframes (anDuration newConfig)
+               _ -> pure ()
         else pure ()
       -- Update the RenderedAnimated to reflect the new target
       let updatedChildNode = updateRenderedTarget newChild oldChildNode

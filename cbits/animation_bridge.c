@@ -31,10 +31,13 @@ void animation_start_loop(void *ctx)
         g_start_loop_impl(ctx);
         return;
     }
-    /* Desktop stub: fire three synchronous test frames */
+    /* Desktop stub: fire six synchronous test frames for multi-keyframe testing */
     fprintf(stderr, "[AnimationBridge stub] animation_start_loop() -> firing test frames\n");
     haskellOnAnimationFrame(ctx, 0.0);
-    haskellOnAnimationFrame(ctx, 16.67);
+    haskellOnAnimationFrame(ctx, 100.0);
+    haskellOnAnimationFrame(ctx, 250.0);
+    haskellOnAnimationFrame(ctx, 500.0);
+    haskellOnAnimationFrame(ctx, 750.0);
     haskellOnAnimationFrame(ctx, 1000.0);
 }
 

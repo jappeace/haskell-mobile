@@ -35,10 +35,13 @@ module Hatter.Widget
   , colorFromText
   , colorToHex
   -- ** animation
-  , Easing(..)
+  , KeyframeAt
+  , mkKeyframeAt
+  , unKeyframeAt
+  , Keyframe(..)
   , AnimatedConfig(..)
   , normalizeAnimated
-  , zeroAnimationOrigin
+  , wrapLayoutItemAnimated
   , interpolateColor
   , lerpWord8
   -- ** key resolution
@@ -58,8 +61,10 @@ where
 
 import Data.ByteString (ByteString)
 import Data.Char (digitToInt, isHexDigit, intToDigit)
+import Data.Fixed (Fixed, E6)
 import Data.Text (Text)
 import Data.Text qualified as Text
+import Data.Time.Clock (NominalDiffTime)
 import Data.Word (Word8)
 import Hatter.Action (Action, OnChange)
 
@@ -198,13 +203,23 @@ defaultStyle = WidgetStyle
   , wsTouchPassthrough = Nothing
   }
 
--- | Easing function for animations.
-data Easing
-  = Linear     -- ^ Constant speed.
-  | EaseIn     -- ^ Slow start, fast end.
-  | EaseOut    -- ^ Fast start, slow end.
-  | EaseInOut  -- ^ Slow start and end, fast middle.
-  deriving (Show, Eq)
+-- | A normalised keyframe position in the range [0, 1].
+-- Constructor is not exported; use 'mkKeyframeAt' for validated construction.
+newtype KeyframeAt = KeyframeAt { unKeyframeAt :: Fixed E6 }
+  deriving (Show, Eq, Ord)
+
+-- | Smart constructor for 'KeyframeAt'.  Returns 'Nothing' if the value
+-- is outside the [0, 1] range.
+mkKeyframeAt :: Fixed E6 -> Maybe KeyframeAt
+mkKeyframeAt value
+  | value >= 0 && value <= 1 = Just (KeyframeAt value)
+  | otherwise                = Nothing
+
+-- | A single keyframe: a position in [0,1] paired with a style snapshot.
+data Keyframe = Keyframe
+  { kfAt    :: KeyframeAt
+  , kfStyle :: WidgetStyle
+  } deriving (Show, Eq)
 
 -- | Configuration for an 'Animated' widget wrapper.
 --
@@ -220,10 +235,10 @@ data Easing
 -- overriding individual children:
 --
 -- @
--- Animated (AnimatedConfig 500 EaseOut) $
+-- Animated (AnimatedConfig 2.0 [kf0, kf1]) $
 --   Column
---     [ styledText   -- inherits 500ms EaseOut
---     , Animated (AnimatedConfig 100 EaseIn) fastWidget  -- keeps 100ms EaseIn
+--     [ styledText   -- inherits 2.0s keyframes
+--     , Animated (AnimatedConfig 0.5 [kf0, kf1]) fastWidget
 --     ]
 -- @
 --
@@ -231,10 +246,10 @@ data Easing
 -- own) are recursively distributed until a leaf or 'Styled' node is
 -- reached.
 data AnimatedConfig = AnimatedConfig
-  { anDuration :: Double
-    -- ^ Animation duration in milliseconds.
-  , anEasing   :: Easing
-    -- ^ Easing function to apply.
+  { anDuration  :: NominalDiffTime
+    -- ^ Animation duration (seconds).
+  , anKeyframes :: [Keyframe]
+    -- ^ Keyframes sorted by 'kfAt'.  At least two are needed for animation.
   } deriving (Show, Eq)
 
 -- | Linearly interpolate a single 'Word8' channel.
@@ -277,27 +292,6 @@ normalizeAnimated _config other = other
 -- | Wrap a 'LayoutItem''s widget in 'Animated', preserving the key.
 wrapLayoutItemAnimated :: AnimatedConfig -> LayoutItem -> LayoutItem
 wrapLayoutItemAnimated config li = li { liWidget = Animated config (liWidget li) }
-
--- | Produce the animation starting point for a first render.
---
--- Zeroes numeric style properties (padding, translateX, translateY) so
--- the first render can animate FROM zero TO the target position.
--- Non-numeric properties (colors, text-align, touch-passthrough) and
--- non-'Styled' widgets are returned unchanged — they have no meaningful
--- numeric zero to animate from.
-zeroAnimationOrigin :: Widget -> Widget
-zeroAnimationOrigin (Styled style child) = Styled (zeroNumericStyle style) child
-zeroAnimationOrigin other = other
-
--- | Zero the numeric style properties that support interpolation.
--- Replaces each 'Just' value with @Just 0@; leaves 'Nothing' fields
--- unchanged so the interpolation engine correctly skips them.
-zeroNumericStyle :: WidgetStyle -> WidgetStyle
-zeroNumericStyle style = style
-  { wsPadding    = fmap (const 0) (wsPadding style)
-  , wsTranslateX = fmap (const 0) (wsTranslateX style)
-  , wsTranslateY = fmap (const 0) (wsTranslateY style)
-  }
 
 -- | How an image should be scaled within its bounds.
 data ScaleType
@@ -448,7 +442,7 @@ data Widget
   | Styled WidgetStyle Widget
     -- ^ Apply visual style overrides to a child widget.
   | Animated AnimatedConfig Widget
-    -- ^ Animate property changes on the child widget over a duration.
+    -- ^ Animate property changes on the child widget using keyframes.
     -- When wrapping a container ('Column', 'Row'), the animation is
     -- distributed to each child.  Nested 'Animated' wrappers collapse:
     -- the innermost config wins.  See 'AnimatedConfig' for details.

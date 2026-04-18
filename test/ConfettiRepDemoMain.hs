@@ -1,18 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
--- | Reproducer for confetti animation bug.
+-- | Confetti animation demo using keyframe API.
 --
--- The prrrrrrrrr confetti pattern creates particles at their final
--- scattered positions on first render.  Because the Animated wrapper
--- only triggers tweens on property *changes* between renders (in
--- diffRenderNode), the first render goes through createRenderedNode
--- which places nodes at their target positions immediately — no
--- "from" state exists to animate from.
---
--- Expected: particles fly outward from centre over 1200ms.
--- Actual:   particles appear instantly at final positions.
---
--- To verify the bug, check logcat for the absence of
--- setNumProp.*translateX calls — no tween is ever registered.
+-- Each particle gets its own 2-keyframe Animated wrapper:
+-- origin (0,0) -> target (offsetX, offsetY) over 1.2 seconds.
 module Main where
 
 import Data.IORef (newIORef, readIORef, writeIORef)
@@ -21,7 +11,9 @@ import Hatter
   ( MobileApp(..)
   , UserState(..)
   , AnimatedConfig(..)
-  , Easing(..)
+  , Keyframe(..)
+  , KeyframeAt
+  , mkKeyframeAt
   , startMobileApp
   , newActionState
   , runActionM
@@ -39,20 +31,31 @@ import Hatter.Widget
   , column
   )
 
--- | A confetti particle: a styled "*" with translateX/Y offsets.
+-- | Unsafely create a KeyframeAt, assuming the value is in [0,1].
+unsafeKeyframeAt :: Rational -> Hatter.KeyframeAt
+unsafeKeyframeAt value = case mkKeyframeAt (fromRational value) of
+  Just kfAt -> kfAt
+  Nothing   -> error ("Invalid keyframe position: " ++ show value)
+
+-- | A confetti particle with a 2-keyframe animation from origin to target.
 confettiParticle :: Double -> Double -> Widget
 confettiParticle offsetX offsetY =
-  Styled (defaultStyle { wsTranslateX = Just offsetX
-                       , wsTranslateY = Just offsetY
-                       }) $
-    Text TextConfig
-      { tcLabel = "*"
-      , tcFontConfig = Nothing
-      }
+  let keyframes =
+        [ Keyframe (unsafeKeyframeAt 0)
+            (defaultStyle { wsTranslateX = Just 0, wsTranslateY = Just 0 })
+        , Keyframe (unsafeKeyframeAt 1)
+            (defaultStyle { wsTranslateX = Just offsetX, wsTranslateY = Just offsetY })
+        ]
+  in Animated (AnimatedConfig 1.2 keyframes) $
+       Styled (defaultStyle { wsTranslateX = Just offsetX
+                            , wsTranslateY = Just offsetY
+                            }) $
+         Text TextConfig
+           { tcLabel = "*"
+           , tcFontConfig = Nothing
+           }
 
--- | Five confetti particles with fixed "random-ish" offsets.
--- Mimics the prrrrrrrrr pattern: particles are created at their
--- final scattered positions wrapped in a single Animated node.
+-- | Five confetti particles with fixed offsets.
 confettiParticles :: [Widget]
 confettiParticles =
   [ confettiParticle 120.0 50.0
@@ -76,14 +79,13 @@ main = do
         isShowing <- readIORef showConfetti
         pure $ if isShowing
           then column
-            [ Animated (AnimatedConfig 1200 EaseOut) $
-                column confettiParticles
-            , Button ButtonConfig
+            ( confettiParticles ++
+            [ Button ButtonConfig
                 { bcLabel = "Confetti Active"
                 , bcAction = triggerAction
                 , bcFontConfig = Nothing
                 }
-            ]
+            ])
           else column
             [ Button ButtonConfig
                 { bcLabel = "Trigger Confetti"

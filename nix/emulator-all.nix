@@ -251,6 +251,17 @@ let
     name = "hatter-animation-apk";
   };
 
+  keyframeAndroid = import ./android.nix {
+    inherit sources androidArch;
+    mainModule = ../test/KeyframeDemoMain.hs;
+  };
+  keyframeApk = lib.mkApk {
+    sharedLibs = [{ lib = keyframeAndroid; inherit abiDir; }];
+    androidSrc = ../android;
+    apkName = "hatter-keyframe.apk";
+    name = "hatter-keyframe-apk";
+  };
+
   filesDirAndroid = import ./android.nix {
     inherit sources androidArch;
     mainModule = ../test/FilesDirDemoMain.hs;
@@ -430,6 +441,7 @@ HTTP_APK="${httpApk}/hatter-http.apk"
 NETWORK_STATUS_APK="${networkStatusApk}/hatter-networkstatus.apk"
 MAPVIEW_APK="${mapviewApk}/hatter-mapview.apk"
 ANIMATION_APK="${animationApk}/hatter-animation.apk"
+KEYFRAME_APK="${keyframeApk}/hatter-keyframe.apk"
 FILES_DIR_APK="${filesDirApk}/hatter-filesdir.apk"
 DEVICE_INFO_APK="${deviceInfoApk}/hatter-deviceinfo.apk"
 TEXTINPUT_RERENDER_APK="${textinputRerenderApk}/hatter-textinput-rerender.apk"
@@ -470,6 +482,7 @@ for so_path in \
     "${networkStatusAndroid}/lib/${abiDir}/libhatter.so" \
     "${mapviewAndroid}/lib/${abiDir}/libhatter.so" \
     "${animationAndroid}/lib/${abiDir}/libhatter.so" \
+    "${keyframeAndroid}/lib/${abiDir}/libhatter.so" \
     "${filesDirAndroid}/lib/${abiDir}/libhatter.so" \
     "${deviceInfoAndroid}/lib/${abiDir}/libhatter.so" \
     "${textinputRerenderAndroid}/lib/${abiDir}/libhatter.so" \
@@ -687,7 +700,7 @@ done
 # ===========================================================================
 # PHASE 1 + PHASE 2 — Run test scripts
 # ===========================================================================
-export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK SCROLL_TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PLATFORM_SIGN_IN_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK FILES_DIR_APK DEVICE_INFO_APK TEXTINPUT_RERENDER_APK STACK_APK SCROLLVIEW_SWITCH_APK STYLED_TYPE_CHANGE_APK HORIZONTAL_SCROLL_APK ASYNC_OOM_APK REDRAW_APK CONFETTI_REPRO_APK PACKAGE ACTIVITY WORK_DIR
+export ADB EMULATOR_SERIAL COUNTER_APK SCROLL_APK TEXTINPUT_APK SCROLL_TEXTINPUT_APK PERMISSION_APK SECURE_STORAGE_APK IMAGE_APK NODEPOOL_APK BLE_APK DIALOG_APK LOCATION_APK WEBVIEW_APK AUTH_SESSION_APK PLATFORM_SIGN_IN_APK CAMERA_APK BOTTOM_SHEET_APK HTTP_APK NETWORK_STATUS_APK MAPVIEW_APK ANIMATION_APK KEYFRAME_APK FILES_DIR_APK DEVICE_INFO_APK TEXTINPUT_RERENDER_APK STACK_APK SCROLLVIEW_SWITCH_APK STYLED_TYPE_CHANGE_APK HORIZONTAL_SCROLL_APK ASYNC_OOM_APK REDRAW_APK CONFETTI_REPRO_APK PACKAGE ACTIVITY WORK_DIR
 
 PHASE1_EXIT=0
 PHASE2_EXIT=0
@@ -790,6 +803,8 @@ echo "--- networkstatus ---"
 run_with_retry "networkstatus" bash "$TEST_SCRIPTS/android/network_status.sh" || PHASE7_EXIT=1
 echo "--- animation ---"
 run_with_retry "animation" bash "$TEST_SCRIPTS/android/animation.sh" || PHASE13_EXIT=1
+echo "--- keyframe ---"
+run_with_retry "keyframe" bash "$TEST_SCRIPTS/android/keyframe.sh" || PHASE13_EXIT=1
 echo "--- filesdir ---"
 run_with_retry "filesdir" bash "$TEST_SCRIPTS/android/filesdir.sh" || PHASE14_EXIT=1
 echo "--- deviceinfo ---"

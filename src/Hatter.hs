@@ -92,7 +92,10 @@ module Hatter
   , newActionState
   , runActionM
     -- * Animation
-  , Easing(..)
+  , KeyframeAt
+  , mkKeyframeAt
+  , unKeyframeAt
+  , Keyframe(..)
   , AnimatedConfig(..)
     -- * Lifecycle
   , LifecycleEvent(..)
@@ -164,11 +167,12 @@ import Hatter.Widget
   ( AnimatedConfig(..)
   , ButtonConfig(..)
   , Color(..)
-  , Easing(..)
   , FontConfig(..)
   , ImageConfig(..)
   , ImageSource(..)
   , InputType(..)
+  , Keyframe(..)
+  , KeyframeAt
   , LayoutItem(..)
   , LayoutSettings(..)
   , MapViewConfig(..)
@@ -188,10 +192,12 @@ import Hatter.Widget
   , defaultStyle
   , item
   , keyedItem
+  , mkKeyframeAt
   , row
   , scrollColumn
   , scrollRow
   , text
+  , unKeyframeAt
   )
 
 -- | Create an 'AppContext' from a 'MobileApp' and return it as a typed
