@@ -46,13 +46,22 @@ static os_log_t g_log;
 #endif
 static int32_t g_next_node_id = 1;
 
-/* --- Free stack: reclaimed node IDs for reuse --- */
+/* --- Free stack: reclaimed node IDs for reuse ---
+ *
+ * Two-buffer scheme: IDs freed during a render pass go into the
+ * "pending" buffer and are NOT available for reuse until setRoot
+ * flushes them into the main free stack.  This prevents same-pass
+ * ID reuse which would confuse the Haskell diff engine (it uses
+ * node ID equality to detect unchanged nodes). */
 #ifdef DYNAMIC_NODE_POOL
-  static int32_t *g_free_stack = NULL;
+  static int32_t *g_free_stack   = NULL;
+  static int32_t *g_pending_free = NULL;
 #else
   static int32_t  g_free_stack[MAX_NODES];
+  static int32_t  g_pending_free[MAX_NODES];
 #endif
-static int32_t g_free_count = 0;
+static int32_t g_free_count    = 0;
+static int32_t g_pending_count = 0;
 
 /* Haskell FFI exports (declared here since this file is compiled by Xcode) */
 extern void haskellOnUIEvent(void *ctx, int callbackId);
@@ -154,11 +163,13 @@ static int ensure_pool_capacity(int32_t needed)
     __strong UIView **new_nodes = (__strong UIView **)calloc((size_t)new_cap, sizeof(UIView *));
     __strong UIView **new_content = (__strong UIView **)calloc((size_t)new_cap, sizeof(UIView *));
     int32_t *new_free = (int32_t *)realloc(g_free_stack, (size_t)new_cap * sizeof(int32_t));
-    if (!new_nodes || !new_content || !new_free) {
+    int32_t *new_pend = (int32_t *)realloc(g_pending_free, (size_t)new_cap * sizeof(int32_t));
+    if (!new_nodes || !new_content || !new_free || !new_pend) {
         LOGE("Node pool calloc failed (requested %d slots)", new_cap);
         free(new_nodes);
         free(new_content);
         if (new_free) g_free_stack = new_free;
+        if (new_pend) g_pending_free = new_pend;
         return -1;
     }
     if (g_nodes) {
@@ -172,6 +183,7 @@ static int ensure_pool_capacity(int32_t needed)
     g_nodes = new_nodes;
     g_content_views = new_content;
     g_free_stack = new_free;
+    g_pending_free = new_pend;
     g_pool_capacity = new_cap;
     return 0;
 }
@@ -780,7 +792,7 @@ static void ios_destroy_node(int32_t nodeId)
 
     [view removeFromSuperview];
     g_nodes[nodeId] = nil;
-    g_free_stack[g_free_count++] = nodeId;
+    g_pending_free[g_pending_count++] = nodeId;
 }
 
 static void ios_set_root(int32_t nodeId)
@@ -807,6 +819,12 @@ static void ios_set_root(int32_t nodeId)
         [view.bottomAnchor   constraintEqualToAnchor:container.bottomAnchor],
     ]];
 
+    /* Flush pending freed IDs into the free stack now that the render
+     * pass is complete.  This prevents same-pass ID reuse. */
+    for (int32_t i = 0; i < g_pending_count; i++)
+        g_free_stack[g_free_count++] = g_pending_free[i];
+    g_pending_count = 0;
+
     LOGI("setRoot(node=%d)", nodeId);
 }
 
@@ -825,6 +843,7 @@ static void ios_clear(void)
     }
     g_next_node_id = 1;
     g_free_count = 0;
+    g_pending_count = 0;
     /* Dynamic mode: keep allocations to avoid malloc/free churn each frame. */
     LOGI("clear()");
 }
@@ -882,6 +901,7 @@ void setup_ios_ui_bridge(void *viewController, void *haskellCtx)
         g_nodes = (__strong UIView **)calloc((size_t)g_pool_capacity, sizeof(UIView *));
         g_content_views = (__strong UIView **)calloc((size_t)g_pool_capacity, sizeof(UIView *));
         g_free_stack = (int32_t *)calloc((size_t)g_pool_capacity, sizeof(int32_t));
+        g_pending_free = (int32_t *)calloc((size_t)g_pool_capacity, sizeof(int32_t));
     } else {
         for (int i = 0; i < g_pool_capacity; i++) {
             g_nodes[i] = nil;
@@ -894,6 +914,7 @@ void setup_ios_ui_bridge(void *viewController, void *haskellCtx)
 #endif
     g_next_node_id = 1;
     g_free_count = 0;
+    g_pending_count = 0;
 
     ui_register_callbacks(&g_ios_callbacks);
     LOGI("iOS UI bridge initialized");
