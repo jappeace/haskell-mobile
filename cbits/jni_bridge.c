@@ -81,6 +81,16 @@ extern void haskellLogLocale(void);
 /* App files directory (cbits/files_dir.c) */
 extern void setAppFilesDir(const char *path);
 
+/* Device info (cbits/device_info.c) */
+extern void setDeviceModel(const char *value);
+extern void setDeviceOsVersion(const char *value);
+extern void setDeviceScreenDensity(const char *value);
+extern void setDeviceScreenWidth(const char *value);
+extern void setDeviceScreenHeight(const char *value);
+
+/* Log device info from Haskell (Hatter.DeviceInfo) */
+extern void haskellLogDeviceInfo(void);
+
 /* Haskell foreign exports */
 extern void haskellOnLifecycle(void *ctx, int eventType);
 extern void haskellRenderUI(void *ctx);
