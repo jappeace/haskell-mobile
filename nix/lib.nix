@@ -594,6 +594,7 @@ in {
         cp ${hatterSrc}/src/Hatter/AppContext.hs Hatter/
         cp ${hatterSrc}/src/Hatter/Animation.hs Hatter/
         cp ${hatterSrc}/src/Hatter/FilesDir.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/DeviceInfo.hs Hatter/
         cp ${hatterSrc}/src/Hatter.hs .
 
         # Extra module copies
@@ -621,6 +622,7 @@ in {
         cp ${hatterSrc}/cbits/animation_bridge.c cbits/
         cp ${hatterSrc}/cbits/redraw_bridge.c cbits/
         cp ${hatterSrc}/cbits/files_dir.c cbits/
+        cp ${hatterSrc}/cbits/device_info.c cbits/
 
         ghc -staticlib \
           -O2 \
@@ -646,6 +648,7 @@ in {
           -optl-Wl,-u,_haskellOnHttpResult \
           -optl-Wl,-u,_haskellOnNetworkStatusChange \
           -optl-Wl,-u,_haskellLogLocale \
+          -optl-Wl,-u,_haskellLogDeviceInfo \
           cbits/platform_log.c \
           cbits/ui_bridge.c \
           cbits/run_main.c \
@@ -664,6 +667,7 @@ in {
           cbits/animation_bridge.c \
           cbits/redraw_bridge.c \
           cbits/files_dir.c \
+          cbits/device_info.c \
           Main.hs \
           Hatter.hs
       '';
@@ -817,6 +821,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${hatterSrc}/src/Hatter/AppContext.hs Hatter/
         cp ${hatterSrc}/src/Hatter/Animation.hs Hatter/
         cp ${hatterSrc}/src/Hatter/FilesDir.hs Hatter/
+        cp ${hatterSrc}/src/Hatter/DeviceInfo.hs Hatter/
         cp ${hatterSrc}/src/Hatter.hs .
 
         # Extra module copies
@@ -844,6 +849,7 @@ open(sys.argv[1], "w").write(yml)
         cp ${hatterSrc}/cbits/animation_bridge.c cbits/
         cp ${hatterSrc}/cbits/redraw_bridge.c cbits/
         cp ${hatterSrc}/cbits/files_dir.c cbits/
+        cp ${hatterSrc}/cbits/device_info.c cbits/
 
         ghc -staticlib \
           -O2 \
@@ -869,6 +875,7 @@ open(sys.argv[1], "w").write(yml)
           -optl-Wl,-u,_haskellOnHttpResult \
           -optl-Wl,-u,_haskellOnNetworkStatusChange \
           -optl-Wl,-u,_haskellLogLocale \
+          -optl-Wl,-u,_haskellLogDeviceInfo \
           cbits/platform_log.c \
           cbits/ui_bridge.c \
           cbits/run_main.c \
@@ -887,6 +894,7 @@ open(sys.argv[1], "w").write(yml)
           cbits/animation_bridge.c \
           cbits/redraw_bridge.c \
           cbits/files_dir.c \
+          cbits/device_info.c \
           Main.hs \
           Hatter.hs
       '';
