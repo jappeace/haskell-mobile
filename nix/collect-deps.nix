@@ -3,6 +3,7 @@
 # Takes a list of nixpkgs haskellPackages derivations (already resolved
 # transitively by resolve-deps.nix) and collects their .conf / .a files:
 #   $out/lib/*.a       — static archives
+#   $out/lib-main/*.a  — main library archives (whole-archived by mkAndroidLib)
 #   $out/pkgdb/        — GHC package database (.conf + cache)
 #
 # Also collects boot package .a files from the GHC, since consumer deps
@@ -12,15 +13,35 @@
 , ghc               # GHC derivation (for boot package .a files)
 , ghcPkgCmd         # full path to ghc-pkg (or cross ghc-pkg)
 , deps              # list of haskellPackages derivations (from resolve-deps.nix)
+, mainLibPnames ? [] # pnames whose .a files go to $out/lib-main/ (whole-archived by mkAndroidLib)
 , iservProxy ? null # optional iserv wrapper script for consumer-side TH
 }:
 let
   depsList = builtins.concatStringsSep " " (map toString deps);
 
+  # Generate shell case patterns like "hatter-*|foo-*" for matching .a filenames.
+  # .a names look like libHShatter-0.2.0-HASH.a — after stripping "libHS",
+  # matching "hatter-*" catches the right package.
+  mainLibPatterns = if mainLibPnames == []
+    then "__NOMATCH__"  # never matches any .a filename
+    else builtins.concatStringsSep "|" (map (p: "${p}-*") mainLibPnames);
+
 in pkgs.runCommand "hatter-collected-deps" {
   nativeBuildInputs = [ pkgs.findutils ];
 } ''
-  mkdir -p $out/lib $out/pkgdb
+  mkdir -p $out/lib $out/lib-main $out/pkgdb
+
+  # Helper: check if an .a filename belongs to a main lib (whole-archive target).
+  # .a names look like libHShatter-0.2.0-HASH.a — strip the "libHS" prefix
+  # and match against pname patterns.
+  is_main_lib() {
+    local aName="$1"
+    local stripped="''${aName#libHS}"
+    case "$stripped" in
+      ${mainLibPatterns}) return 0 ;;
+      *) return 1 ;;
+    esac
+  }
 
   for pkg in ${depsList}; do
     echo "Processing: $pkg"
@@ -40,13 +61,21 @@ in pkgs.runCommand "hatter-collected-deps" {
     # We collect all .a files rather than just those in hs-libraries because
     # internal sub-libraries (e.g. attoparsec-internal) have empty
     # hs-libraries fields in their .conf but still need their .a collected.
+    # Main lib .a files go to lib-main/ for whole-archive linking.
     find "$pkg" -name 'libHS*.a' ! -name '*_p.a' | while read aFile; do
       aName=$(basename "$aFile")
       case "$aName" in
         *-benchmark*|*-benchmarks*|*-test*) echo "  skip .a: $aName"; continue ;;
       esac
-      if [ ! -f "$out/lib/$aName" ]; then
-        cp "$aFile" $out/lib/
+      if is_main_lib "$aName"; then
+        if [ ! -f "$out/lib-main/$aName" ]; then
+          echo "  main-lib: $aName"
+          cp "$aFile" $out/lib-main/
+        fi
+      else
+        if [ ! -f "$out/lib/$aName" ]; then
+          cp "$aFile" $out/lib/
+        fi
       fi
     done
   done
@@ -79,6 +108,9 @@ in pkgs.runCommand "hatter-collected-deps" {
 
   echo "=== Package database ==="
   ${ghcPkgCmd} --package-db=$out/pkgdb list
+
+  echo "=== Main libraries (whole-archived) ==="
+  ls -lh $out/lib-main/ 2>/dev/null || echo "  (none)"
 
   echo "=== Libraries ==="
   ls -lh $out/lib/

@@ -17,6 +17,7 @@
 , consumerCabalFile ? null
 , consumerCabal2Nix ? null
 , hpkgs ? (_: _: {})       # consumer haskellPackages overrides
+, hatterSrc ? null          # hatter source tree (builds hatter as a normal cross-dep)
 }:
 let
   archConfig = {
@@ -204,12 +205,36 @@ WRAPPER
     });
   };
 
+  # Build hatter as a regular haskellPackages derivation from local source.
+  # The cabal file already specifies c-sources, include-dirs, exposed-modules
+  # so the generic builder handles Haskell + C bridge compilation correctly.
+  # Executables and tests are disabled because they can't link on Android
+  # (platform_log.c references __android_log_print from liblog, which is
+  # only available in the NDK sysroot during the final .so link).
+  hatterOverride = self: super:
+    if hatterSrc != null then {
+      hatter = pkgs.haskell.lib.overrideCabal
+        (self.callCabal2nix "hatter" hatterSrc {})
+        (old: {
+          # Strip executable and test stanzas — they can't link on Android
+          # (platform_log.c references __android_log_print from liblog,
+          # which only exists in the NDK sysroot during the final .so link).
+          postPatch = (old.postPatch or "") + ''
+            sed -i '/^executable /,$d' hatter.cabal
+            sed -i '/^test-suite /,$d' hatter.cabal
+          '';
+          enableLibraryProfiling = false;
+          doCheck = false;
+        });
+    } else {};
+
   defaultOverrides =
     let
       common = pkgs.lib.composeManyExtensions [
         vectorOverride
         thPackageDbOverride
         thIservOverride
+        hatterOverride
       ];
     in
     if androidArch == "aarch64"
@@ -255,8 +280,13 @@ WRAPPER
     ${iservBuild}/bin/iserv-proxy "$@" 127.0.0.1 "$PORT"
   '';
 
+  # When hatterSrc is provided, add the hatter package to the collected deps
+  # so its .a and .conf are available for linking.
+  hatterDep = if hatterSrc != null then [ crossHaskellPkgs.hatter ] else [];
+
 in import ./collect-deps.nix {
   inherit pkgs ghc ghcPkgCmd;
-  deps = resolvedDeps;
+  deps = resolvedDeps ++ hatterDep;
+  mainLibPnames = if hatterSrc != null then [ "hatter" ] else [];
   iservProxy = iservWrapper;
 }

@@ -72,87 +72,6 @@ let
 in {
 
   # ---------------------------------------------------------------------------
-  # mkHatterObjs: Pre-compile hatter library objects (Haskell + C bridges)
-  # ---------------------------------------------------------------------------
-  # Produces reusable .o/.hi files that are identical across all apps.
-  # Nix caches this derivation, so 27 demo builds share one compilation.
-  #
-  # Output layout:
-  #   $out/hs/       — Haskell .o and .hi files (Hatter + all sub-modules)
-  #   $out/cbits/    — cross-GHC compiled C .o files
-  mkHatterObjs =
-    { hatterSrc
-    , pname ? "hatter-objs"
-    }:
-    pkgs.stdenv.mkDerivation {
-      inherit pname;
-      version = "0.1.0.0";
-
-      src = hatterSrc + "/src";
-
-      nativeBuildInputs = [ ghc ];
-      buildInputs = [ androidPkgs.libffi androidPkgs.gmp ];
-
-      buildPhase = ''
-        # Copy Haskell sources into writable build directory.
-        # GHC writes _stub.h files next to sources, so they can't live in
-        # the read-only nix store.  --make discovers all modules transitively
-        # from Hatter.hs, so no manual module list is needed.
-        cp -r ${hatterSrc}/src/Hatter .
-        cp ${hatterSrc}/src/Hatter.hs .
-
-        # Compile all Haskell modules (no linking).
-        # Pass all .hs files explicitly because not every module is
-        # transitively imported from Hatter.hs (e.g. FilesDir, I18n).
-        echo "=== Compiling Hatter library modules ==="
-        ${ghcCmd} --make -no-link -O2 \
-          -I${hatterSrc}/include \
-          Hatter.hs Hatter/*.hs
-
-        # Copy C sources into writable build dir and compile them
-        # separately with cross-GHC.
-        mkdir -p cbits
-        cp ${hatterSrc}/cbits/android_stubs.c cbits/
-        cp ${hatterSrc}/cbits/platform_log.c cbits/
-        cp ${hatterSrc}/cbits/numa_stubs.c cbits/
-        cp ${hatterSrc}/cbits/ui_bridge.c cbits/
-        cp ${hatterSrc}/cbits/run_main.c cbits/
-        cp ${hatterSrc}/cbits/locale.c cbits/
-        cp ${hatterSrc}/cbits/permission_bridge.c cbits/
-        cp ${hatterSrc}/cbits/secure_storage_bridge.c cbits/
-        cp ${hatterSrc}/cbits/ble_bridge.c cbits/
-        cp ${hatterSrc}/cbits/dialog_bridge.c cbits/
-        cp ${hatterSrc}/cbits/location_bridge.c cbits/
-        cp ${hatterSrc}/cbits/auth_session_bridge.c cbits/
-        cp ${hatterSrc}/cbits/platform_sign_in_bridge.c cbits/
-        cp ${hatterSrc}/cbits/camera_bridge.c cbits/
-        cp ${hatterSrc}/cbits/bottom_sheet_bridge.c cbits/
-        cp ${hatterSrc}/cbits/http_bridge.c cbits/
-        cp ${hatterSrc}/cbits/network_status_bridge.c cbits/
-        cp ${hatterSrc}/cbits/animation_bridge.c cbits/
-        cp ${hatterSrc}/cbits/redraw_bridge.c cbits/
-        cp ${hatterSrc}/cbits/files_dir.c cbits/
-
-        echo "=== Compiling C bridge files with cross-GHC ==="
-        for cfile in cbits/*.c; do
-          echo "  $cfile"
-          ${ghcCmd} -c -I${hatterSrc}/include "$cfile"
-        done
-      '';
-
-      installPhase = ''
-        mkdir -p $out/hs $out/cbits
-
-        # Collect Haskell .o and .hi files
-        cp Hatter.o Hatter.hi $out/hs/
-        cp -r Hatter/ $out/hs/Hatter/
-
-        # Collect C .o files
-        cp cbits/*.o $out/cbits/
-      '';
-    };
-
-  # ---------------------------------------------------------------------------
   # mkAndroidLib: Cross-compile Haskell to shared .so for Android (aarch64/armv7a)
   # ---------------------------------------------------------------------------
   mkAndroidLib =
@@ -165,11 +84,10 @@ in {
     , extraModuleCopy ? ""
     , extraLinkObjects ? []
     , extraGhcIncludeDirs ? []
-    , crossDeps ? null          # output of cross-deps.nix (lib/, hi/, pkgdb/)
+    , crossDeps ? null          # output of cross-deps.nix (lib/, lib-main/, pkgdb/)
     , extraGhcFlags ? []        # additional flags passed to cross-GHC
     , maxNodes ? 256            # static pool size (ignored when dynamicNodePool=true)
     , dynamicNodePool ? false   # use malloc/realloc instead of fixed array
-    , hatterObjs ? null          # output of mkHatterObjs — skips Haskell/C recompilation when set
     , soMaxSizeMB ? 200         # fail build if .so exceeds this (MB), catches whole-archive bloat
     }:
     let
@@ -196,6 +114,11 @@ in {
       buildInputs = [ androidPkgs.libffi androidPkgs.gmp ];
 
       buildPhase = ''
+        # Clean stale build artifacts from the source tree.
+        # Local cabal builds may leave .hi/.o files in src/ which confuse
+        # the cross-GHC (wrong profile tag "dyn" vs "").
+        find . -name '*.hi' -o -name '*.o' -o -name '*.dyn_hi' -o -name '*.dyn_o' | xargs rm -f
+
         # Discover RTS include path for HsFFI.h
         GHC_LIBDIR=$(${ghcCmd} --print-libdir)
         RTS_INCLUDE=$(dirname $(find $GHC_LIBDIR -name "HsFFI.h" | head -1))
@@ -354,75 +277,15 @@ in {
         # Extra module copies (consumer overrides, additional modules)
         ${extraModuleCopy}
 
-        ${if hatterObjs != null then ''
-        # --- Pre-compiled hatter objects path ---
-        # Steps 2+3 skipped: hatter Haskell modules and C bridge files
-        # are already compiled in hatterObjs.
-        echo "=== Using pre-compiled hatter objects from ${hatterObjs} ==="
-        '' else ''
-        # Step 2: Copy source modules into writable build directory.
-        # GHC writes _stub.h files next to sources, so they can't live in
-        # the read-only nix store.
-        mkdir -p Hatter
-        cp ${hatterSrc}/src/Hatter/Types.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/Lifecycle.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/Widget.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/UIBridge.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/Render.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/Locale.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/I18n.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/Permission.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/SecureStorage.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/Ble.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/Dialog.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/Location.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/AuthSession.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/PlatformSignIn.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/Camera.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/BottomSheet.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/Http.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/NetworkStatus.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/AppContext.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/Animation.hs Hatter/
-        cp ${hatterSrc}/src/Hatter/FilesDir.hs Hatter/
-        cp ${hatterSrc}/src/Hatter.hs .
+        # Step 2: Compile platform-specific C files not in the cabal c-sources.
+        # numa_stubs.c: Android lacks libnuma; provides stubs for GHC's RTS.
+        # run_main.c:   Calls ZCMain_main_closure via RTS API (per-app symbol).
+        echo "=== Compiling platform C files ==="
+        ${ghcCmd} -c -I${hatterSrc}/include -o numa_stubs.o ${hatterSrc}/cbits/numa_stubs.c
+        ${ghcCmd} -c -I${hatterSrc}/include -o run_main.o ${hatterSrc}/cbits/run_main.c
 
-        # Step 3: Copy C sources into writable build dir and compile them
-        # separately with cross-GHC.  This keeps them out of GHC's
-        # compilation graph so iserv-proxy-interpreter doesn't try to
-        # load them during Template Haskell evaluation (the C bridge
-        # files reference Haskell FFI exports that iserv can't resolve).
-        mkdir -p cbits
-        cp ${hatterSrc}/cbits/android_stubs.c cbits/
-        cp ${hatterSrc}/cbits/platform_log.c cbits/
-        cp ${hatterSrc}/cbits/numa_stubs.c cbits/
-        cp ${hatterSrc}/cbits/ui_bridge.c cbits/
-        cp ${hatterSrc}/cbits/run_main.c cbits/
-        cp ${hatterSrc}/cbits/locale.c cbits/
-        cp ${hatterSrc}/cbits/permission_bridge.c cbits/
-        cp ${hatterSrc}/cbits/secure_storage_bridge.c cbits/
-        cp ${hatterSrc}/cbits/ble_bridge.c cbits/
-        cp ${hatterSrc}/cbits/dialog_bridge.c cbits/
-        cp ${hatterSrc}/cbits/location_bridge.c cbits/
-        cp ${hatterSrc}/cbits/auth_session_bridge.c cbits/
-        cp ${hatterSrc}/cbits/platform_sign_in_bridge.c cbits/
-        cp ${hatterSrc}/cbits/camera_bridge.c cbits/
-        cp ${hatterSrc}/cbits/bottom_sheet_bridge.c cbits/
-        cp ${hatterSrc}/cbits/http_bridge.c cbits/
-        cp ${hatterSrc}/cbits/network_status_bridge.c cbits/
-        cp ${hatterSrc}/cbits/animation_bridge.c cbits/
-        cp ${hatterSrc}/cbits/redraw_bridge.c cbits/
-        cp ${hatterSrc}/cbits/files_dir.c cbits/
-
-        echo "=== Compiling C bridge files with cross-GHC ==="
-        for cfile in cbits/*.c; do
-          echo "  $cfile"
-          ${ghcCmd} -c -I${hatterSrc}/include "$cfile"
-        done
-        ''}
-
-        # Step 4: Compile Haskell to shared library with cross-GHC.
-        # Discover library paths dynamically — hash suffixes vary across nixpkgs.
+        # Step 3: Link shared library.
+        # Discover boot library paths dynamically — hash suffixes vary.
         GHC_PKG_DIR="${ghcPkgDir}"
 
         find_lib() {
@@ -458,30 +321,33 @@ in {
         echo "  base: $BASE_LIB"
         echo "  containers: $CONTAINERS_LIB"
 
-        ${if hatterObjs != null then ''
-        # --- Pre-compiled path: compile Main.hs only, then link ---
-        # Clear default search path (-i) to avoid stale .hi files from the
-        # source tree, then add hatterObjs for pre-compiled interfaces and
-        # current dir for consumer modules from extraModuleCopy.
-        echo "=== Compiling Main.hs (using pre-compiled hatter objects) ==="
+        # Step 3b: Compile Main.hs against the cross-compiled package DB.
+        echo "=== Compiling Main.hs ==="
         ${ghcCmd} -c -O2 -split-sections \
           -I${hatterSrc}/include \
           ${builtins.concatStringsSep " " (map (d: "-I${d}") extraGhcIncludeDirs)} \
-          ${if crossDeps != null then "-package-db ${crossDeps}/pkgdb -i${crossDeps}/hi" else ""} \
+          ${if crossDeps != null then "-package-db ${crossDeps}/pkgdb" else ""} \
           ${thFlags} \
           ${builtins.concatStringsSep " " extraGhcFlags} \
-          -i -i${hatterObjs}/hs -i. \
+          -i -i. \
           Main.hs
 
+        # -no-auto-link-packages: all libraries are explicitly provided via
+        # -optl below.  Without this, GHC would auto-link packages from the
+        # package DB, causing hatter (and others) to be linked twice — once
+        # by GHC and once by the explicit --whole-archive / lib/ sections.
         echo "=== Linking shared library ==="
         ${ghcCmd} -shared \
+          -no-auto-link-packages \
           -o ${soName} \
           ${if crossDeps != null then "-package-db ${crossDeps}/pkgdb" else ""} \
           Main.o \
-          $(find ${hatterObjs}/hs -name '*.o' -type f) \
+          numa_stubs.o \
+          run_main.o \
           -optl-L${androidPkgs.gmp}/lib \
           -optl-L${androidPkgs.libffi}/lib \
           -optl-lffi \
+          -optl-lgmp \
           -optl-llog \
           -optl-Wl,-z,max-page-size=16384 \
           -optl-Wl,--gc-sections \
@@ -500,7 +366,6 @@ in {
           -optl$(pwd)/network_status_android.o \
           -optl$(pwd)/animation_bridge_android.o \
           -optl$(pwd)/redraw_bridge_android.o \
-          $(for o in ${hatterObjs}/cbits/*.o; do echo -n "-optl$o "; done) \
           ${builtins.concatStringsSep " " (builtins.genList (i: "-optl$(pwd)/extra_jni_${toString i}.o") (builtins.length extraJniBridge))} \
           ${builtins.concatStringsSep " " (map (o: "-optl${o}") extraLinkObjects)} \
           -optl-Wl,-u,haskellRunMain \
@@ -537,100 +402,10 @@ in {
           -optl$CONTAINERS_LIB \
           -optl$TRANSFORMERS_LIB \
           -optl$TIME_LIB \
+          ${if crossDeps != null then "$(find ${crossDeps}/lib-main -name '*.a' -exec printf '-optl%s ' {} +)" else ""} \
           -optl-Wl,--no-whole-archive \
-          ${if crossDeps != null then "$(for a in ${crossDeps}/lib/*.a; do echo -n \"-optl$a \"; done)" else ""} \
-          ${if crossDeps != null && builtins.pathExists "${crossDeps}/lib-boot" then "$(for a in ${crossDeps}/lib-boot/*.a; do echo -n \"-optl$a \"; done)" else ""}
-        '' else ''
-        ${ghcCmd} -shared -O2 -split-sections \
-          -o ${soName} \
-          -I${hatterSrc}/include \
-          ${builtins.concatStringsSep " " (map (d: "-I${d}") extraGhcIncludeDirs)} \
-          ${if crossDeps != null then "-package-db ${crossDeps}/pkgdb -i${crossDeps}/hi" else ""} \
-          ${thFlags} \
-          ${builtins.concatStringsSep " " extraGhcFlags} \
-          Main.hs \
-          Hatter.hs \
-          -optl-L${androidPkgs.gmp}/lib \
-          -optl-L${androidPkgs.libffi}/lib \
-          -optl-lffi \
-          -optl-llog \
-          -optl-Wl,-z,max-page-size=16384 \
-          -optl-Wl,--gc-sections \
-          -optl$(pwd)/jni_bridge.o \
-          -optl$(pwd)/ui_bridge_android.o \
-          -optl$(pwd)/permission_bridge_android.o \
-          -optl$(pwd)/secure_storage_android.o \
-          -optl$(pwd)/ble_bridge_android.o \
-          -optl$(pwd)/dialog_bridge_android.o \
-          -optl$(pwd)/location_bridge_android.o \
-          -optl$(pwd)/auth_session_android.o \
-          -optl$(pwd)/platform_sign_in_android.o \
-          -optl$(pwd)/camera_bridge_android.o \
-          -optl$(pwd)/bottom_sheet_android.o \
-          -optl$(pwd)/http_bridge_android.o \
-          -optl$(pwd)/network_status_android.o \
-          -optl$(pwd)/animation_bridge_android.o \
-          -optl$(pwd)/redraw_bridge_android.o \
-          -optl$(pwd)/cbits/android_stubs.o \
-          -optl$(pwd)/cbits/platform_log.o \
-          -optl$(pwd)/cbits/numa_stubs.o \
-          -optl$(pwd)/cbits/ui_bridge.o \
-          -optl$(pwd)/cbits/run_main.o \
-          -optl$(pwd)/cbits/locale.o \
-          -optl$(pwd)/cbits/permission_bridge.o \
-          -optl$(pwd)/cbits/secure_storage_bridge.o \
-          -optl$(pwd)/cbits/ble_bridge.o \
-          -optl$(pwd)/cbits/dialog_bridge.o \
-          -optl$(pwd)/cbits/location_bridge.o \
-          -optl$(pwd)/cbits/auth_session_bridge.o \
-          -optl$(pwd)/cbits/platform_sign_in_bridge.o \
-          -optl$(pwd)/cbits/camera_bridge.o \
-          -optl$(pwd)/cbits/bottom_sheet_bridge.o \
-          -optl$(pwd)/cbits/http_bridge.o \
-          -optl$(pwd)/cbits/network_status_bridge.o \
-          -optl$(pwd)/cbits/animation_bridge.o \
-          -optl$(pwd)/cbits/redraw_bridge.o \
-          -optl$(pwd)/cbits/files_dir.o \
-          ${builtins.concatStringsSep " " (builtins.genList (i: "-optl$(pwd)/extra_jni_${toString i}.o") (builtins.length extraJniBridge))} \
-          ${builtins.concatStringsSep " " (map (o: "-optl${o}") extraLinkObjects)} \
-          -optl-Wl,-u,haskellRunMain \
-          -optl-Wl,-u,haskellOnLifecycle \
-          -optl-Wl,-u,haskellRenderUI \
-          -optl-Wl,-u,haskellOnUIEvent \
-          -optl-Wl,-u,haskellOnUITextChange \
-          -optl-Wl,-u,haskellOnPermissionResult \
-          -optl-Wl,-u,haskellOnSecureStorageResult \
-          -optl-Wl,-u,haskellOnBleScanResult \
-          -optl-Wl,-u,haskellOnDialogResult \
-          -optl-Wl,-u,haskellOnLocationUpdate \
-          -optl-Wl,-u,haskellOnAuthSessionResult \
-          -optl-Wl,-u,haskellOnPlatformSignInResult \
-          -optl-Wl,-u,haskellOnCameraResult \
-          -optl-Wl,-u,haskellOnVideoFrame \
-          -optl-Wl,-u,haskellOnAudioChunk \
-          -optl-Wl,-u,haskellOnBottomSheetResult \
-          -optl-Wl,-u,haskellOnHttpResult \
-          -optl-Wl,-u,haskellOnNetworkStatusChange \
-          -optl-Wl,-u,haskellLogLocale \
-          -optl-Wl,--wrap=registerForeignExports \
-          -optl-Wl,--no-undefined \
-          -optl-Wl,--whole-archive \
-          -optl$RTS_LIB \
-          -optl$GHC_PRIM_LIB \
-          -optl$GHC_BIGNUM_LIB \
-          -optl$GHC_INTERNAL_LIB \
-          -optl$BASE_LIB \
-          -optl$INTEGER_GMP_LIB \
-          -optl$TEXT_LIB \
-          -optl$ARRAY_LIB \
-          -optl$DEEPSEQ_LIB \
-          -optl$CONTAINERS_LIB \
-          -optl$TRANSFORMERS_LIB \
-          -optl$TIME_LIB \
-          -optl-Wl,--no-whole-archive \
-          ${if crossDeps != null then "$(for a in ${crossDeps}/lib/*.a; do echo -n \"-optl$a \"; done)" else ""} \
-          ${if crossDeps != null && builtins.pathExists "${crossDeps}/lib-boot" then "$(for a in ${crossDeps}/lib-boot/*.a; do echo -n \"-optl$a \"; done)" else ""}
-        ''}
+          ${if crossDeps != null then "$(find ${crossDeps}/lib -name '*.a' -exec printf '-optl%s ' {} +)" else ""} \
+          ${if crossDeps != null then "$(find ${crossDeps}/lib-boot -name '*.a' -exec printf '-optl%s ' {} +)" else ""}
       '';
 
       installPhase = ''
