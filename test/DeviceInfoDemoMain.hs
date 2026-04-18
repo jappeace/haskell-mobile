@@ -7,6 +7,7 @@
 module Main where
 
 import Data.Text (Text)
+import Data.Text qualified as Text
 import Foreign.Ptr (Ptr)
 import Hatter
   ( MobileApp(..)
@@ -33,9 +34,9 @@ main = do
   info <- getDeviceInfo
   platformLog ("DeviceInfo model: " <> diModel info)
   platformLog ("DeviceInfo osVersion: " <> diOsVersion info)
-  platformLog ("DeviceInfo screenDensity: " <> diScreenDensity info)
-  platformLog ("DeviceInfo screenWidth: " <> diScreenWidth info)
-  platformLog ("DeviceInfo screenHeight: " <> diScreenHeight info)
+  platformLog ("DeviceInfo screenDensity: " <> Text.pack (show (diScreenDensity info)))
+  platformLog ("DeviceInfo screenWidth: " <> Text.pack (show (diScreenWidth info)))
+  platformLog ("DeviceInfo screenHeight: " <> Text.pack (show (diScreenHeight info)))
 
   pure ctxPtr
 
@@ -46,9 +47,9 @@ deviceInfoDemoView = do
   pure $ column
     [ infoRow "Model" (diModel info)
     , infoRow "OS Version" (diOsVersion info)
-    , infoRow "Density" (diScreenDensity info)
-    , infoRow "Width" (diScreenWidth info)
-    , infoRow "Height" (diScreenHeight info)
+    , infoRow "Density" (Text.pack (show (diScreenDensity info)))
+    , infoRow "Width" (Text.pack (show (diScreenWidth info)))
+    , infoRow "Height" (Text.pack (show (diScreenHeight info)))
     ]
 
 -- | A text widget showing a label-value pair.

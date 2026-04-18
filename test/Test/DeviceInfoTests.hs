@@ -8,7 +8,6 @@ module Test.DeviceInfoTests
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Data.Text qualified as Text
 import Foreign.C.String (CString, newCString)
 import Hatter.DeviceInfo (DeviceInfo(..), getDeviceInfo)
 
@@ -25,9 +24,9 @@ deviceInfoTests = sequentialTestGroup "DeviceInfo" AllFinish
       info <- getDeviceInfo
       diModel info @?= "desktop"
       diOsVersion info @?= "unknown"
-      diScreenDensity info @?= "1.0"
-      diScreenWidth info @?= "0"
-      diScreenHeight info @?= "0"
+      diScreenDensity info @?= 1.0
+      diScreenWidth info @?= 0
+      diScreenHeight info @?= 0
   , testCase "setDevice* / getDeviceInfo roundtrip" $ do
       cmodel   <- newCString "Pixel 7"
       cosver   <- newCString "14"
@@ -42,14 +41,12 @@ deviceInfoTests = sequentialTestGroup "DeviceInfo" AllFinish
       info <- getDeviceInfo
       diModel info @?= "Pixel 7"
       diOsVersion info @?= "14"
-      diScreenDensity info @?= "2.75"
-      diScreenWidth info @?= "1080"
-      diScreenHeight info @?= "2400"
-  , testCase "all fields are non-empty after setting" $ do
+      diScreenDensity info @?= 2.75
+      diScreenWidth info @?= 1080
+      diScreenHeight info @?= 2400
+  , testCase "numeric fields are parsed after setting" $ do
       info <- getDeviceInfo
-      assertBool "model should not be empty" (not (Text.null (diModel info)))
-      assertBool "osVersion should not be empty" (not (Text.null (diOsVersion info)))
-      assertBool "screenDensity should not be empty" (not (Text.null (diScreenDensity info)))
-      assertBool "screenWidth should not be empty" (not (Text.null (diScreenWidth info)))
-      assertBool "screenHeight should not be empty" (not (Text.null (diScreenHeight info)))
+      assertBool "screenDensity should be positive" (diScreenDensity info > 0)
+      assertBool "screenWidth should be positive" (diScreenWidth info > 0)
+      assertBool "screenHeight should be positive" (diScreenHeight info > 0)
   ]
