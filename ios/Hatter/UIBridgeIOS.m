@@ -29,7 +29,9 @@ static os_log_t g_log;
  *   -DMAX_NODES=N         Override the static pool size (default 256).
  *   -DDYNAMIC_NODE_POOL   Use malloc/realloc; MAX_NODES is ignored.
  *
- * Re-renders clear all nodes, so the pool only bounds a single frame. */
+ * Incremental diffing means nodes persist across frames; the pool bounds
+ * the total live node count.  Destroyed node IDs are reclaimed via a
+ * free stack to avoid exhausting the pool during navigation. */
 #ifdef DYNAMIC_NODE_POOL
   static __strong UIView **g_nodes         = NULL;
   static __strong UIView **g_content_views = NULL;
@@ -43,6 +45,14 @@ static os_log_t g_log;
   static __strong UIView *g_content_views[MAX_NODES];
 #endif
 static int32_t g_next_node_id = 1;
+
+/* --- Free stack: reclaimed node IDs for reuse --- */
+#ifdef DYNAMIC_NODE_POOL
+  static int32_t *g_free_stack = NULL;
+#else
+  static int32_t  g_free_stack[MAX_NODES];
+#endif
+static int32_t g_free_count = 0;
 
 /* Haskell FFI exports (declared here since this file is compiled by Xcode) */
 extern void haskellOnUIEvent(void *ctx, int callbackId);
@@ -143,10 +153,12 @@ static int ensure_pool_capacity(int32_t needed)
 
     __strong UIView **new_nodes = (__strong UIView **)calloc((size_t)new_cap, sizeof(UIView *));
     __strong UIView **new_content = (__strong UIView **)calloc((size_t)new_cap, sizeof(UIView *));
-    if (!new_nodes || !new_content) {
+    int32_t *new_free = (int32_t *)realloc(g_free_stack, (size_t)new_cap * sizeof(int32_t));
+    if (!new_nodes || !new_content || !new_free) {
         LOGE("Node pool calloc failed (requested %d slots)", new_cap);
         free(new_nodes);
         free(new_content);
+        if (new_free) g_free_stack = new_free;
         return -1;
     }
     if (g_nodes) {
@@ -159,6 +171,7 @@ static int ensure_pool_capacity(int32_t needed)
     }
     g_nodes = new_nodes;
     g_content_views = new_content;
+    g_free_stack = new_free;
     g_pool_capacity = new_cap;
     return 0;
 }
@@ -250,17 +263,20 @@ static UIColor *parse_hex_color(const char *hex)
 
 static int32_t ios_create_node(int32_t nodeType)
 {
+    /* Only check capacity when no free IDs are available */
+    if (g_free_count == 0) {
 #ifdef DYNAMIC_NODE_POOL
-    if (ensure_pool_capacity(g_next_node_id) != 0) {
-        LOGE("Node pool exhausted (realloc failed at %d)", g_next_node_id);
-        return 0;
-    }
+        if (ensure_pool_capacity(g_next_node_id) != 0) {
+            LOGE("Node pool exhausted (realloc failed at %d)", g_next_node_id);
+            return 0;
+        }
 #else
-    if (g_next_node_id >= MAX_NODES) {
-        LOGE("Node pool exhausted (max %d)", MAX_NODES);
-        return 0;
-    }
+        if (g_next_node_id >= MAX_NODES) {
+            LOGE("Node pool exhausted (max %d)", MAX_NODES);
+            return 0;
+        }
 #endif
+    }
 
     UIView *view = nil;
 
@@ -353,7 +369,8 @@ static int32_t ios_create_node(int32_t nodeType)
             [contentStack.bottomAnchor  constraintEqualToAnchor:contentGuide.bottomAnchor],
             [contentStack.widthAnchor   constraintEqualToAnchor:frameGuide.widthAnchor],
         ]];
-        int32_t nodeId = g_next_node_id++;
+        int32_t nodeId = (g_free_count > 0) ? g_free_stack[--g_free_count]
+                                             : g_next_node_id++;
         g_nodes[nodeId]        = scrollView;
         g_content_views[nodeId] = contentStack;
         LOGI("createNode(type=%d) -> %d", nodeType, nodeId);
@@ -378,7 +395,8 @@ static int32_t ios_create_node(int32_t nodeType)
             [contentStack.bottomAnchor  constraintEqualToAnchor:contentGuide.bottomAnchor],
             [contentStack.heightAnchor  constraintEqualToAnchor:frameGuide.heightAnchor],
         ]];
-        int32_t nodeId = g_next_node_id++;
+        int32_t nodeId = (g_free_count > 0) ? g_free_stack[--g_free_count]
+                                             : g_next_node_id++;
         g_nodes[nodeId]        = scrollView;
         g_content_views[nodeId] = contentStack;
         LOGI("createNode(type=%d) -> %d", nodeType, nodeId);
@@ -389,7 +407,8 @@ static int32_t ios_create_node(int32_t nodeType)
         return 0;
     }
 
-    int32_t nodeId = g_next_node_id++;
+    int32_t nodeId = (g_free_count > 0) ? g_free_stack[--g_free_count]
+                                        : g_next_node_id++;
     g_nodes[nodeId] = view;
 
     LOGI("createNode(type=%d) -> %d", nodeType, nodeId);
@@ -761,6 +780,7 @@ static void ios_destroy_node(int32_t nodeId)
 
     [view removeFromSuperview];
     g_nodes[nodeId] = nil;
+    g_free_stack[g_free_count++] = nodeId;
 }
 
 static void ios_set_root(int32_t nodeId)
@@ -804,6 +824,7 @@ static void ios_clear(void)
         g_content_views[i] = nil;
     }
     g_next_node_id = 1;
+    g_free_count = 0;
     /* Dynamic mode: keep allocations to avoid malloc/free churn each frame. */
     LOGI("clear()");
 }
@@ -860,6 +881,7 @@ void setup_ios_ui_bridge(void *viewController, void *haskellCtx)
         g_pool_capacity = INITIAL_POOL_SIZE;
         g_nodes = (__strong UIView **)calloc((size_t)g_pool_capacity, sizeof(UIView *));
         g_content_views = (__strong UIView **)calloc((size_t)g_pool_capacity, sizeof(UIView *));
+        g_free_stack = (int32_t *)calloc((size_t)g_pool_capacity, sizeof(int32_t));
     } else {
         for (int i = 0; i < g_pool_capacity; i++) {
             g_nodes[i] = nil;
@@ -871,6 +893,7 @@ void setup_ios_ui_bridge(void *viewController, void *haskellCtx)
     memset(g_content_views, 0, sizeof(g_content_views));
 #endif
     g_next_node_id = 1;
+    g_free_count = 0;
 
     ui_register_callbacks(&g_ios_callbacks);
     LOGI("iOS UI bridge initialized");

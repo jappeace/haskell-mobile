@@ -13,6 +13,11 @@
 static UIBridgeCallbacks *g_callbacks = NULL;
 static int32_t g_stub_next_id = 1;
 
+/* Stub free stack for ID reclamation (mirrors real platform behaviour) */
+#define STUB_MAX_NODES 256
+static int32_t g_stub_free_stack[STUB_MAX_NODES];
+static int32_t g_stub_free_count = 0;
+
 void ui_register_callbacks(UIBridgeCallbacks *callbacks)
 {
     g_callbacks = callbacks;
@@ -23,7 +28,12 @@ int32_t ui_create_node(int32_t nodeType)
     if (g_callbacks && g_callbacks->createNode) {
         return g_callbacks->createNode(nodeType);
     }
-    int32_t id = g_stub_next_id++;
+    int32_t id;
+    if (g_stub_free_count > 0) {
+        id = g_stub_free_stack[--g_stub_free_count];
+    } else {
+        id = g_stub_next_id++;
+    }
     fprintf(stderr, "[UIBridge stub] createNode(type=%d) -> %d\n", nodeType, id);
     return id;
 }
@@ -94,6 +104,9 @@ void ui_destroy_node(int32_t nodeId)
         return;
     }
     fprintf(stderr, "[UIBridge stub] destroyNode(node=%d)\n", nodeId);
+    if (g_stub_free_count < STUB_MAX_NODES) {
+        g_stub_free_stack[g_stub_free_count++] = nodeId;
+    }
 }
 
 void ui_set_root(int32_t nodeId)
@@ -112,5 +125,6 @@ void ui_clear(void)
         return;
     }
     g_stub_next_id = 1;
+    g_stub_free_count = 0;
     fprintf(stderr, "[UIBridge stub] clear()\n");
 }
