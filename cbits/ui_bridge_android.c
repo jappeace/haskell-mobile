@@ -24,7 +24,9 @@
  *   -DMAX_NODES=N         Override the static pool size (default 256).
  *   -DDYNAMIC_NODE_POOL   Use malloc/realloc; MAX_NODES is ignored.
  *
- * Re-renders clear all nodes, so the pool only bounds a single frame. */
+ * Incremental diffing means nodes persist across frames; the pool bounds
+ * the total live node count.  Destroyed node IDs are reclaimed via a
+ * free stack to avoid exhausting the pool during navigation. */
 #ifdef DYNAMIC_NODE_POOL
   static jobject *g_nodes         = NULL;
   static int32_t  g_pool_capacity = 0;
@@ -36,6 +38,23 @@
   static jobject  g_nodes[MAX_NODES];
 #endif
 static int32_t g_next_node_id = 1;
+
+/* --- Free stack: reclaimed node IDs for reuse ---
+ *
+ * Two-buffer scheme: IDs freed during a render pass go into the
+ * "pending" buffer and are NOT available for reuse until setRoot
+ * flushes them into the main free stack.  This prevents same-pass
+ * ID reuse which would confuse the Haskell diff engine (it uses
+ * node ID equality to detect unchanged nodes). */
+#ifdef DYNAMIC_NODE_POOL
+  static int32_t *g_free_stack   = NULL;
+  static int32_t *g_pending_free = NULL;
+#else
+  static int32_t  g_free_stack[MAX_NODES];
+  static int32_t  g_pending_free[MAX_NODES];
+#endif
+static int32_t g_free_count    = 0;
+static int32_t g_pending_count = 0;
 
 /* Haskell FFI exports (declared here since this file is compiled by NDK) */
 extern void haskellOnUIEvent(void *ctx, int callbackId);
@@ -388,13 +407,20 @@ static int ensure_pool_capacity(int32_t needed)
     int32_t new_cap = g_pool_capacity ? g_pool_capacity : INITIAL_POOL_SIZE;
     while (new_cap <= needed) new_cap *= 2;
     jobject *new_pool = realloc(g_nodes, (size_t)new_cap * sizeof(jobject));
-    if (!new_pool) {
+    int32_t *new_free = realloc(g_free_stack, (size_t)new_cap * sizeof(int32_t));
+    int32_t *new_pend = realloc(g_pending_free, (size_t)new_cap * sizeof(int32_t));
+    if (!new_pool || !new_free || !new_pend) {
         LOGE("Node pool realloc failed (requested %d slots)", new_cap);
+        if (new_pool) g_nodes = new_pool;
+        if (new_free) g_free_stack = new_free;
+        if (new_pend) g_pending_free = new_pend;
         return -1;
     }
     memset(new_pool + g_pool_capacity, 0,
            (size_t)(new_cap - g_pool_capacity) * sizeof(jobject));
     g_nodes = new_pool;
+    g_free_stack = new_free;
+    g_pending_free = new_pend;
     g_pool_capacity = new_cap;
     return 0;
 }
@@ -446,17 +472,20 @@ static jint parse_hex_color(const char *hex)
 
 static int32_t android_create_node(int32_t nodeType)
 {
+    /* Only check capacity when no free IDs are available */
+    if (g_free_count == 0) {
 #ifdef DYNAMIC_NODE_POOL
-    if (ensure_pool_capacity(g_next_node_id) != 0) {
-        LOGE("Node pool exhausted (realloc failed at %d)", g_next_node_id);
-        return 0;
-    }
+        if (ensure_pool_capacity(g_next_node_id) != 0) {
+            LOGE("Node pool exhausted (realloc failed at %d)", g_next_node_id);
+            return 0;
+        }
 #else
-    if (g_next_node_id >= MAX_NODES) {
-        LOGE("Node pool exhausted (max %d)", MAX_NODES);
-        return 0;
-    }
+        if (g_next_node_id >= MAX_NODES) {
+            LOGE("Node pool exhausted (max %d)", MAX_NODES);
+            return 0;
+        }
 #endif
+    }
 
     JNIEnv *env = g_env;
     jobject view = NULL;
@@ -552,7 +581,12 @@ static int32_t android_create_node(int32_t nodeType)
         return 0;
     }
 
-    int32_t nodeId = g_next_node_id++;
+    int32_t nodeId;
+    if (g_free_count > 0) {
+        nodeId = g_free_stack[--g_free_count];
+    } else {
+        nodeId = g_next_node_id++;
+    }
     g_nodes[nodeId] = (*env)->NewGlobalRef(env, view);
     (*env)->DeleteLocalRef(env, view);
 
@@ -971,6 +1005,7 @@ static void android_destroy_node(int32_t nodeId)
 
     (*env)->DeleteGlobalRef(env, view);
     g_nodes[nodeId] = NULL;
+    g_pending_free[g_pending_count++] = nodeId;
 }
 
 static void android_set_root(int32_t nodeId)
@@ -980,6 +1015,13 @@ static void android_set_root(int32_t nodeId)
     if (!view) return;
 
     (*env)->CallVoidMethod(env, g_activity, g_method_setContentView, view);
+
+    /* Flush pending freed IDs into the free stack now that the render
+     * pass is complete.  This prevents same-pass ID reuse. */
+    for (int32_t i = 0; i < g_pending_count; i++)
+        g_free_stack[g_free_count++] = g_pending_free[i];
+    g_pending_count = 0;
+
     LOGI("setRoot(node=%d)", nodeId);
 }
 
@@ -993,6 +1035,8 @@ static void android_clear(void)
         }
     }
     g_next_node_id = 1;
+    g_free_count = 0;
+    g_pending_count = 0;
     /* Dynamic mode: keep the allocation to avoid malloc/free churn each frame.
      * Static mode: nothing extra to do — array is stack-allocated. */
     LOGI("clear()");
@@ -1015,6 +1059,8 @@ void setup_android_ui_bridge(JNIEnv *env, jobject activity, void *haskellCtx)
     if (!g_nodes) {
         g_pool_capacity = INITIAL_POOL_SIZE;
         g_nodes = calloc((size_t)g_pool_capacity, sizeof(jobject));
+        g_free_stack = calloc((size_t)g_pool_capacity, sizeof(int32_t));
+        g_pending_free = calloc((size_t)g_pool_capacity, sizeof(int32_t));
     } else {
         memset(g_nodes, 0, (size_t)g_pool_capacity * sizeof(jobject));
     }
@@ -1022,6 +1068,8 @@ void setup_android_ui_bridge(JNIEnv *env, jobject activity, void *haskellCtx)
     memset(g_nodes, 0, sizeof(g_nodes));
 #endif
     g_next_node_id = 1;
+    g_free_count = 0;
+    g_pending_count = 0;
 
     if (resolve_jni_ids(env, activity) != 0) {
         LOGE("Failed to resolve JNI IDs for UI bridge");

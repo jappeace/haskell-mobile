@@ -12,12 +12,21 @@ class WatchUIBridgeState: ObservableObject {
     @Published var rootNode: WatchUINode?
     var nodes: [Int32: WatchUINode] = [:]
     var nextNodeId: Int32 = 1
+    /// IDs available for reuse (from previous render passes).
+    var freeIds: [Int32] = []
+    /// IDs freed during the current render pass (flushed to freeIds in setRoot).
+    var pendingFreeIds: [Int32] = []
 
     private init() {}
 
     func createNode(nodeType: Int32) -> Int32 {
-        let nodeId = nextNodeId
-        nextNodeId += 1
+        let nodeId: Int32
+        if let reused = freeIds.popLast() {
+            nodeId = reused
+        } else {
+            nodeId = nextNodeId
+            nextNodeId += 1
+        }
         let node = WatchUINode(id: nodeId, nodeType: nodeType)
         nodes[nodeId] = node
         os_log("createNode(type=%d) -> %d", log: bridgeLog, type: .info, nodeType, nodeId)
@@ -112,10 +121,15 @@ class WatchUIBridgeState: ObservableObject {
 
     func destroyNode(nodeId: Int32) {
         nodes.removeValue(forKey: nodeId)
+        pendingFreeIds.append(nodeId)
     }
 
     func setRoot(nodeId: Int32) {
         rootNode = nodes[nodeId]
+        // Flush pending freed IDs into the free list now that the render
+        // pass is complete.  Prevents same-pass ID reuse.
+        freeIds.append(contentsOf: pendingFreeIds)
+        pendingFreeIds.removeAll()
         os_log("setRoot(node=%d)", log: bridgeLog, type: .info, nodeId)
     }
 
@@ -129,6 +143,8 @@ class WatchUIBridgeState: ObservableObject {
         rootNode = nil
         nodes.removeAll()
         nextNodeId = 1
+        freeIds.removeAll()
+        pendingFreeIds.removeAll()
         os_log("clear()", log: bridgeLog, type: .info)
     }
 }
